@@ -42,6 +42,7 @@ export const handler: Handler = async (event) => {
 
     const db = admin();
     let connected = 0;
+    let igConnected = false;
     for (const page of pages.data) {
       await saveAccount(db, state.uid,
         { platform: "facebook", external_id: page.id, username: page.name, display_name: page.name },
@@ -54,9 +55,12 @@ export const handler: Handler = async (event) => {
           { platform: "instagram", external_id: ig.id, username: ig.username ?? page.name, avatar_url: ig.profile_picture_url ?? null },
           { access_token: page.access_token, expires_at: expiresAt, extra: { kind: "ig_business", page_id: page.id } });
         connected++;
+        igConnected = true;
       }
     }
-    return backToApp("connected", connected > 1 ? "meta" : "facebook");
+    // Report Instagram only when an IG business account was actually linked — two
+    // Pages with no Instagram is still just Facebook.
+    return backToApp("connected", igConnected ? "meta" : "facebook");
   } catch (e) {
     return backToApp("error", e instanceof Error ? e.message : "meta_callback_failed");
   }

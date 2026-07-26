@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": false,
+    "rootDir": "../netlify/functions",
+    "outDir": "./build-oauth"
+  },
+  "files": ["../netlify/functions/oauth-meta-callback.ts"]
+}

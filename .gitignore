@@ -6,3 +6,8 @@ dist
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# verification harness build output + captured run logs (sources are tracked)
+verify/build*/
+verify/out-*.txt
+verify/full-log.txt

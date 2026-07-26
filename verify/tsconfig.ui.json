@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": false,
+    "esModuleInterop": true,
+    "rootDir": "../src/lib",
+    "outDir": "./build-ui"
+  },
+  "files": [
+    "../src/lib/api.ts",
+    "../src/lib/analytics.ts",
+    "../src/lib/format.ts"
+  ]
+}

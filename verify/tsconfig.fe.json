@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": false,
+    "esModuleInterop": true,
+    "rootDir": "../src",
+    "outDir": "./build-fe"
+  },
+  "files": [
+    "../src/lib/env.d.ts",
+    "../src/lib/api.ts",
+    "../src/lib/analytics.ts",
+    "../src/lib/snapshot.ts",
+    "../src/lib/reports.ts",
+    "../src/lib/format.ts",
+    "../src/components/charts/LineChart.tsx",
+    "../src/components/charts/Sparkline.tsx",
+    "../src/components/BarList.tsx",
+    "../src/components/StatCard.tsx",
+    "../src/components/Delta.tsx",
+    "../src/components/ReportSheet.tsx"
+  ]
+}

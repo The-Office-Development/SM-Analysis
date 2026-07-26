@@ -21,8 +21,12 @@ export default function LineChart({ series, height = 240, legend = true }: Props
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [hover, setHover] = useState<number | null>(null);
 
-  const visible = series.filter((s) => !hidden.has(s.key));
-  const n = series[0]?.points.length ?? 0;
+  const visible = series.filter((s) => !hidden.has(s.key) && s.points.length > 0);
+  // Series can differ in length (e.g. a Page synced before its linked IG account),
+  // so the axis follows the longest one and every lookup is bounds-checked.
+  const axis = series.reduce<Series | undefined>((a, s) => (!a || s.points.length > a.points.length ? s : a), undefined);
+  const axisPoints = axis?.points ?? [];
+  const n = axisPoints.length;
   const W = Math.max(width, 240);
   const padL = 44, padR = 12, padT = 10, padB = 24;
 
@@ -63,7 +67,7 @@ export default function LineChart({ series, height = 240, legend = true }: Props
           );
         })}
         {/* x labels */}
-        {series[0].points.map((p, i) =>
+        {axisPoints.map((p, i) =>
           i % step === 0 ? (
             <text key={i} x={X(i)} y={height - 7} textAnchor="middle" fontSize={10} fill="var(--muted)">
               {shortDate(p.date)}
@@ -72,8 +76,9 @@ export default function LineChart({ series, height = 240, legend = true }: Props
         )}
         {/* series */}
         {visible.map((s) => {
+          const end = s.points.length - 1;
           const line = s.points.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.value).toFixed(1)}`).join(" ");
-          const area = `${line} L${X(n - 1).toFixed(1)} ${Y(0)} L${X(0).toFixed(1)} ${Y(0)} Z`;
+          const area = `${line} L${X(end).toFixed(1)} ${Y(0)} L${X(0).toFixed(1)} ${Y(0)} Z`;
           const gid = `grad-${s.key}`;
           return (
             <g key={s.key}>
@@ -85,7 +90,7 @@ export default function LineChart({ series, height = 240, legend = true }: Props
               </defs>
               <path d={area} fill={`url(#${gid})`} />
               <path d={line} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-              <circle cx={X(n - 1)} cy={Y(s.points[n - 1].value)} r={3} fill={s.color} stroke="var(--panel)" strokeWidth={2} />
+              <circle cx={X(end)} cy={Y(s.points[end].value)} r={3} fill={s.color} stroke="var(--panel)" strokeWidth={2} />
             </g>
           );
         })}
@@ -93,7 +98,7 @@ export default function LineChart({ series, height = 240, legend = true }: Props
         {hover !== null && (
           <>
             <line x1={X(hover)} x2={X(hover)} y1={padT} y2={height - padB} stroke="var(--border-strong)" strokeWidth={1} />
-            {visible.map((s) => (
+            {visible.map((s) => s.points[hover] && (
               <circle key={s.key} cx={X(hover)} cy={Y(s.points[hover].value)} r={3.4} fill={s.color} stroke="var(--panel)" strokeWidth={2} />
             ))}
           </>
@@ -103,11 +108,11 @@ export default function LineChart({ series, height = 240, legend = true }: Props
       {hover !== null && (
         <div className="tooltip" style={{
           left: `${(X(hover) / W) * 100}%`,
-          top: `${(Y(Math.max(...visible.map((s) => s.points[hover].value))) / height) * 100}%`,
+          top: `${(Y(Math.max(0, ...visible.map((s) => s.points[hover]?.value ?? 0))) / height) * 100}%`,
           opacity: 1,
         }}>
-          <div className="d">{shortDate(series[0].points[hover].date)}</div>
-          {visible.map((s) => (
+          <div className="d">{shortDate((axisPoints[hover] ?? axisPoints[axisPoints.length - 1]).date)}</div>
+          {visible.map((s) => s.points[hover] && (
             <div className="r" key={s.key}>
               <i style={{ background: s.color }} />{s.label}<b>{full(s.points[hover].value)}</b>
             </div>

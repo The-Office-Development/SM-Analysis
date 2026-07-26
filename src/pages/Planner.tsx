@@ -6,7 +6,7 @@ import { PLATFORMS } from "../lib/platforms";
 import { seriesByDay, followersByDay, sum, latest } from "../lib/api";
 import { fetchGoals, createGoal, deleteGoal } from "../lib/api";
 import { activeGrid, bestTimes, anomalies, DOW_SHORT, fmtHour } from "../lib/analytics";
-import { compact } from "../lib/format";
+import { compact, ratioPct } from "../lib/format";
 import EmptyState from "../components/EmptyState";
 import { IcClock, IcTarget, IcAlert, IcSpark, IcPlug, IcCheck, IcUp, IcDown } from "../lib/icons";
 import type { Goal, GoalMetric, Platform, Scope } from "../lib/types";
@@ -132,7 +132,7 @@ export default function Planner() {
           {goalsLoaded && goals.length === 0 && <p className="muted" style={{ fontSize: 13 }}>No goals yet. Set a target below and track your progress toward it.</p>}
           {goals.map((g) => {
             const cur = goalCurrent(g);
-            const pct = Math.min(100, (cur / g.target) * 100);
+            const pct = Math.min(100, ratioPct(cur, g.target));
             const done = cur >= g.target;
             const scopeLabel = g.scope === "all" ? "All platforms" : PLATFORMS[g.scope as Platform].name;
             const mLabel = METRICS.find((m) => m.key === g.metric)?.label ?? g.metric;

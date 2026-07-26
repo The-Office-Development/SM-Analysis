@@ -93,6 +93,11 @@ function ContentInner() {
                   <td><PlatformBadge platform={c.platform} /></td>
                 </tr>
               ))}
+              {sorted.length === 0 && (
+                <tr><td colSpan={COLS.length + 3} className="muted" style={{ textAlign: "center", padding: 24 }}>
+                  No posts synced for this scope yet.
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>

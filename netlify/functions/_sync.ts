@@ -118,11 +118,20 @@ async function syncInstagram(acc: AccountRow, token: string, start: string): Pro
     views: reachByDate[date] ?? 0,
     engagements: engByDate[date] ?? 0,
   }));
-  // If the account-level interactions metric is unavailable, at least make today's
-  // engagements reflect the recent posts we did fetch, so the ER KPI isn't zeroed.
-  const todayRow = days.find((d) => d.date === now);
-  if (todayRow && !todayRow.engagements) {
-    todayRow.engagements = posts.reduce((s, p) => s + p.likes + p.comments + p.shares + p.saves, 0);
+  // If the account-level interactions metric is unavailable (it is permission-gated
+  // and often missing on small accounts), fall back to per-post engagement attributed
+  // to each post's own publish date. Attributing every post's lifetime engagement to
+  // today instead produced engagement rates in the hundreds of percent.
+  if (!Object.keys(engByDate).length) {
+    const byDate: Record<string, number> = {};
+    for (const p of posts) {
+      const d = (p.published_at ?? "").slice(0, 10);
+      if (d) byDate[d] = (byDate[d] ?? 0) + p.likes + p.comments + p.shares + p.saves;
+    }
+    // Only attribute to days Meta also reported reach for, so the engagement-rate
+    // numerator and denominator always span the same days. Otherwise a handful of
+    // reach-bearing days carries the engagement of the whole window.
+    for (const row of days) row.engagements = row.date in reachByDate ? byDate[row.date] ?? 0 : 0;
   }
   return { days, posts };
 }
@@ -288,11 +297,13 @@ function seriesFromInsight(json: any, name: string): Record<string, number> {
 /** Rebuild a cumulative followers series from the current total + daily deltas. */
 function reconstructFollowers(datesAsc: string[], currentTotal: number, deltaByDate: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = {};
-  let running = currentTotal; // total at end of the most recent day
+  let running = Math.max(0, currentTotal); // total at end of the most recent day
   for (let i = datesAsc.length - 1; i >= 0; i--) {
     const d = datesAsc[i];
     out[d] = running;
-    running -= deltaByDate[d] ?? 0; // step back to the previous day's total
+    // `follower_count` reports gross new follows, not net change, so on an account
+    // with unfollows the deltas can exceed the current total. Never step below zero.
+    running = Math.max(0, running - (deltaByDate[d] ?? 0));
   }
   return out;
 }

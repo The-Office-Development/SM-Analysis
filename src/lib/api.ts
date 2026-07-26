@@ -197,14 +197,15 @@ export function momentum(series: { value: number }[]): number {
   const half = Math.floor(series.length / 2);
   const prev = series.slice(0, half).reduce((s, x) => s + x.value, 0);
   const cur = series.slice(series.length - half).reduce((s, x) => s + x.value, 0);
-  return prev ? ((cur - prev) / prev) * 100 : 0;
+  return prev > 0 ? ((cur - prev) / prev) * 100 : 0;
 }
 
 /** Growth of a stock series (last vs first). */
 export function stockDelta(series: { value: number }[]): number {
   if (series.length < 2) return 0;
   const first = series[0].value, last = series[series.length - 1].value;
-  return first ? ((last - first) / first) * 100 : 0;
+  // A zero or negative base makes the percentage meaningless, not just imprecise.
+  return first > 0 ? ((last - first) / first) * 100 : 0;
 }
 
 export function sum(series: { value: number }[]): number {

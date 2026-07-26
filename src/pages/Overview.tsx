@@ -4,7 +4,7 @@ import { PLATFORMS } from "../lib/platforms";
 import {
   seriesByDay, followersByDay, sum, latest, stockDelta, momentum, engagementRate,
 } from "../lib/api";
-import { compact, full, pctPlain, shortDate } from "../lib/format";
+import { compact, full, pctPlain, ratioPct, shortDate } from "../lib/format";
 import type { Platform } from "../lib/types";
 import StatCard from "../components/StatCard";
 import LineChart, { type Series } from "../components/charts/LineChart";
@@ -89,9 +89,9 @@ export default function Overview() {
                   <span className="text-2">{f.k}</span><span className="tnum">{full(f.v)}</span>
                 </div>
                 <div style={{ height: 22, borderRadius: 6, background: "var(--panel-sunk)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${(f.v / fMax) * 100}%`, background: f.c, borderRadius: 6, transition: "width .5s" }} />
+                  <div style={{ height: "100%", width: `${ratioPct(f.v, fMax)}%`, background: f.c, borderRadius: 6, transition: "width .5s" }} />
                 </div>
-                <span className="muted" style={{ fontSize: 11 }}>{i ? `${((f.v / funnel[i - 1].v) * 100 || 0).toFixed(1)}% of previous` : "top of funnel"}</span>
+                <span className="muted" style={{ fontSize: 11 }}>{i ? `${ratioPct(f.v, funnel[i - 1].v).toFixed(1)}% of previous` : "top of funnel"}</span>
               </div>
             ))}
           </div>
@@ -102,7 +102,7 @@ export default function Overview() {
           <div className="panel__body">
             <BarList keyWidth={92} rows={shareRows.map((r) => ({
               key: r.key, label: r.label, value: r.value, color: r.color,
-              display: `${((r.value / shareTotal) * 100).toFixed(0)}%`,
+              display: `${ratioPct(r.value, shareTotal).toFixed(0)}%`,
             }))} />
           </div>
         </section>

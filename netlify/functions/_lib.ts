@@ -49,11 +49,19 @@ export function signState(payload: Record<string, string>): string {
 export function verifyState(state: string | undefined): Record<string, string> | null {
   if (!state || !state.includes(".")) return null;
   const [body, sig] = state.split(".");
+  if (!body || !sig) return null;
   const expect = crypto.createHmac("sha256", env.STATE_SECRET).update(body).digest("base64url");
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expect))) return null;
-  const data = JSON.parse(Buffer.from(body, "base64url").toString());
-  if (Date.now() - Number(data.t) > 15 * 60 * 1000) return null; // 15 min TTL
-  return data;
+  // `sig` is caller-controlled and timingSafeEqual throws on a length mismatch, so
+  // compare lengths first — otherwise a malformed state crashes the OAuth callback.
+  const got = Buffer.from(sig), want = Buffer.from(expect);
+  if (got.length !== want.length || !crypto.timingSafeEqual(got, want)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(body, "base64url").toString());
+    if (Date.now() - Number(data.t) > 15 * 60 * 1000) return null; // 15 min TTL
+    return data;
+  } catch {
+    return null; // body was not valid base64url JSON
+  }
 }
 
 export function redirect(location: string) {
