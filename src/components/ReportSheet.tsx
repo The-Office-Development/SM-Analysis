@@ -25,48 +25,54 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
       </header>
 
       <h4 className="sheet__h">Headline metrics</h4>
-      <table className="data">
-        <thead><tr><th>Metric</th><th className="num">Total</th><th className="num">Trend</th></tr></thead>
-        <tbody>
-          {snap.headline.map((h) => (
-            <tr key={h.label}><td>{h.label}</td><td className="num tnum">{full(h.total)}</td><td className="num">{delta(h.deltaPct)}</td></tr>
-          ))}
-          <tr><td>Engagement rate</td><td className="num tnum">{snap.engagementRate.toFixed(1)}%</td><td className="num muted">—</td></tr>
-        </tbody>
-      </table>
+      <div className="table-wrap">
+        <table className="data">
+          <thead><tr><th>Metric</th><th className="num">Total</th><th className="num">Trend</th></tr></thead>
+          <tbody>
+            {snap.headline.map((h) => (
+              <tr key={h.label}><td>{h.label}</td><td className="num tnum">{full(h.total)}</td><td className="num">{delta(h.deltaPct)}</td></tr>
+            ))}
+            <tr><td>Engagement rate</td><td className="num tnum">{snap.engagementRate.toFixed(1)}%</td><td className="num muted">—</td></tr>
+          </tbody>
+        </table>
+      </div>
 
       <h4 className="sheet__h">By platform</h4>
-      <table className="data">
-        <thead><tr><th>Platform</th><th className="num">Followers</th><th className="num">Reach</th><th className="num">Views</th><th className="num">Engagements</th></tr></thead>
-        <tbody>
-          {snap.platforms.map((p) => (
-            <tr key={p.name}>
-              <td>{p.name}</td>
-              <td className="num tnum">{compact(p.followers)}</td>
-              <td className="num tnum">{compact(p.reach)}</td>
-              <td className="num tnum">{compact(p.views)}</td>
-              <td className="num tnum">{compact(p.engagements)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {snap.top.length > 0 && <>
-        <h4 className="sheet__h">Top content</h4>
+      <div className="table-wrap">
         <table className="data">
-          <thead><tr><th>Post</th><th>Platform</th><th className="num">Views</th><th className="num">Likes</th><th className="num">Comments</th></tr></thead>
+          <thead><tr><th>Platform</th><th className="num">Followers</th><th className="num">Reach</th><th className="num">Views</th><th className="num">Engagements</th></tr></thead>
           <tbody>
-            {snap.top.map((c, i) => (
-              <tr key={i}>
-                <td style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</td>
-                <td>{c.platform}</td>
-                <td className="num tnum">{compact(c.views)}</td>
-                <td className="num tnum">{compact(c.likes)}</td>
-                <td className="num tnum">{compact(c.comments)}</td>
+            {snap.platforms.map((p) => (
+              <tr key={p.name}>
+                <td>{p.name}</td>
+                <td className="num tnum">{compact(p.followers)}</td>
+                <td className="num tnum">{compact(p.reach)}</td>
+                <td className="num tnum">{compact(p.views)}</td>
+                <td className="num tnum">{compact(p.engagements)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {snap.top.length > 0 && <>
+        <h4 className="sheet__h">Top content</h4>
+        <div className="table-wrap">
+          <table className="data">
+            <thead><tr><th>Post</th><th>Platform</th><th className="num">Views</th><th className="num">Likes</th><th className="num">Comments</th></tr></thead>
+            <tbody>
+              {snap.top.map((c, i) => (
+                <tr key={i}>
+                  <td className="cell-clamp">{c.title}</td>
+                  <td>{c.platform}</td>
+                  <td className="num tnum">{compact(c.views)}</td>
+                  <td className="num tnum">{compact(c.likes)}</td>
+                  <td className="num tnum">{compact(c.comments)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>}
 
       <div className="sheet__cols">

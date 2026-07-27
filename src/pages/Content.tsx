@@ -57,7 +57,7 @@ function ContentInner() {
 
       <section className="panel" style={{ marginTop: 16 }}>
         <div className="panel__head"><h3>All content</h3><span className="sub">{items.length} posts · click a column to sort</span></div>
-        <div className="table-wrap">
+        <div className="table-wrap table-wrap--sticky">
           <table className="data">
             <thead>
               <tr>

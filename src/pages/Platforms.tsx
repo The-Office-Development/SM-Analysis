@@ -22,7 +22,9 @@ function PlatformsInner() {
 
   return (
     <>
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))" }}>
+      {/* min() lets the track fall below 300px on a narrow phone instead of
+          overflowing the grid container. */}
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(min(300px,100%),1fr))" }}>
         {platforms.map((p) => {
           const foll = followersByDay(dash.metrics, p);
           const acct = dash.accounts.find((a) => a.platform === p && a.status === "connected");

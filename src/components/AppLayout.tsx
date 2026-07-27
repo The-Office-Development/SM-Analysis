@@ -98,13 +98,16 @@ export default function AppLayout() {
 
       <div className="main">
         <header className="topbar">
-          <button className="navtoggle iconbtn" onClick={() => setNavOpen(true)} aria-label="Open menu"><IcMenu /></button>
-          <h1>{title}</h1>
-          <button className="searchbtn" onClick={() => window.dispatchEvent(new Event("pb-open-cmdk"))} aria-label="Open command palette">
-            <IcSearch /> <span className="sb-label">Search</span> <kbd>⌘K</kbd>
-          </button>
-          <div className="spacer" />
+          <div className="topbar__lead">
+            <button className="navtoggle iconbtn" onClick={() => setNavOpen(true)} aria-label="Open menu"><IcMenu /></button>
+            <h1>{title}</h1>
+            <button className="searchbtn" onClick={() => window.dispatchEvent(new Event("pb-open-cmdk"))} aria-label="Open command palette">
+              <IcSearch /> <span className="sb-label">Search</span> <kbd>⌘K</kbd>
+            </button>
+            <div className="spacer" />
+          </div>
 
+          <div className="topbar__tools">
           <div className="seg" role="group" aria-label="Date range">
             {[7, 30, 90].map((r) => (
               <button key={r} aria-pressed={dash.range === r} onClick={() => dash.setRange(r as Range)}>{r}D</button>
@@ -136,8 +139,9 @@ export default function AppLayout() {
           <button className="btn btn--sm" onClick={() => dash.sync()} disabled={dash.syncing || dash.connectedPlatforms.length === 0}>
             <IcRefresh className={dash.syncing ? "spin" : ""} /> {dash.syncing ? "Syncing" : "Sync"}
           </button>
-          <button className="iconbtn" title="Export CSV" onClick={() => exportCsv(dash)} disabled={!dash.hasData}><IcDownload /></button>
-          <ThemeToggle />
+          <button className="iconbtn" title="Export CSV" aria-label="Export CSV" onClick={() => exportCsv(dash)} disabled={!dash.hasData}><IcDownload /></button>
+            <ThemeToggle />
+          </div>
         </header>
 
         <main className="content">

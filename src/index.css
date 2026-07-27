@@ -105,6 +105,11 @@ body{
   font-family:var(--font);font-size:14px;line-height:1.5;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
   font-feature-settings:"cv05","ss01";
+  /* A stray wide child must never scroll the page itself; the scroll belongs to
+     the specific region that overflows (.table-wrap, .heat-wrap, .topbar__tools). */
+  overflow-x:hidden;
+  /* Stop iOS/Android rotating or zooming from rescaling type unpredictably. */
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;
 }
 h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.014em;color:var(--text)}
 a{color:inherit;text-decoration:none}
@@ -179,9 +184,9 @@ input,select{font:inherit}
 .delta--pos{color:var(--pos)} .delta--neg{color:var(--neg)} .delta--flat{color:var(--muted)}
 
 /* ------------------------------ tables ---------------------------------- */
-.table-wrap{overflow-x:auto}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 table.data{width:100%;border-collapse:collapse;font-size:13px}
-table.data th{position:sticky;top:0;background:var(--panel);text-align:left;font-size:11px;font-weight:600;
+table.data th{position:sticky;top:0;z-index:2;background:var(--panel);text-align:left;font-size:11px;font-weight:600;
   letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:10px 14px;
   border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 table.data th.num,table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
@@ -190,6 +195,19 @@ table.data th .arrow{opacity:.6;font-size:10px}
 table.data td{padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
 table.data tbody tr:last-child td{border-bottom:none}
 table.data tbody tr:hover{background:var(--panel-sunk)}
+/* Long free-text cells (post titles) truncate instead of widening the table. */
+.cell-clamp{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Opt-in: pin the first column so a wide table keeps its row label in view
+   while the numeric columns scroll under it. */
+.table-wrap--sticky table.data th:first-child,
+.table-wrap--sticky table.data td:first-child{
+  position:sticky;left:0;background:var(--panel);
+  /* hairline that reads as an edge once the row scrolls beneath it */
+  box-shadow:1px 0 0 var(--border);
+}
+.table-wrap--sticky table.data th:first-child{z-index:3}
+.table-wrap--sticky table.data tbody tr:hover td:first-child{background:var(--panel-sunk)}
 
 /* utility layout */
 .stack{display:flex;flex-direction:column}
@@ -197,3 +215,31 @@ table.data tbody tr:hover{background:var(--panel-sunk)}
 .grid{display:grid;gap:14px}
 .muted{color:var(--muted)}
 .text-2{color:var(--text-2)}
+/* Media never widens its container. */
+img,svg,video,canvas{max-width:100%}
+
+/* ==========================================================================
+   Touch + small-screen base
+   The desktop UI is deliberately dense. On touch we trade a little of that
+   density for reliable hit areas, and on narrow screens we stop iOS zooming
+   the page when a control is focused.
+   ========================================================================== */
+
+/* iOS Safari zooms the viewport when a focused field is under 16px. Applied by
+   width rather than pointer type so desktop stays dense on touch laptops. */
+@media (max-width:820px){
+  .input,input,select,textarea{font-size:16px}
+  .goalform .input{font-size:16px}
+  /* Keep the visual scale by trimming padding rather than shrinking type. */
+  .input{height:42px}
+}
+
+@media (pointer:coarse) and (max-width:820px){
+  .btn{min-height:40px;padding:0 14px}
+  .btn--sm{min-height:36px;padding:0 12px}
+  .iconbtn{width:40px;height:40px}
+  .seg button{min-height:34px;padding:0 13px}
+  /* Inline row actions (e.g. Disconnect) sit inside dense text rows. */
+  .btn--sm.btn--danger{min-height:32px}
+  table.data th,table.data td{padding-top:13px;padding-bottom:13px}
+}

@@ -109,18 +109,22 @@ function AudienceInner() {
         <div className="panel__body">
           {hasHeat ? (
             <>
-              <div className="heat">
-                <span />
-                {Array.from({ length: 24 }, (_, h) => <span className="hh" key={h}>{h % 3 === 0 ? (h % 12 || 12) : ""}</span>)}
-                {heat.map((row, d) => (
-                  <Fragment key={d}>
-                    <span className="lbl">{DOW[d]}</span>
-                    {row.map((v, h) => (
-                      <span className="cell" key={`${d}-${h}`} title={`${DOW[d]} ${(h % 12) || 12}${h < 12 ? "am" : "pm"} · ${((v / hMax) * 100).toFixed(0)}% of peak`}
-                        style={{ opacity: 0.12 + (v / hMax) * 0.88 }} />
-                    ))}
-                  </Fragment>
-                ))}
+              {/* 25 columns never fit a phone legibly — scroll it rather than
+                  shrink the cells into an unreadable smear. */}
+              <div className="heat-wrap">
+                <div className="heat">
+                  <span />
+                  {Array.from({ length: 24 }, (_, h) => <span className="hh" key={h}>{h % 3 === 0 ? (h % 12 || 12) : ""}</span>)}
+                  {heat.map((row, d) => (
+                    <Fragment key={d}>
+                      <span className="lbl">{DOW[d]}</span>
+                      {row.map((v, h) => (
+                        <span className="cell" key={`${d}-${h}`} title={`${DOW[d]} ${(h % 12) || 12}${h < 12 ? "am" : "pm"} · ${((v / hMax) * 100).toFixed(0)}% of peak`}
+                          style={{ opacity: 0.12 + (v / hMax) * 0.88 }} />
+                      ))}
+                    </Fragment>
+                  ))}
+                </div>
               </div>
               <div className="heatscale">Less<i style={{ opacity: 0.2 }} /><i style={{ opacity: 0.5 }} /><i style={{ opacity: 0.75 }} /><i style={{ opacity: 1 }} />More</div>
             </>

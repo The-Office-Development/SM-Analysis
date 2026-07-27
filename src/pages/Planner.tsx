@@ -69,18 +69,22 @@ export default function Planner() {
         <div className="panel__body">
           {gridMax > 0 ? (
             <>
-              <div className="heat">
-                <div />
-                {Array.from({ length: 24 }).map((_, h) => <div key={h} className="hh">{h % 6 === 0 ? fmtHour(h) : ""}</div>)}
-                {DOW_SHORT.map((d, di) => (
-                  <Fragment key={d}>
-                    <div className="lbl">{d}</div>
-                    {grid[di].map((v, hi) => (
-                      <div key={hi} className="cell" title={`${d} ${fmtHour(hi)}`}
-                        style={{ opacity: gridMax ? Math.max(0.05, v / gridMax) : 0.05 }} />
-                    ))}
-                  </Fragment>
-                ))}
+              {/* 25 columns never fit a phone legibly — scroll it rather than
+                  shrink the cells into an unreadable smear. */}
+              <div className="heat-wrap">
+                <div className="heat">
+                  <div />
+                  {Array.from({ length: 24 }).map((_, h) => <div key={h} className="hh">{h % 6 === 0 ? fmtHour(h) : ""}</div>)}
+                  {DOW_SHORT.map((d, di) => (
+                    <Fragment key={d}>
+                      <div className="lbl">{d}</div>
+                      {grid[di].map((v, hi) => (
+                        <div key={hi} className="cell" title={`${d} ${fmtHour(hi)}`}
+                          style={{ opacity: gridMax ? Math.max(0.05, v / gridMax) : 0.05 }} />
+                      ))}
+                    </Fragment>
+                  ))}
+                </div>
               </div>
               <div className="heatscale"><span>Quieter</span><i style={{ opacity: .15 }} /><i style={{ opacity: .45 }} /><i style={{ opacity: .8 }} /><i /><span>Peak</span></div>
             </>
