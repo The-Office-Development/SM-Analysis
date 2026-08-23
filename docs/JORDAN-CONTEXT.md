@@ -23,6 +23,16 @@ D2 shifts a day only when the account's UTC offset is **≤ 0**. Re-running
 ### Amman, incremental (cron path)   rows wrong: 0/1
 ```
 
+> **Caveat added after the Meta API review — this result covers the *daily insights* path only.**
+> The Meta audit finds evidence that Instagram and Facebook use *different* day boundaries: Facebook
+> follows the Page's own timezone, while Instagram's `online_followers` hour keys appear to be in a
+> **fixed Pacific time**, not account-local. If that holds, the best-time-to-post defect (D3) is
+> **not** resolved by Jordan's +3 offset — an Amman account's heatmap would be shifted by ~10 hours
+> regardless — and a naive "convert everything to account timezone" fix would make Instagram rows
+> newly wrong. This is the single highest-priority item to verify against a real Graph API response
+> before any timezone fix is written. Treat section 1's clean result as applying to `reach` /
+> `impressions` / `follower_count` day series, not yet to the Planner.
+
 **The condition is the account's timezone as configured on the platform, not where the company or
 the client sits.** That means:
 
