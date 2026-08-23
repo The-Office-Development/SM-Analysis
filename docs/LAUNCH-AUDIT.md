@@ -14,6 +14,12 @@ of connected accounts.
 Severity key: **P0** blocks launch · **P1** must ship before real accounts connect ·
 **P2** required before scale · **P3** hardening.
 
+> **See also [`DATA-INTEGRITY.md`](DATA-INTEGRITY.md)** — a separate class of defect found in a
+> later pass and proven numerically in [`verify/proofs/`](../verify/proofs/): once the integration
+> is fixed and running, the numbers it stores are still wrong. Three further P0s live there
+> (days frozen at ~6 hours of data, every day filed under the wrong date for US accounts, and
+> "best time to post" naming the wrong day).
+
 ---
 
 ## P0 — the integration cannot work today
