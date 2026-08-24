@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 
 const SYNC = "verify/build/_sync.js";
 const LIB = "verify/build/_lib.js";
+const TOKENS = "verify/build/_tokens.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -40,11 +41,20 @@ const mutations = [
   { name: "auth errors classified by message text again", file: LIB,
     find: "return e instanceof GraphError && e.code !== undefined && AUTH_CODES.has(e.code);",
     replace: "return e instanceof GraphError && /token|expired|oauth|session/i.test(e.message);" },
+  { name: "rotated refresh token discarded", file: TOKENS,
+    find: "refresh_token: body.refresh_token ? encryptToken(body.refresh_token) : id.refresh_token,",
+    replace: "refresh_token: id.refresh_token," },
+  { name: "refresh lock removed (concurrent refresh kills the token)", file: TOKENS,
+    find: "if (!(await acquireRefreshLock(db, id.id)))\n        return \"locked\";",
+    replace: "if (false)\n        return \"locked\";" },
+  { name: "TikTok and Meta share one refresh window", file: TOKENS,
+    find: "const window = id.provider === \"tiktok\" ? RENEW_WITHIN_MS_TIKTOK : RENEW_WITHIN_MS;",
+    replace: "const window = RENEW_WITHIN_MS;" },
 ];
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

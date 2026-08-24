@@ -23,6 +23,24 @@ export function makeDb(seed = {}) {
       gte(c, v) { preds.push((r) => r[c] >= v); return api; },
       lte(c, v) { preds.push((r) => r[c] <= v); return api; },
       order(c, o = {}) { api._order = { c, asc: o.ascending !== false }; return api; },
+      /** Minimal PostgREST `or` support: "col.is.null,col.lt.value" (OR of terms). */
+      or(expr) {
+        const terms = String(expr).split(",").map((t) => {
+          const [col, op, ...rest] = t.split(".");
+          const val = rest.join(".");
+          if (op === "is" && val === "null") return (r) => r[col] === null || r[col] === undefined;
+          if (op === "lt") return (r) => r[col] != null && r[col] < val;
+          if (op === "eq") return (r) => String(r[col]) === val;
+          return () => false;
+        });
+        preds.push((r) => terms.some((t) => t(r)));
+        return api;
+      },
+      not(col, op, val) {
+        if (op === "is" && (val === null || val === "null")) preds.push((r) => r[col] !== null && r[col] !== undefined);
+        else preds.push((r) => r[col] !== val);
+        return api;
+      },
       limit(n) { api._limit = n; return api; },
       _apply() {
         let out = rows.filter((r) => preds.every((p) => p(r)));
@@ -36,8 +54,13 @@ export function makeDb(seed = {}) {
           return { data: null, error: null };
         }
         if (api._mutation?.type === "update") {
-          for (const r of rowsOf(table)) if (preds.every((p) => p(r))) Object.assign(r, api._mutation.patch);
-          return { data: null, error: null };
+          // Return the rows actually changed, as PostgREST does with ?select= —
+          // this is what makes a conditional update usable as a lock.
+          const changed = [];
+          for (const r of rowsOf(table)) {
+            if (preds.every((p) => p(r))) { Object.assign(r, api._mutation.patch); changed.push({ ...r }); }
+          }
+          return { data: changed, error: null };
         }
         return { data: api._apply(), error: null };
       },
