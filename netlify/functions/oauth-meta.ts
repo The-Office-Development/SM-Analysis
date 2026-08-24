@@ -1,33 +1,53 @@
 import type { Handler } from "@netlify/functions";
-import { env, userIdFromToken, signState, redirect, backToApp } from "./_lib";
+import { env, userIdFromToken, signState, newNonce, setNonceCookie, redirect, backToApp, GRAPH_VERSION, log } from "./_lib";
 
 /**
  * Starts the Meta (Facebook + Instagram) OAuth flow.
- * GET /api/oauth-meta?token=<supabase access token>
+ * POST /api/oauth-meta   body { token: <supabase access token> }  -> { url }
+ *
+ * The Supabase token is POSTed rather than placed in the URL: as a query
+ * parameter it lands in browser history, in Netlify's request logs, and in any
+ * TLS-terminating proxy along the way, and it is a live session for this tenant.
  */
 export const handler: Handler = async (event) => {
-  const token = event.queryStringParameters?.token;
-  const userId = await userIdFromToken(token);
+  if (event.httpMethod !== "POST") return { statusCode: 405, body: "Use POST." };
+
+  let token: string | undefined;
+  try { token = JSON.parse(event.body || "{}").token; } catch { /* handled below */ }
+
+  const userId = await userIdFromToken(token ?? event.headers.authorization);
   if (!userId) return backToApp("error", "not_signed_in");
   if (!env.META_APP_ID) return backToApp("error", "meta_not_configured");
 
   const redirectUri = `${env.SITE_URL}/api/oauth-meta-callback`;
+
+  // Read-only scopes only. `business_management` is write-capable and nothing in
+  // the sync uses it; requesting it would turn a token leak from a data exposure
+  // into business-asset compromise across the client's Meta estate.
+  // `public_profile` is granted by default and does not need requesting.
   const scope = [
-    "public_profile",
     "pages_show_list",
     "pages_read_engagement",
     "read_insights",
     "instagram_basic",
     "instagram_manage_insights",
-    "business_management",
   ].join(",");
 
-  const url = new URL("https://www.facebook.com/v19.0/dialog/oauth");
+  const nonce = newNonce();
+  const url = new URL(`https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`);
   url.searchParams.set("client_id", env.META_APP_ID);
   url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("state", signState({ uid: userId, provider: "meta" }));
+  url.searchParams.set("state", signState({ uid: userId, provider: "meta", n: nonce }));
   url.searchParams.set("scope", scope);
   url.searchParams.set("response_type", "code");
 
-  return redirect(url.toString());
+  log("oauth.start", { provider: "meta", uid: userId });
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json", "Set-Cookie": setNonceCookie(nonce) },
+    body: JSON.stringify({ url: url.toString() }),
+  };
 };
+
+/** Kept so an accidental GET does not silently 404 into the SPA fallback. */
+export const _redirectHelper = redirect;
