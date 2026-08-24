@@ -57,6 +57,9 @@ const mutations = [
   { name: "deletion acknowledges without deleting", file: DELETION,
     find: "await db.from(\"account_secrets\").delete().eq(\"account_id\", a.id);",
     replace: "" },
+  { name: "deploy previews allowed to touch the production database", file: LIB,
+    find: "if ((context === \"deploy-preview\" || context === \"branch-deploy\") && !process.env.ALLOW_NONPROD_DB) {",
+    replace: "if (false) {" },
 ];
 
 function runSuite() {

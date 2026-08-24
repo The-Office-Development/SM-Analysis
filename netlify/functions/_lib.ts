@@ -72,6 +72,16 @@ export function admin(): Db {
   if (!env.SUPABASE_URL || !env.SERVICE_ROLE) {
     throw new Error("Supabase service credentials are not configured.");
   }
+  // Netlify environment variables are global by default, so a Deploy Preview
+  // runs with the production service-role key against the production database.
+  // Refuse, unless the deployment has been given its own database deliberately.
+  const context = process.env.CONTEXT;
+  if ((context === "deploy-preview" || context === "branch-deploy") && !process.env.ALLOW_NONPROD_DB) {
+    throw new Error(
+      `Refusing to use these Supabase credentials from a ${context} deployment. ` +
+      "Scope the production keys to the production context, or set ALLOW_NONPROD_DB after pointing this context at a non-production database."
+    );
+  }
   return createClient(env.SUPABASE_URL, env.SERVICE_ROLE, {
     db: { schema: "pulseboard" }, // PulseBoard tables live in their own schema
     auth: { autoRefreshToken: false, persistSession: false },

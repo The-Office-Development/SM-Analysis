@@ -108,3 +108,30 @@ test("logging never emits token material", () => {
   assert.ok(!lines.join("").includes("SECRET"), "token material leaked into logs");
   assert.ok(lines.join("").includes("acc-1"), "non-sensitive fields still logged");
 });
+
+/* ---- deploy-preview credential guard ------------------------------------ */
+
+test("a deploy preview refuses to use production database credentials", async () => {
+  // Netlify env vars are global by default, so a preview build otherwise runs
+  // with the production service-role key against production data.
+  const saved = { ctx: process.env.CONTEXT, allow: process.env.ALLOW_NONPROD_DB,
+                  url: process.env.VITE_SUPABASE_URL, key: process.env.SUPABASE_SERVICE_ROLE_KEY };
+  process.env.VITE_SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+  delete process.env.ALLOW_NONPROD_DB;
+  const fresh = await import(`../build/_lib.js?ctx=${Date.now()}`);
+  try {
+    process.env.CONTEXT = "deploy-preview";
+    assert.throws(() => fresh.admin(), /Refusing to use these Supabase credentials/);
+    process.env.CONTEXT = "branch-deploy";
+    assert.throws(() => fresh.admin(), /Refusing/);
+    process.env.ALLOW_NONPROD_DB = "1";
+    assert.doesNotThrow(() => fresh.admin(), "an explicitly-configured non-prod database is allowed");
+    process.env.CONTEXT = "production";
+    delete process.env.ALLOW_NONPROD_DB;
+    assert.doesNotThrow(() => fresh.admin(), "production is unaffected");
+  } finally {
+    process.env.CONTEXT = saved.ctx; process.env.ALLOW_NONPROD_DB = saved.allow;
+    process.env.VITE_SUPABASE_URL = saved.url; process.env.SUPABASE_SERVICE_ROLE_KEY = saved.key;
+  }
+});
