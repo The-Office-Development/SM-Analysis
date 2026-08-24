@@ -7,6 +7,24 @@
 [functions]
   node_bundler = "esbuild"
 
+# Security headers. None were set at all: no CSP, no HSTS, no nosniff, and no
+# referrer policy on a site that holds platform credentials.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+# Public report pages are shared deliberately; they should not be indexed.
+[[headers]]
+  for = "/r/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
 # SPA fallback — let the React router handle client-side routes,
 # but never swallow the serverless function paths.
 [[redirects]]

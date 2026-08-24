@@ -18,11 +18,15 @@ export interface MetricPoint {
   account_id: string;
   platform: Platform;
   date: string; // YYYY-MM-DD
-  followers: number;
-  reach: number;
-  impressions: number;
-  views: number;
-  engagements: number;
+  // null means the platform did not report this metric for this day. It is NOT
+  // zero, and it must never be rendered or summed as if it were.
+  followers: number | null;
+  reach: number | null;
+  impressions: number | null;
+  views: number | null;
+  engagements: number | null;
+  /** The day is still settling; treat it as incomplete, not as a decline. */
+  provisional?: boolean;
 }
 
 export interface ContentItem {

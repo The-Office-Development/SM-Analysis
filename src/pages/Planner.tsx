@@ -5,7 +5,7 @@ import { useToast } from "../context/ToastContext";
 import { PLATFORMS } from "../lib/platforms";
 import { seriesByDay, followersByDay, sum, latest } from "../lib/api";
 import { fetchGoals, createGoal, deleteGoal } from "../lib/api";
-import { activeGrid, bestTimes, anomalies, DOW_SHORT, fmtHour } from "../lib/analytics";
+import { activeGrid, bestTimes, anomalies, DOW_SHORT, fmtHour, BEST_TIME_NOTE } from "../lib/analytics";
 import { compact, ratioPct } from "../lib/format";
 import EmptyState from "../components/EmptyState";
 import { IcClock, IcTarget, IcAlert, IcSpark, IcPlug, IcCheck, IcUp, IcDown } from "../lib/icons";
@@ -65,7 +65,7 @@ export default function Planner() {
     <div className="dash">
       {/* -------- best time to post -------- */}
       <section className="panel col-2">
-        <div className="panel__head"><IcClock style={{ width: 16, height: 16, color: "var(--text-2)" }} /><h3>Best time to post</h3><span className="sub">when your audience is online</span></div>
+        <div className="panel__head"><IcClock style={{ width: 16, height: 16, color: "var(--text-2)" }} /><h3>Best time to post</h3><span className="sub" title={BEST_TIME_NOTE}>when your audience is online · platform timezone</span></div>
         <div className="panel__body">
           {gridMax > 0 ? (
             <>

@@ -99,7 +99,7 @@ export const demoContent: ContentItem[] = (() => {
     const last = demoMetrics.filter((m) => m.account_id === a.id).at(-1)!;
     TITLES[a.platform].forEach((title, i) => {
       const viral = r() > 0.8 ? 2.2 + r() * 3 : 0.5 + r() * 1.1;
-      const views = Math.round(last.reach * viral * (a.platform === "tiktok" ? 1.6 : 1));
+      const views = Math.round((last.reach ?? 0) * viral * (a.platform === "tiktok" ? 1.6 : 1));
       const er = a.er * (0.5 + r() * 1.6);
       const eng = Math.round((views * er) / 100);
       const isVideo = a.platform !== "facebook" && r() > 0.35;

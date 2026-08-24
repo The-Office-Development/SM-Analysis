@@ -3,7 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { useDemo } from "../context/DemoContext";
 import { useToast } from "../context/ToastContext";
-import { supabase, isConfigured } from "../lib/supabase";
+import { isConfigured } from "../lib/supabase";
+import { startOAuth, disconnectAccount } from "../lib/api";
 import { PLATFORMS, PLATFORM_ORDER, PLATFORM_FILL } from "../lib/platforms";
 import { SETUP_GUIDES, redirectUri } from "../lib/setupGuides";
 import { formatDistanceToNow } from "date-fns";
@@ -38,19 +39,28 @@ export default function Connections() {
     if (demo) { toast("This is a preview. Real accounts connect here once the app is set up."); return; }
     if (!isConfigured) { toast("Configure Supabase first (see README)."); return; }
     setConnecting(platform);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { toast("Please sign in again."); setConnecting(null); return; }
-    // Meta OAuth covers both Facebook Pages and their linked Instagram accounts.
-    const fn = platform === "tiktok" ? "oauth-tiktok" : "oauth-meta";
-    window.location.href = `/api/${fn}?token=${encodeURIComponent(session.access_token)}`;
+    try {
+      // Meta OAuth covers both Facebook Pages and their linked Instagram accounts.
+      // The server mints the URL and sets the state cookie; the session token is
+      // POSTed rather than placed in a URL where it would land in history and logs.
+      window.location.href = await startOAuth(platform === "tiktok" ? "tiktok" : "meta");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not start the connection.");
+      setConnecting(null);
+    }
   }
 
   async function disconnect(id: string, name: string) {
     if (demo) { toast("Preview mode: disconnecting is disabled."); return; }
-    if (!confirm(`Disconnect ${name}? Historical data is kept; syncing stops.`)) return;
-    const { error } = await supabase.from("social_accounts").update({ status: "revoked" }).eq("id", id);
-    if (error) toast(error.message);
-    else { toast(`${name} disconnected.`); void dash.refresh(); }
+    if (!confirm(
+      `Disconnect ${name}?\n\nThis revokes PulseBoard's access at the platform and permanently deletes the metrics, posts and audience data we hold for this account. It cannot be undone.`
+    )) return;
+    try {
+      toast(await disconnectAccount(id));
+      void dash.refresh();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not disconnect.");
+    }
   }
 
   const connectedByPlatform = (p: Platform) => dash.accounts.filter((a) => a.platform === p && a.status !== "revoked");
@@ -61,7 +71,7 @@ export default function Connections() {
         <IcAlert />
         <div className="bt">
           <b>Live data needs approved platform apps.</b>
-          <p>Connections use official OAuth. Until your Meta and TikTok developer apps pass review and the backend keys are set, the connect buttons will return an auth error — that’s expected. See the README for the full setup.</p>
+          <p>Connections use official read-only OAuth: PulseBoard never sees your password, and you can revoke access at any time from the platform's own settings. Until the developer apps pass review, only accounts added as testers can connect. See the README for setup.</p>
         </div>
       </div>
 

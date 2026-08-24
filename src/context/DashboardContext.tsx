@@ -41,7 +41,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const [acc, met, con, aud] = await Promise.all([
-        fetchAccounts(), fetchMetrics(r), fetchContent(), fetchAudience(),
+        fetchAccounts(), fetchMetrics(r), fetchContent(r), fetchAudience(),
       ]);
       setAccounts(acc);
       setMetrics(met);

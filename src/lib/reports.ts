@@ -7,13 +7,26 @@ type Dash = ReturnType<typeof useDash>;
 export function download(name: string, content: string | Blob, type = "text/csv;charset=utf-8") {
   const blob = content instanceof Blob ? content : new Blob([content], { type });
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  const href = URL.createObjectURL(blob);
+  a.href = href;
   a.download = name;
   a.click();
-  URL.revokeObjectURL(a.href);
+  // Revoking synchronously can race the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(href), 30_000);
 }
 
-const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
+/**
+ * Quote a CSV field AND neutralise spreadsheet formula injection.
+ *
+ * Quoting alone does not stop Excel or Google Sheets evaluating a field that
+ * begins with = + - @ tab or CR. Post titles come from platform captions, and
+ * these exports get emailed to sponsors, so the blast radius is the client's
+ * commercial contacts rather than the client.
+ */
+const esc = (s: string) => {
+  const v = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return `"${v.replace(/"/g, '""')}"`;
+};
 
 /** Build a CSV of the current dashboard scope/window from real synced data. */
 export function buildCsv(dash: Dash): string {
@@ -36,7 +49,7 @@ export function buildCsv(dash: Dash): string {
   rows.push("Content,Platform,Type,Published,Views,Likes,Comments,Shares,Saves");
   for (const c of dash.content.slice(0, 200)) {
     rows.push([
-      esc(c.title), PLATFORMS[c.platform].name, c.media_type, c.published_at.slice(0, 10),
+      esc(c.title), esc(PLATFORMS[c.platform].name), esc(c.media_type), c.published_at.slice(0, 10),
       c.views, c.likes, c.comments, c.shares, c.saves,
     ].join(","));
   }

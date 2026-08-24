@@ -26,32 +26,47 @@ export async function fetchAccounts(): Promise<SocialAccount[]> {
 
 export async function fetchMetrics(range: Range): Promise<MetricPoint[]> {
   if (isDemoMode()) return demoMetricsInRange(range);
+  // Ordered DESC with an explicit limit: PostgREST caps a limitless query at
+  // 1000 rows, and ascending order meant the cap silently discarded the NEWEST
+  // days — a multi-account dashboard simply stopped a week short.
   const { data, error } = await supabase
     .from("metrics_daily")
-    .select("account_id,platform,date,followers,reach,impressions,views,engagements")
+    .select("account_id,platform,date,followers,reach,impressions,views,engagements,provisional")
     .gte("date", isoDaysAgo(range))
-    .order("date", { ascending: true });
+    .order("date", { ascending: false })
+    .limit(20000);
   if (error) throw error;
-  return (data ?? []) as MetricPoint[];
+  return ((data ?? []) as MetricPoint[]).slice().reverse();
 }
 
-export async function fetchContent(): Promise<ContentItem[]> {
+/**
+ * Content published inside the selected window.
+ *
+ * This used to take the top 200 posts of ALL TIME with no date predicate, so a
+ * report headed "last 7 days" could be led by a post from last year — in the
+ * dashboard, the CSV, the shared report and the AI summary alike.
+ */
+export async function fetchContent(range: Range): Promise<ContentItem[]> {
   if (isDemoMode()) return demoContent;
   const { data, error } = await supabase
     .from("content")
     .select("*")
+    .gte("published_at", isoDaysAgo(range))
     .order("views", { ascending: false })
-    .limit(200);
+    .limit(500);
   if (error) throw error;
   return (data ?? []) as ContentItem[];
 }
 
 export async function fetchAudience(): Promise<AudienceSnapshot[]> {
   if (isDemoMode()) return demoAudience;
+  // Only the most recent snapshot per account is meaningful; summing a year of
+  // daily snapshots inflates the heatmap without changing its shape.
   const { data, error } = await supabase
     .from("audience_snapshots")
     .select("*")
-    .order("captured_on", { ascending: false });
+    .order("captured_on", { ascending: false })
+    .limit(50);
   if (error) throw error;
   return (data ?? []) as AudienceSnapshot[];
 }
@@ -112,6 +127,34 @@ export async function fetchShare(slug: string): Promise<unknown> {
   return body.snapshot;
 }
 
+/** Begin a platform OAuth flow. The session token is POSTed, never put in a URL. */
+export async function startOAuth(provider: "meta" | "tiktok"): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not signed in.");
+  const res = await fetch(`/api/oauth-${provider}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token: session.access_token }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.url) throw new Error(body.message || "Could not start the connection.");
+  return body.url as string;
+}
+
+/** Revoke at the platform, delete the stored token, and purge the account's data. */
+export async function disconnectAccount(accountId: string): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not signed in.");
+  const res = await fetch("/api/disconnect", {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ account_id: accountId }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message || "Could not disconnect.");
+  return body.message as string;
+}
+
 /** Kicks off a server-side sync (Netlify function) for the signed-in user. */
 export async function triggerSync(): Promise<{ ok: boolean; message: string }> {
   if (isDemoMode()) return { ok: false, message: "Preview mode: connect a real account after setup to sync live data." };
@@ -154,13 +197,19 @@ function scoped(rows: MetricPoint[], scope: Scope): MetricPoint[] {
   return scope === "all" ? rows : rows.filter((r) => r.platform === scope);
 }
 
-/** Sum a flow metric per day across the scoped platforms -> [{date, value}]. */
+/**
+ * Sum a flow metric per day across the scoped platforms -> [{date, value}].
+ * Days where no scoped account reported the metric are omitted entirely rather
+ * than emitted as zero, so an unreported day is not drawn as a crash.
+ */
 export function seriesByDay(
   rows: MetricPoint[], scope: Scope, key: MetricKey
 ): { date: string; value: number }[] {
   const map = new Map<string, number>();
   for (const r of scoped(rows, scope)) {
-    map.set(r.date, (map.get(r.date) ?? 0) + (r[key] ?? 0));
+    const v = r[key];
+    if (v === null || v === undefined) continue;
+    map.set(r.date, (map.get(r.date) ?? 0) + v);
   }
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, value]) => ({ date, value }));
 }
@@ -171,6 +220,7 @@ export function followersByDay(
 ): { date: string; value: number }[] {
   const byDate = new Map<string, Map<string, number>>();
   for (const r of scoped(rows, scope)) {
+    if (r.followers === null || r.followers === undefined) continue;
     if (!byDate.has(r.date)) byDate.set(r.date, new Map());
     byDate.get(r.date)!.set(r.account_id, r.followers);
   }
@@ -217,8 +267,10 @@ export function latest(series: { value: number }[]): number {
 
 /** Weighted engagement rate = engagements / reach over the window. */
 export function engagementRate(rows: MetricPoint[], scope: Scope): number {
-  const s = scoped(rows, scope);
-  const eng = s.reduce((a, r) => a + r.engagements, 0);
-  const reach = s.reduce((a, r) => a + r.reach, 0);
+  // Only days that reported BOTH sides count, so the ratio never divides an
+  // engagement total by a reach total measured over a different set of days.
+  const s = scoped(rows, scope).filter((r) => r.engagements !== null && r.reach !== null);
+  const eng = s.reduce((a, r) => a + (r.engagements ?? 0), 0);
+  const reach = s.reduce((a, r) => a + (r.reach ?? 0), 0);
   return reach ? (eng / reach) * 100 : 0;
 }

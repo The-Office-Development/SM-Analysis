@@ -26,6 +26,16 @@ export function activeGrid(audience: AudienceSnapshot[], platforms: Platform[]):
 
 export interface BestWindow { day: number; hour: number; score: number; label: string; }
 
+/**
+ * Which timezone the posting-window hours are expressed in is set by the
+ * platform, not by us, and has not been confirmed for Instagram. Until it is,
+ * every recommendation must be shown with this caveat rather than implying the
+ * viewer's local time — a "best time" that is silently hours out is advice a
+ * client will act on.
+ */
+export const BEST_TIME_NOTE =
+  "Hours are as the platform reports them and may not match your local timezone. Confirm against your own Instagram insights before scheduling.";
+
 /** Rank the strongest posting windows from the audience heatmap. */
 export function bestTimes(audience: AudienceSnapshot[], platforms: Platform[], top = 5): BestWindow[] {
   const grid = activeGrid(audience, platforms);
@@ -51,8 +61,12 @@ const METRIC_LABEL: Record<string, string> = {
 export function anomalies(metrics: MetricPoint[], scope: Scope): Anomaly[] {
   const keys: MetricKey[] = ["reach", "views", "engagements"];
   const out: Anomaly[] = [];
+  // Provisional days are still settling and are always short. Alerting on them
+  // produced a standing "reach dropped" every day, which the AI assistant then
+  // repeated back to the client as fact.
+  const settled = metrics.filter((m) => !m.provisional);
   for (const key of keys) {
-    const s = seriesByDay(metrics, scope, key);
+    const s = seriesByDay(settled, scope, key);
     if (s.length < 6) continue;
     for (let i = 4; i < s.length; i++) {
       const window = s.slice(i - 4, i).map((x) => x.value);
