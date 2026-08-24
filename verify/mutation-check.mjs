@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 const SYNC = "verify/build/_sync.js";
 const LIB = "verify/build/_lib.js";
 const TOKENS = "verify/build/_tokens.js";
+const DELETION = "verify/build/meta-data-deletion.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -50,11 +51,17 @@ const mutations = [
   { name: "TikTok and Meta share one refresh window", file: TOKENS,
     find: "const window = id.provider === \"tiktok\" ? RENEW_WITHIN_MS_TIKTOK : RENEW_WITHIN_MS;",
     replace: "const window = RENEW_WITHIN_MS;" },
+  { name: "signed_request signature not verified", file: DELETION,
+    find: "if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected))\n        return null;",
+    replace: "if (false)\n        return null;" },
+  { name: "deletion acknowledges without deleting", file: DELETION,
+    find: "await db.from(\"account_secrets\").delete().eq(\"account_id\", a.id);",
+    replace: "" },
 ];
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

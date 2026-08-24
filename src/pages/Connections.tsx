@@ -4,7 +4,7 @@ import { useDash } from "../context/DashboardContext";
 import { useDemo } from "../context/DemoContext";
 import { useToast } from "../context/ToastContext";
 import { isConfigured } from "../lib/supabase";
-import { startOAuth, disconnectAccount } from "../lib/api";
+import { startOAuth, disconnectAccount, exportMyData, deleteMyAccount } from "../lib/api";
 import { PLATFORMS, PLATFORM_ORDER, PLATFORM_FILL } from "../lib/platforms";
 import { SETUP_GUIDES, redirectUri } from "../lib/setupGuides";
 import { formatDistanceToNow } from "date-fns";
@@ -18,6 +18,7 @@ export default function Connections() {
   const [params, setParams] = useSearchParams();
   const [connecting, setConnecting] = useState<Platform | null>(null);
   const [guide, setGuide] = useState<Platform | null>(null);
+  const [consented, setConsented] = useState(false);
   const origin = import.meta.env.VITE_SITE_URL || window.location.origin;
 
   // Surface the OAuth callback result (?connected=instagram or ?error=...)
@@ -37,6 +38,7 @@ export default function Connections() {
 
   async function connect(platform: Platform) {
     if (demo) { toast("This is a preview. Real accounts connect here once the app is set up."); return; }
+    if (!consented) { toast("Please confirm you agree to the terms before connecting."); return; }
     if (!isConfigured) { toast("Configure Supabase first (see README)."); return; }
     setConnecting(platform);
     try {
@@ -74,6 +76,18 @@ export default function Connections() {
           <p>Connections use official read-only OAuth: PulseBoard never sees your password, and you can revoke access at any time from the platform's own settings. Until the developer apps pass review, only accounts added as testers can connect. See the README for setup.</p>
         </div>
       </div>
+
+      {/* Consent is the lawful basis under Jordan's PDPL, and the server records
+          the moment it is given. This is the visible half of that. */}
+      <label className="panel" style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: 14, marginBottom: 4, cursor: "pointer" }}>
+        <input type="checkbox" checked={consented} onChange={(e) => setConsented(e.target.checked)} style={{ marginTop: 3 }} />
+        <span style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+          I own or am authorised to manage the accounts I connect, and I agree that PulseBoard may read their
+          analytics — including aggregated audience statistics about my followers — as described in the{" "}
+          <a href="/privacy" target="_blank" rel="noreferrer">privacy policy</a> and{" "}
+          <a href="/terms" target="_blank" rel="noreferrer">terms</a>. Access is read-only and I can withdraw it at any time by disconnecting.
+        </span>
+      </label>
 
       <div className="stack" style={{ gap: 12 }}>
         {PLATFORM_ORDER.map((p) => {
@@ -148,7 +162,8 @@ function SetupPanel({ platform, origin }: { platform: Platform; origin: string }
                 {s.text}
                 {s.link && (
                   <> <a href={s.link.href} target="_blank" rel="noreferrer"
-                    style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>{s.link.label}</a></>
+                    style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>{s.link.label}</a>
+</>
                 )}
               </li>
             ))}

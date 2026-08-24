@@ -1,11 +1,14 @@
 import type { Handler } from "@netlify/functions";
-import { env, userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log } from "./_lib";
+import { env, userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin } from "./_lib";
 
 /**
  * Starts the TikTok Login Kit (v2) OAuth flow.
  * POST /api/oauth-tiktok   body { token: <supabase access token> }  -> { url }
  * The Supabase token is POSTed, not put in the URL — see oauth-meta.ts.
  */
+/** Bump when the consent wording or the requested scopes change. */
+const CONSENT_VERSION = "2026-08-1";
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Use POST." };
 
@@ -18,6 +21,19 @@ export const handler: Handler = async (event) => {
 
   const redirectUri = `${env.SITE_URL}/api/oauth-tiktok-callback`;
   const scope = ["user.info.basic", "user.info.profile", "user.info.stats", "video.list"].join(",");
+
+  // Consent is the lawful basis under Jordan's PDPL, so the moment it is given
+  // is recorded rather than assumed. Withdrawal is the Disconnect action.
+  await admin().from("consents").insert({
+    user_id: userId,
+    purpose: "connect_tiktok",
+    version: CONSENT_VERSION,
+    evidence: {
+      ip: event.headers["x-nf-client-connection-ip"] ?? event.headers["client-ip"] ?? null,
+      user_agent: event.headers["user-agent"] ?? null,
+      scopes: scope,
+    },
+  });
 
   const nonce = newNonce();
   const url = new URL("https://www.tiktok.com/v2/auth/authorize/");

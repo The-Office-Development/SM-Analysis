@@ -94,6 +94,11 @@ export default function AppLayout() {
             </>
           )}
         </div>
+          <div style={{ marginTop: "auto", paddingTop: 12, display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11.5 }}>
+            <a className="muted" href="/privacy" target="_blank" rel="noreferrer">Privacy</a>
+            <a className="muted" href="/terms" target="_blank" rel="noreferrer">Terms</a>
+            <a className="muted" href="/data-deletion" target="_blank" rel="noreferrer">Data deletion</a>
+          </div>
       </aside>
 
       <div className="main">

@@ -4,6 +4,7 @@ import { syncAccount, dayKeyFromEndTime, syncStart, seriesFrom } from "../build/
 import { makeDb } from "./fake-supabase.mjs";
 import { installGraphMock, trueValue, addDays } from "./mock-graph.mjs";
 
+process.env.GRAPH_BACKOFF_BASE_MS = "1";
 process.env.TOKEN_ENC_KEY ??= Buffer.alloc(32, 7).toString("base64");
 process.env.META_APP_SECRET ??= "test-app-secret";
 

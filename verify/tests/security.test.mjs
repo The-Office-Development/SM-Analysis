@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeDb } from "./fake-supabase.mjs";
 
+process.env.GRAPH_BACKOFF_BASE_MS = "1";
 process.env.OAUTH_STATE_SECRET = "test-state-secret-value";
 process.env.TOKEN_ENC_KEY = Buffer.alloc(32, 7).toString("base64");
 process.env.META_APP_SECRET = "test-app-secret";

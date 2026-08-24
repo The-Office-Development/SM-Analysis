@@ -189,6 +189,8 @@ export function appUsage(headers: Headers): number {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Backoff base, read per call so tests can override it without real sleeps. */
+const backoffBaseMs = () => Number(process.env.GRAPH_BACKOFF_BASE_MS ?? 2000);
 
 /**
  * One Graph GET: token in the Authorization header (not the query string),
@@ -208,7 +210,7 @@ export async function graphGet(
 
   let lastErr: GraphError | null = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
-    if (attempt > 0) await sleep(Math.min(2000 * 2 ** (attempt - 1), 8000) + Math.random() * 250);
+    if (attempt > 0) { const b = backoffBaseMs(); await sleep(Math.min(b * 2 ** (attempt - 1), b * 4) + Math.random() * (b / 8)); }
     let res: Response;
     try {
       res = await fetch(url, {

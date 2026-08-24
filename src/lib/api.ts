@@ -155,6 +155,34 @@ export async function disconnectAccount(accountId: string): Promise<string> {
   return body.message as string;
 }
 
+/** Download everything we hold about the signed-in user (portability). */
+export async function exportMyData(): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not signed in.");
+  const res = await fetch("/api/account-data", { headers: { Authorization: `Bearer ${session.access_token}` } });
+  if (!res.ok) throw new Error("Could not build your export.");
+  const blob = await res.blob();
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = `pulseboard-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(href), 30_000);
+}
+
+/** Erase the account and everything associated with it. */
+export async function deleteMyAccount(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not signed in.");
+  const res = await fetch("/api/account-data", {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message || "Could not delete your account.");
+  return body.confirmation_code as string;
+}
+
 /** Kicks off a server-side sync (Netlify function) for the signed-in user. */
 export async function triggerSync(): Promise<{ ok: boolean; message: string }> {
   if (isDemoMode()) return { ok: false, message: "Preview mode: connect a real account after setup to sync live data." };

@@ -15,6 +15,7 @@ import Assistant from "./pages/Assistant";
 import Reports from "./pages/Reports";
 import Connections from "./pages/Connections";
 import SharedReport from "./pages/SharedReport";
+import { Privacy, Terms, DataDeletion } from "./pages/Legal";
 
 function Splash() {
   return (
@@ -62,6 +63,10 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/r/:slug" element={<SharedReport />} />
+              {/* Public and reachable without an account: App Review checks these. */}
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/data-deletion" element={<DataDeletion />} />
               <Route path="/*" element={<Gate />} />
             </Routes>
           </BrowserRouter>

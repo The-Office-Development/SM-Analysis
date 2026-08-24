@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { env, userIdFromToken, signState, newNonce, setNonceCookie, redirect, backToApp, GRAPH_VERSION, log } from "./_lib";
+import { env, userIdFromToken, signState, newNonce, setNonceCookie, redirect, backToApp, GRAPH_VERSION, log, admin } from "./_lib";
 
 /**
  * Starts the Meta (Facebook + Instagram) OAuth flow.
@@ -9,6 +9,9 @@ import { env, userIdFromToken, signState, newNonce, setNonceCookie, redirect, ba
  * parameter it lands in browser history, in Netlify's request logs, and in any
  * TLS-terminating proxy along the way, and it is a live session for this tenant.
  */
+/** Bump when the consent wording or the requested scopes change. */
+const CONSENT_VERSION = "2026-08-1";
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Use POST." };
 
@@ -32,6 +35,19 @@ export const handler: Handler = async (event) => {
     "instagram_basic",
     "instagram_manage_insights",
   ].join(",");
+
+  // Consent is the lawful basis under Jordan's PDPL, so the moment it is given
+  // is recorded rather than assumed. Withdrawal is the Disconnect action.
+  await admin().from("consents").insert({
+    user_id: userId,
+    purpose: "connect_meta",
+    version: CONSENT_VERSION,
+    evidence: {
+      ip: event.headers["x-nf-client-connection-ip"] ?? event.headers["client-ip"] ?? null,
+      user_agent: event.headers["user-agent"] ?? null,
+      scopes: scope,
+    },
+  });
 
   const nonce = newNonce();
   const url = new URL(`https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`);
