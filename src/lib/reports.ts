@@ -1,6 +1,7 @@
 import type { useDash } from "../context/DashboardContext";
 import { seriesByDay, sum } from "./api";
 import { PLATFORMS } from "./platforms";
+import { escapeCsvField as esc } from "./csv";
 
 type Dash = ReturnType<typeof useDash>;
 
@@ -15,18 +16,6 @@ export function download(name: string, content: string | Blob, type = "text/csv;
   setTimeout(() => URL.revokeObjectURL(href), 30_000);
 }
 
-/**
- * Quote a CSV field AND neutralise spreadsheet formula injection.
- *
- * Quoting alone does not stop Excel or Google Sheets evaluating a field that
- * begins with = + - @ tab or CR. Post titles come from platform captions, and
- * these exports get emailed to sponsors, so the blast radius is the client's
- * commercial contacts rather than the client.
- */
-const esc = (s: string) => {
-  const v = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
-  return `"${v.replace(/"/g, '""')}"`;
-};
 
 /** Build a CSV of the current dashboard scope/window from real synced data. */
 export function buildCsv(dash: Dash): string {

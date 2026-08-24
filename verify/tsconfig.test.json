@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": false,
+    "declaration": false,
+    "esModuleInterop": true,
+    "rootDir": "../netlify/functions",
+    "outDir": "./build"
+  },
+  "files": ["../netlify/functions/_sync.ts", "../netlify/functions/_lib.ts"]
+}

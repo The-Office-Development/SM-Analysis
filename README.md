@@ -7,7 +7,7 @@ Production social-media analytics for **Facebook, Instagram and TikTok** — one
 - **Backend:** Netlify Functions — OAuth flows + data sync (holds all platform secrets)
 - **Hosting:** Netlify (static frontend + serverless functions + a daily scheduled sync)
 
-> **No mock data.** Every number comes from a connected, synced account. Before you connect anything, the app shows empty states — never invented figures.
+> **No invented figures.** Every number comes from a connected, synced account. A metric the platform does not report is stored as *unknown* and omitted from charts — it is never written as a zero, and a failed or rate-limited call never overwrites data you already have. There is also an explicit, clearly-labelled **preview mode** (`src/lib/demoData.ts`) that serves sample data for demos; it must be entered deliberately and never mixes with real data.
 
 ---
 
@@ -29,10 +29,11 @@ The browser can read only the signed-in user's own rows. OAuth access tokens are
 ## Setup (about 30–45 min, most of it waiting on platform review)
 
 ### 1. Supabase
-1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run the whole of [`supabase/schema.sql`](supabase/schema.sql).
+1. Create a project at [supabase.com](https://supabase.com). Choose the region deliberately — for Jordanian clients this is a data-residency decision under the PDPL, not just a latency one.
+2. Open **SQL Editor** and run the whole of [`supabase/schema.sql`](supabase/schema.sql), then every file in [`supabase/migrations/`](supabase/migrations/) in order.
+   Re-running `schema.sql` after an edit does **nothing** — every statement in it is `create table if not exists`, so a change appears to succeed while the schema stays as it was. Schema changes go in a new numbered migration; keep a record of which have been applied.
 3. **Project settings → API** — copy the **Project URL**, the **anon public** key, and the **service_role** key.
-4. **Authentication → Providers → Email**: enable it. For a smoother demo you can turn *Confirm email* off (Authentication → Providers → Email → “Confirm email”).
+4. **Authentication → Providers → Email**: enable it, and **leave *Confirm email* ON**. Turning it off lets anyone register an address they do not control, which in a multi-tenant product holding platform credentials means impersonation and cheap disposable accounts. Set a password policy while you are there.
 
 ### 2. Meta app (Facebook + Instagram)
 Instagram analytics come through the Facebook Graph API, so one Meta app covers both.
@@ -42,7 +43,9 @@ Instagram analytics come through the Facebook Graph API, so one Meta app covers 
    `https://YOUR-SITE.netlify.app/api/oauth-meta-callback`
 4. Note the **App ID** and **App Secret** (Settings → Basic).
 5. Request these permissions and submit for **App Review** (required for other people's data):
-   `pages_show_list`, `pages_read_engagement`, `read_insights`, `instagram_basic`, `instagram_manage_insights`, `business_management`.
+   `pages_show_list`, `pages_read_engagement`, `read_insights`, `instagram_basic`, `instagram_manage_insights`.
+   All of them are read-only. **Do not add `business_management`** — nothing here uses it, and being write-capable it would turn a token leak from a data exposure into asset compromise across the client's Meta estate.
+6. **App Settings → Advanced → Security → Require App Secret**: turn it on. Every Graph call this app makes is signed with `appsecret_proof`.
 6. Instagram must be a **Business/Creator** account linked to a Facebook Page.
 
 ### 3. TikTok app
@@ -77,6 +80,7 @@ The repo is already wired for Netlify (`netlify.toml`). In Netlify: **Add new si
 
 ```bash
 npm install
+npm test          # typecheck, build, the suite, then the mutation check
 # frontend only:
 npm run dev
 # frontend + functions together (recommended — /api/* works):
@@ -127,5 +131,8 @@ supabase/schema.sql  tables (+ goals, report_shares) + row-level security
   - *Instagram* backfills reach/impressions from time-ranged insights and reconstructs the daily followers curve from the current total plus daily `follower_count` deltas; engagements use `total_interactions` where the account exposes it.
   - *TikTok* has no daily-history API, so it records the current day only and its trend builds up over time.
 - **Audience** (age/gender/country + weekday×hour best-time heatmap) syncs from IG `follower_demographics` and FB `page_fans_*`. TikTok exposes no demographics.
-- Graph API metric names evolve — the sync stores whatever a call returns and fails softly per account, flagging accounts whose token expired so the UI can prompt a reconnect.
-- Tokens are encrypted at rest by Supabase and never leave the backend.
+- **Graph API versions expire about every two years and metrics are removed between them** (Instagram `impressions`/`plays` in April 2025; Facebook `page_impressions`/`page_fans`/`post_impressions` in November 2025). The version is pinned in one place — `GRAPH_VERSION` in `netlify/functions/_lib.ts`, overridable with `META_GRAPH_VERSION`. Put a recurring reminder in someone's calendar to check the deprecation schedule; that is the cheapest possible insurance and its absence is what breaks products like this.
+- Each metric is requested separately, so one removed metric cannot fail the whole request. Failures are classified by the platform's numeric error code, and only a genuine auth failure flags the account for reconnection.
+- **Tokens are encrypted at rest by the application** with AES-256-GCM under `TOKEN_ENC_KEY`, so a leaked database snapshot is not a set of live credentials, and they never leave the backend. (Supabase's own encryption is disk-level only and does not protect against anyone holding the service-role key.)
+- **Disconnect really disconnects**: it revokes the app's access at the platform, deletes the stored token, and permanently deletes the metrics, posts and audience data held for that account.
+- **The OAuth state is bound to the browser** with an HttpOnly cookie, so a signed state cannot be replayed into someone else's session to attach their accounts to another tenant.
