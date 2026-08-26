@@ -98,7 +98,7 @@ for the new callbacks, and nothing is deployed.
   client sees the product until the numbers agree
 
 **Blocking, administrative (not code, start first — it runs in parallel):**
-- Business Verification (typically 2–5 business days; Jordanian commercial registration,
+- Business Verification (10 minutes to 14 working days; Jordanian commercial registration,
   stamped English translation if needed)
 - App Review with a screencast, Data Use Checkup, Data Protection Assessment
 

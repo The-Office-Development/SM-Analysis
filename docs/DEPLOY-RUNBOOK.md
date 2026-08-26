@@ -12,7 +12,7 @@ first. Times are working estimates.
 - A Netlify site connected to this repo.
 - A Meta developer app.
 
-## 1. Start Business Verification — do this FIRST (2–5 business days, waiting)
+## 1. Start Business Verification — do this FIRST (10 min to 14 working days)
 
 See [`SETUP-META.md`](SETUP-META.md) §1. It is free, it blocks Advanced Access,
 and nothing you do in code shortens it. If your commercial registration needs a

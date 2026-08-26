@@ -102,8 +102,9 @@ reconciled against Instagram's own insights.
 ## 5. What is left
 
 ### Blocking — start today
-- [ ] **Business Verification** (2–5 business days of waiting; order the stamped
-      English translation of the commercial registration now if needed)
+- [ ] **Business Verification** — 10 minutes to 14 working days. Order the
+      stamped English translation of the commercial registration now if needed,
+      and deploy first so the website exists. Step-by-step in `SETUP-META.md` §1.
 
 ### Blocking — technical, about a day of work
 - [ ] Apply `schema.sql` then migrations `0001`–`0005` in order; add `pulseboard`

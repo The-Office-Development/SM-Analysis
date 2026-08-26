@@ -10,25 +10,94 @@ client volume. It has nothing to do with API access.
 
 ---
 
-## 1. Business Verification — start first, typically 2–5 business days
+## 1. Business Verification — start first
 
-**Where:** [business.facebook.com](https://business.facebook.com) → Business
-settings → Security Centre → Start verification.
+**Timeline: 10 minutes to 14 working days.** It can be near-instant when
+everything matches; plan for two weeks. This blocks Advanced Access, so nothing
+you do in code shortens it.
 
-**What you need:**
-- A Business Portfolio (create one if you don't have it) with your legal
-  company name exactly as registered.
-- Your Jordanian commercial registration (سجل تجاري). If it is not in a
-  language Meta supports, you need an English translation carrying an official
-  stamp from a recognised translation agency — **order this today**, it is the
-  step most likely to add days.
-- A company email on your own domain, and a phone number that can receive a code.
-- Consistency matters: the name, address and phone on the form should match the
-  registration document exactly. Mismatches are the usual rejection reason.
+### Phase 0 — Prepare before you open the form
 
-**Note:** because you build on behalf of other businesses rather than for your
-own assets, Meta may classify you as a **Tech Provider** during verification.
-That is a designation inside verification, not a separate application.
+Most rejections are decided here, not by Meta. The single most common rejection
+in 2026 is a **legal-name mismatch**: Meta compares the name in your business
+account against the name on your document and wants an *exact* match, not
+"close enough" — including suffixes, punctuation and word order.
+
+Gather:
+
+- [ ] **Commercial registration** (السجل التجاري) from the Ministry of Industry,
+      Trade and Supply, and/or your **certificate of registration** (شهادة تسجيل).
+      It must carry an official **stamp or seal** — Meta will not accept a
+      document without one.
+- [ ] A **second corroborating document** showing the *same* legal name and the
+      *same* address: a business bank statement or a utility bill. Submitting two
+      documents that agree with each other is the single best thing you can do
+      for approval odds.
+- [ ] A **certified English translation** with a recognised translation agency's
+      stamp, unless your documents are already in a language Meta supports.
+      Order this now — it is the step most likely to add days.
+- [ ] A **business phone number** that can receive a call or SMS.
+- [ ] A **business email on your own domain** (not gmail).
+- [ ] A **live website on that domain.** Meta looks for a real, working web
+      presence, so deploy first — the privacy and terms pages built into this
+      app help here.
+
+Document freshness rules:
+- Registration certificates: no more than **1 year** old.
+- Utility bills and bank statements: no more than **90 days** old.
+
+Scan quality: full page, all four edges visible, no glare, no cropping. A clean
+PDF scan beats a phone photo. "File is not viewable" is a rejection reason.
+
+### Phase 1 — Set the business details up correctly
+
+1. Go to [business.facebook.com](https://business.facebook.com).
+2. Create a **Business Portfolio** if you do not have one, or open the existing one.
+3. **Business settings → Business info.** Fill in, copying **character for
+   character from your registration document**:
+   - Legal business name
+   - Registered address
+   - Phone number
+   - Website
+4. Cross-check every field against the document before continuing. If the
+   document says `Company for Trading and Services L.L.C.`, that exact string
+   goes in the name field — not a shortened trading name.
+
+### Phase 2 — Run the verification
+
+1. **Business settings → Security Centre → Start verification.**
+2. Confirm the organisation details you entered in Phase 1.
+3. Choose a **contact method** to receive a confirmation code (phone or email on
+   your domain).
+4. **Upload your documents** — the registration plus the corroborating one.
+5. **Enter the confirmation code** you receive.
+6. Click **Done**.
+
+### Phase 3 — After submitting
+
+- Status arrives by email and as a notification in Business Manager.
+- Do **not** edit the business name or address while review is pending; a change
+  mid-review is treated as a mismatch.
+- Meanwhile, continue with §2 onward — app configuration, deployment and the
+  reconciliation all proceed in parallel.
+
+### Phase 4 — If it is rejected
+
+Meta names the reason. Map it:
+
+| Reason given | Fix |
+|---|---|
+| Legal name does not match | Copy the name from the document exactly into Business info, then resubmit |
+| Address missing or does not match | Use the registered address, not the trading address, and make both documents agree |
+| Phone number missing or does not match | The number in Business info must also appear on a submitted document |
+| Document expired | Registration under 1 year; utility/bank under 90 days |
+| Document not supported / self-created | Must be government or bank issued, with a stamp or seal |
+| Language not supported | Add the stamped certified English translation |
+| File not viewable | Rescan: full page, higher resolution, no glare |
+| Additional documents required | Send the second corroborating document |
+
+Resubmission is allowed. Fix the named reason rather than resubmitting the same
+pack, and change one thing at a time so you learn what mattered.
 
 ## 2. The Instagram app — configuration
 
