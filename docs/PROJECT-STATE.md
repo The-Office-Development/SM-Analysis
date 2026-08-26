@@ -3,7 +3,66 @@
 The living record. `CLAUDE.md` is the technical brief; this is the commercial
 and strategic one. Update it when a decision changes.
 
-Last updated: 2026-08-23.
+Last updated: 2026-08-26.
+
+---
+
+## 0. Start here — current position
+
+The rest of this file is context. This section is what to do next. **Keep it
+current; it is the first thing a new session should read after `CLAUDE.md`.**
+
+### The company
+
+| | |
+|---|---|
+| Legal entity | **Alhujra Technology LLC** — *spelling UNCONFIRMED* |
+| Brand / product | The Office · PulseBoard |
+| Website | `theoffice.it.com` |
+| Bank account | None yet |
+| Jurisdiction | Jordan (UTC+3, no DST) |
+
+**The legal name must be transcribed character for character from the commercial
+registration before anything is submitted to Meta.** A name mismatch is the most
+common verification rejection, and `LLC` vs `L.L.C.` is enough to fail it. Until
+someone confirms it from the document, treat the name above as a guess and do not
+paste it into a Meta form or into the legal pages.
+
+Two consequences already identified:
+
+- The legal pages still carry `[REGISTERED COMPANY NAME]` and
+  `[REGISTERED ADDRESS, JORDAN]` placeholders. Filling them puts the entity name
+  on our own domain, which is exactly the corroboration Meta's reviewer wants.
+- `theoffice.it.com` is a subdomain resold by the it.com registrar, not a
+  registrable domain we own. That may complicate Meta domain verification and a
+  business email on our own domain. A proper `.com` or `.jo` for Alhujra is cheap
+  insurance before submitting.
+- No bank account means the corroborating second document must be a tax
+  registration certificate, a chamber of commerce certificate, a utility bill for
+  the registered premises, or a second official registry document.
+
+### Immediate next action
+
+1. **Blocked on a human:** transcribe the legal name and registered address from
+   the commercial registration, exactly as printed, and confirm it carries an
+   official stamp or seal.
+2. Then: fill the legal page placeholders, deploy, and submit Business
+   Verification (`SETUP-META.md` §1).
+3. Then: connect our own Instagram, sync for 3+ days, and run
+   `node verify/reconcile.mjs`. **No client sees the product until those numbers
+   agree with the Instagram app.**
+
+### Environment gotchas that keep recurring
+
+- Sessions so far have run in a **remote Linux sandbox**, not on a local Mac,
+  even when driven from the desktop app. Check with `uname -a`.
+- `developers.facebook.com` and `developers.tiktok.com` are **blocked by the
+  egress proxy** in that sandbox. Every platform API claim in this repo therefore
+  rests on secondary sources and is flagged as needing human verification.
+- That sandbox has **no OCR** (`pdftoppm`, `tesseract` absent), so scanned
+  documents cannot be read. Ask the human to transcribe instead.
+- Running Claude Code locally (`brew install poppler tesseract`) removes both
+  limits and is worth doing before the Meta endpoint verification.
 
 ---
 

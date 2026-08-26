@@ -6,6 +6,10 @@ non-obvious things are the way they are, and which invariants must not be
 
 ---
 
+**New session? Read `docs/PROJECT-STATE.md` §0 first** — it holds the current
+position, the company details, what is blocked on a human right now, and the
+environment gotchas. This file is the technical brief; that one is what to do next.
+
 ## 1. What has been built
 
 **The product.** A multi-tenant social analytics dashboard. Clients connect their
