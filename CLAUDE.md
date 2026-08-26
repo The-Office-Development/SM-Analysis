@@ -1,0 +1,188 @@
+# PulseBoard — project brief for Claude Code sessions
+
+Read this before changing anything. It records what exists, why several
+non-obvious things are the way they are, and which invariants must not be
+"simplified" back into defects.
+
+---
+
+## 1. What has been built
+
+**The product.** A multi-tenant social analytics dashboard. Clients connect their
+Instagram Business accounts (and Facebook Pages / TikTok, secondary) via official
+read-only OAuth; a scheduled sync pulls daily metrics, posts and audience
+breakdowns into Supabase; the app renders dashboards, a planner, a grounded AI
+assistant, CSV/PDF exports and public read-only share links.
+
+- **Frontend** — React + TypeScript + Vite, `src/`. Hand-built SVG charts, no chart library.
+- **Backend** — Netlify Functions, `netlify/functions/`. Holds every platform secret.
+- **Data** — Supabase Postgres, isolated `pulseboard` schema, RLS default-deny on every table.
+- **Hosting** — Netlify: static frontend, serverless functions, two scheduled functions.
+
+**The audit.** A multi-domain pre-launch audit found 24 P0 findings. Full record in
+`docs/COMPLETE-AUDIT.md` (single file) with the seven specialist reports under
+`docs/audit/`, the proven data defects in `docs/DATA-INTEGRITY.md`, the Jordan
+analysis in `docs/JORDAN-CONTEXT.md`, and a corrections register listing eight
+claims that later passes overturned.
+
+**The remediation.** 19 of 24 P0s fixed, 1 mitigated, 4 partly done or
+organisational. Per-finding status in `docs/REMEDIATION-STATUS.md`. Headlines:
+
+- Graph API moved v19.0 (expired 21 May 2026) to v25.0, pinned once
+- removed metrics replaced (`views`, `page_media_view`, `page_follows`, `post_media_view`)
+- TikTok's success envelope no longer read as an error — it had never worked at all
+- the sync can no longer write fabricated zeros over real client history
+- days no longer freeze at a few hours of data; a trailing window is re-fetched
+- calendar days derived correctly at every UTC offset
+- OAuth state bound to the browser, closing an account-takeover
+- `business_management` dropped; tokens encrypted at rest; secrets fail closed
+- disconnect revokes at the platform and deletes; token refresh under a lock
+- data-deletion and deauthorize callbacks, legal pages, consent capture, data export
+- a test suite that can actually fail: 35 assertions, mutation score 16/16, gating CI
+
+---
+
+## 2. The goal
+
+Serve **large Jordanian creator and agency Instagram accounts** with analytics
+they can trust well enough to show a sponsor. The operator, the software and the
+clients are all in Jordan (UTC+3, no DST).
+
+Two constraints shape every decision:
+
+1. **A wrong number is worse than an outage.** Nobody notices a wrong number, and
+   a client who catches one stops trusting the product permanently. Correctness
+   beats features, and honest "unknown" beats a confident zero.
+2. **These accounts are valuable and must not be put at risk.** Reading analytics
+   through the official API does not get accounts banned — credential-based and
+   automation tools do. The one real risk is holding write-capable credentials
+   insecurely, which is why `business_management` was dropped and tokens are
+   encrypted.
+
+---
+
+## 3. Where it currently stands
+
+Code is on `main`, all green: typecheck, build, 35 tests, mutation 16/16.
+
+**Nothing has ever run against the live Instagram API.** Every test runs against
+a mock built on Meta's *documented* conventions. The correctness fixes are
+validated against that model, not against real responses. The first real
+connection is an experiment, not a formality.
+
+**No client account can connect yet.** Until App Review passes, OAuth only works
+for accounts holding a role on the Meta app. That is a platform rule, not a
+limitation of this code.
+
+Not yet done by anyone: migrations `0001`–`0004` have not been applied, secrets
+are not set (the code fails closed without them), the Meta app is not configured
+for the new callbacks, and nothing is deployed.
+
+---
+
+## 4. What is left
+
+**Blocking, technical (about a day):**
+- apply `supabase/migrations/0001` → `0004` in order
+- set `TOKEN_ENC_KEY` and `OAUTH_STATE_SECRET`; scope Netlify env vars to the production context
+- register the data-deletion and deauthorize callback URLs; turn on Require App Secret
+- deploy, connect a real Instagram account, **reconcile a week of numbers against the
+  account's own Instagram insights** — this is the gate that matters most
+
+**Blocking, administrative (not code, start first — it runs in parallel):**
+- Business Verification (typically 2–5 business days; Jordanian commercial registration,
+  stamped English translation if needed)
+- App Review with a screencast, Data Use Checkup, Data Protection Assessment
+
+**One verification that changes code.** Instagram's `online_followers` hour keys:
+account-local, or a fixed platform timezone? Unresolved. The Planner currently
+labels its recommendation rather than implying local time. One real API response
+settles it. Highest-value open question.
+
+**One decision.** Whether to migrate to *Instagram API with Instagram Login*
+(drops the Facebook Page requirement and shrinks the permission set) from the
+current *Instagram API with Facebook Login*. Not attempted because the API
+surface could not be verified.
+
+**Organisational.** DPO question under Jordan's PDPL, cross-border transfer file
+(Supabase, Netlify and Anthropic are all outside Jordan), region choice, alerting
+and on-call, counsel sign-off on the PDPL analysis and the draft legal pages.
+
+**Deferred.** Share-link expiry and revocation; a retention purge job; a real
+queue-backed sync for scale; remaining optimistic claims in `src/lib/setupGuides.ts`.
+
+---
+
+## 5. Notes for future Claude and AI sessions
+
+### Run this before you claim anything works
+```bash
+npm test        # typecheck, build, 35 assertions, then the mutation gate
+```
+The mutation check injects 16 real defects and requires every one to be caught.
+**If you fix a defect the suite would not otherwise catch, add a mutation for it.**
+
+### Invariants — do not "simplify" these back into bugs
+
+Each of these looks like it could be tidier. Each is deliberate, and each was a
+P0 finding. There is a test and a mutation guarding every one.
+
+- **Never write a fabricated zero into a metric column.** `null` means the
+  platform did not report it. `?? 0` in the sync path is how a single rate-limit
+  response once erased 30 days of a client's real history.
+- **Never narrow the trailing re-fetch.** `TRAILING_REFETCH` in `_sync.ts` exists
+  because fetching only the gap froze every day at a few hours of data.
+- **Never take the date with `end_time.slice(0, 10)`.** `dayKeyFromEndTime`
+  derives the account's offset from `end_time` itself, because `end_time` is
+  local midnight of the *following* day. Slicing filed every day one day late for
+  every account at UTC offset ≤ 0 — the whole of the Americas.
+- **Never accept an OAuth state without the cookie nonce.** The signature alone
+  lets an attacker replay their own state into a victim's browser and attach the
+  victim's accounts to the attacker's tenant.
+- **Never re-add `business_management`** or any write-capable scope.
+- **Never let a secret fall back to a default.** `OAUTH_STATE_SECRET` once
+  defaulted to a constant published in this repository.
+- **Never put caller-supplied text into the system prompt** in `ai.ts`. The
+  dashboard snapshot goes in a user turn; captions are data, not instructions.
+- **Never swallow a throttle or auth error** in the sync. Degrading silently is
+  what turned platform rate limiting into data loss.
+
+### Things that look wrong but are not
+- `metrics_daily` columns are nullable *on purpose*.
+- Days are re-fetched repeatedly *on purpose*; upserts are idempotent.
+- The cron is hourly and stops early *on purpose* — Netlify caps scheduled
+  functions at 30s and they cannot be background functions.
+- `buildCsv` uses `seriesByDay(..., "followers")` while the dashboard uses
+  `followersByDay()`. These agree: the primary key is `(account_id, date)`.
+
+### Testing
+- `verify/tests/` is the suite that counts. `tests/mock-graph.mjs` knows each
+  day's **true** value, so tests assert against an oracle rather than the absence
+  of a crash. `tests/fake-supabase.mjs` actually applies filters.
+- `verify/proofs/` demonstrates the original defects; kept as documentation.
+- **The older `verify/*.mjs` scripts are printers, not tests.** No assertions,
+  always exit 0, runners `grep` for a `RESULT` line without reading it. They
+  reported PASS throughout the period the sync was writing wrong numbers. Never
+  cite them as evidence that anything works.
+
+### Schema changes
+`supabase/schema.sql` is `create table if not exists` throughout, so **re-running
+it after an edit does nothing**. Every change goes in a new numbered file in
+`supabase/migrations/`, applied in order. Keep a record of what has been applied.
+
+### Epistemic status of the documentation
+`developers.facebook.com` and `developers.tiktok.com` were unreachable from the
+audit environment, so **every claim about platform API behaviour and platform
+policy rests on secondary sources**, as does the Jordanian law analysis. Each
+document flags what a human must confirm. Verify before acting on any of it, and
+say so when you are relying on it.
+
+### Working style that fits this project
+- Prefer proving a claim numerically over asserting it. `verify/proofs/` exists
+  because a worked example beat an argument.
+- Correct yourself in writing when a later pass overturns an earlier claim; the
+  corrections register in `docs/COMPLETE-AUDIT.md` is part of the deliverable.
+- Platform deprecation is a permanent tax on this product, not a one-off
+  migration. Meta expires API versions roughly every two years and removes
+  metrics between them. A standing watch on the deprecation schedule is the
+  cheapest insurance available and its absence is what caused most of this.
