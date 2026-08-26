@@ -83,9 +83,11 @@ for the new callbacks, and nothing is deployed.
 ## 4. What is left
 
 **Blocking, technical (about a day):**
-- apply `supabase/migrations/0001` → `0004` in order
+- apply `supabase/migrations/0001` → `0005` in order
 - set `TOKEN_ENC_KEY` and `OAUTH_STATE_SECRET`; scope Netlify env vars to the production context
 - register the data-deletion and deauthorize callback URLs; turn on Require App Secret
+- set `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` (distinct from `META_APP_*`)
+- see `docs/SETUP-META.md` for the full administrative path
 - deploy, connect a real Instagram account, **reconcile a week of numbers against the
   account's own Instagram insights** — this is the gate that matters most
 
@@ -99,10 +101,17 @@ account-local, or a fixed platform timezone? Unresolved. The Planner currently
 labels its recommendation rather than implying local time. One real API response
 settles it. Highest-value open question.
 
-**One decision.** Whether to migrate to *Instagram API with Instagram Login*
-(drops the Facebook Page requirement and shrinks the permission set) from the
-current *Instagram API with Facebook Login*. Not attempted because the API
-surface could not be verified.
+**Decided and built: Instagram API with Instagram Login is the primary path.**
+It requires no linked Facebook Page — on the Facebook Login path a creator
+without one cannot connect at all — and needs a smaller, entirely read-only
+permission set (`instagram_business_basic`, `instagram_business_manage_insights`,
+no `pages_*`). The Facebook Login path is retained unchanged for Facebook Pages.
+
+**Its endpoints are unverified.** Every URL, scope and field name lives in the
+`IG` block at the top of `netlify/functions/_instagram.ts`, deliberately in one
+place, because they were assembled from secondary sources. Check them against the
+official docs and one live response before a client account connects; if a name
+is wrong, it is wrong only there.
 
 **Organisational.** DPO question under Jordan's PDPL, cross-border transfer file
 (Supabase, Netlify and Anthropic are all outside Jordan), region choice, alerting
@@ -139,7 +148,8 @@ P0 finding. There is a test and a mutation guarding every one.
 - **Never accept an OAuth state without the cookie nonce.** The signature alone
   lets an attacker replay their own state into a victim's browser and attach the
   victim's accounts to the attacker's tenant.
-- **Never re-add `business_management`** or any write-capable scope.
+- **Never re-add `business_management`**, `instagram_business_content_publish`, or any
+  other write-capable scope. Guarded by a mutation.
 - **Never let a secret fall back to a default.** `OAUTH_STATE_SECRET` once
   defaulted to a constant published in this repository.
 - **Never put caller-supplied text into the system prompt** in `ai.ts`. The

@@ -45,7 +45,10 @@ export default function Connections() {
       // Meta OAuth covers both Facebook Pages and their linked Instagram accounts.
       // The server mints the URL and sets the state cookie; the session token is
       // POSTed rather than placed in a URL where it would land in history and logs.
-      window.location.href = await startOAuth(platform === "tiktok" ? "tiktok" : "meta");
+      // Instagram connects directly, with no linked Facebook Page required.
+      // Facebook Pages still use the Meta path.
+      const route = platform === "tiktok" ? "tiktok" : platform === "instagram" ? "instagram" : "meta";
+      window.location.href = await startOAuth(route);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not start the connection.");
       setConnecting(null);

@@ -1,4 +1,5 @@
 import { type Db, env, encryptToken, decryptToken, graphGet, log, GRAPH } from "./_lib";
+import { refreshLongLivedToken } from "./_instagram";
 
 /**
  * Token refresh.
@@ -12,6 +13,12 @@ import { type Db, env, encryptToken, decryptToken, graphGet, log, GRAPH } from "
 /** Refresh anything expiring within this window. */
 const RENEW_WITHIN_MS = 7 * 24 * 60 * 60 * 1000;      // Meta: 7 days of headroom
 const RENEW_WITHIN_MS_TIKTOK = 6 * 60 * 60 * 1000;    // TikTok: 6 hours of a 24h life
+/**
+ * Instagram Login tokens last 60 days and are refreshed by presenting the token
+ * itself — there is no separate refresh token. A token allowed to lapse cannot
+ * be recovered at all: the client has to re-authorise. Renew early.
+ */
+const RENEW_WITHIN_MS_INSTAGRAM = 14 * 24 * 60 * 60 * 1000;
 /** A lock older than this is considered abandoned by a crashed invocation. */
 const LOCK_STALE_MS = 5 * 60 * 1000;
 
@@ -23,7 +30,9 @@ export interface Identity {
 
 export function needsRefresh(id: Identity, now = Date.now()): boolean {
   if (!id.expires_at) return false;                    // no stated expiry to act on
-  const window = id.provider === "tiktok" ? RENEW_WITHIN_MS_TIKTOK : RENEW_WITHIN_MS;
+  const window = id.provider === "tiktok" ? RENEW_WITHIN_MS_TIKTOK
+    : id.provider === "instagram" ? RENEW_WITHIN_MS_INSTAGRAM
+    : RENEW_WITHIN_MS;
   return Date.parse(id.expires_at) - now < window;
 }
 
@@ -127,12 +136,32 @@ async function refreshTiktok(db: Db, id: Identity): Promise<boolean> {
   return true;
 }
 
+/** Refresh an Instagram Login token by presenting the token itself. */
+async function refreshInstagram(db: Db, id: Identity): Promise<boolean> {
+  const { accessToken, expiresAt } = await refreshLongLivedToken(decryptToken(id.access_token));
+  await db.from("provider_identities").update({
+    access_token: encryptToken(accessToken),
+    expires_at: expiresAt,
+    last_refresh_at: new Date().toISOString(),
+    refresh_failures: 0,
+  }).eq("id", id.id);
+
+  const { data: accts } = await db.from("social_accounts").select("id").eq("identity_id", id.id);
+  for (const a of accts ?? []) {
+    await db.from("account_secrets")
+      .update({ access_token: encryptToken(accessToken), expires_at: expiresAt })
+      .eq("account_id", a.id);
+  }
+  return true;
+}
+
 /** Refresh one identity if it needs it and we can claim the lock. */
 export async function refreshIdentity(db: Db, id: Identity): Promise<"skipped" | "refreshed" | "locked" | "failed"> {
   if (!needsRefresh(id)) return "skipped";
   if (!(await acquireRefreshLock(db, id.id))) return "locked";
   try {
     if (id.provider === "meta") await refreshMeta(db, id);
+    else if (id.provider === "instagram") await refreshInstagram(db, id);
     else if (id.provider === "tiktok") await refreshTiktok(db, id);
     else return "skipped";
     log("token.refreshed", { identity: id.id, provider: id.provider });

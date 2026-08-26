@@ -13,6 +13,7 @@ const SYNC = "verify/build/_sync.js";
 const LIB = "verify/build/_lib.js";
 const TOKENS = "verify/build/_tokens.js";
 const DELETION = "verify/build/meta-data-deletion.js";
+const INSTA = "verify/build/_instagram.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -48,9 +49,9 @@ const mutations = [
   { name: "refresh lock removed (concurrent refresh kills the token)", file: TOKENS,
     find: "if (!(await acquireRefreshLock(db, id.id)))\n        return \"locked\";",
     replace: "if (false)\n        return \"locked\";" },
-  { name: "TikTok and Meta share one refresh window", file: TOKENS,
-    find: "const window = id.provider === \"tiktok\" ? RENEW_WITHIN_MS_TIKTOK : RENEW_WITHIN_MS;",
-    replace: "const window = RENEW_WITHIN_MS;" },
+  { name: "all providers share one refresh window", file: TOKENS,
+    find: "const window = id.provider === \"tiktok\" ? RENEW_WITHIN_MS_TIKTOK",
+    replace: "const window = RENEW_WITHIN_MS; const _unused = id.provider === \"tiktok\" ? RENEW_WITHIN_MS_TIKTOK" },
   { name: "signed_request signature not verified", file: DELETION,
     find: "if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected))\n        return null;",
     replace: "if (false)\n        return null;" },
@@ -60,11 +61,17 @@ const mutations = [
   { name: "deploy previews allowed to touch the production database", file: LIB,
     find: "if ((context === \"deploy-preview\" || context === \"branch-deploy\") && !process.env.ALLOW_NONPROD_DB) {",
     replace: "if (false) {" },
+  { name: "Instagram Login requests a write-capable scope", file: INSTA,
+    find: 'SCOPES: ["instagram_business_basic", "instagram_business_manage_insights"],',
+    replace: 'SCOPES: ["instagram_business_basic", "instagram_business_manage_insights", "instagram_business_content_publish"],' },
+  { name: "short-lived Instagram token stored instead of long-lived", file: INSTA,
+    find: "const accessToken = long.access_token || short.access_token;",
+    replace: "const accessToken = short.access_token;" },
 ];
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

@@ -1,4 +1,5 @@
 import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, log } from "./_lib";
+import { igGet, IG } from "./_instagram";
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
@@ -77,7 +78,11 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
   const counter = { calls: 0 };
   let days: DayRow[] = [];
   let posts: Post[] = [];
-  if (acc.platform === "instagram") ({ days, posts } = await syncInstagram(acc, token, start, counter));
+  // Instagram accounts arrive through one of two authentication paths. Instagram
+  // Login needs no linked Facebook Page and talks to a different host.
+  const igLogin = (secretRow?.extra as any)?.kind === "ig_login";
+  if (acc.platform === "instagram" && igLogin) ({ days, posts } = await syncInstagramLogin(acc, token, start, counter));
+  else if (acc.platform === "instagram") ({ days, posts } = await syncInstagram(acc, token, start, counter));
   else if (acc.platform === "facebook") ({ days, posts } = await syncFacebook(acc, token, start, counter));
   else if (acc.platform === "tiktok") ({ days, posts } = await syncTiktok(acc, token, counter));
 
@@ -100,7 +105,8 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
 
   // Audience demographics — best effort, IG + FB expose them (TikTok basic API does not).
   try {
-    const snap = acc.platform === "instagram" ? await audienceInstagram(acc, token, counter)
+    const snap = acc.platform === "instagram"
+      ? (igLogin ? await audienceInstagramLogin(acc, token, counter) : await audienceInstagram(acc, token, counter))
       : acc.platform === "facebook" ? await audienceFacebook(acc, token, counter) : null;
     if (snap && hasAudience(snap)) {
       await db.from("audience_snapshots").upsert(
@@ -228,6 +234,101 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
     provisional: isProvisional(date, now),
   }));
   return { days, posts };
+}
+
+/**
+ * Instagram API with Instagram Login.
+ *
+ * Same metric semantics as the Facebook Login path — including the day-boundary
+ * handling in `seriesFrom` — but addressed as /me on a different host with no
+ * appsecret_proof. Every endpoint and field name lives in the IG block in
+ * _instagram.ts; correct it there, not here.
+ */
+async function syncInstagramLogin(acc: AccountRow, token: string, start: string, c: { calls: number }): Promise<{ days: DayRow[]; posts: Post[] }> {
+  const get = (path: string, params: Record<string, string>) => { c.calls++; return igGet(path, params, token); };
+  const prof = await get("/me", { fields: IG.ME_FIELDS });
+  const now = today();
+  const since = String(unixSec(start)), until = String(unixSec(addDays(now, 1)));
+
+  const daily = async (metric: string) => optional(
+    () => get("/me/insights", { metric, period: "day", since, until }).then((j) => seriesFrom(j, metric)),
+    UNAVAILABLE, { metric, account: acc.id, mode: "instagram_login" });
+
+  const reach = await daily("reach");
+  const views = await daily("views");
+  const inter = await daily("total_interactions");
+  const delta = await daily("follower_count");
+
+  const media = await optional(
+    () => get("/me/media", { fields: `${IG.MEDIA_FIELDS},insights.metric(${IG.MEDIA_INSIGHT_METRICS})`, limit: "25" }),
+    { data: [] as any[] }, { call: "media", account: acc.id });
+
+  const posts: Post[] = (media.data ?? []).map((m: any) => {
+    const ins = normInsights(m.insights?.data ?? []);
+    return {
+      external_id: m.id,
+      title: (m.caption ?? "Instagram post").slice(0, 120),
+      media_type: m.media_type === "VIDEO" ? "Reel" : m.media_type === "CAROUSEL_ALBUM" ? "Carousel" : "Photo",
+      permalink: safePermalink(m.permalink),
+      published_at: m.timestamp ?? new Date().toISOString(),
+      views: ins.views ?? ins.reach ?? 0,
+      likes: m.like_count ?? 0,
+      comments: m.comments_count ?? 0,
+      shares: ins.shares ?? 0,
+      saves: ins.saved ?? 0,
+      reach: ins.reach ?? 0,
+      avg_watch_seconds: null,
+      retention_pct: null,
+    };
+  });
+
+  const dates = enumerateDays(start, now);
+  const followers = delta.available
+    ? reconstructFollowers(dates, prof.followers_count ?? 0, delta.byDate)
+    : flatFollowers(dates, prof.followers_count ?? null);
+
+  const engagements: Record<string, number | null> = {};
+  if (inter.available) {
+    for (const d of dates) engagements[d] = d in inter.byDate ? inter.byDate[d] : null;
+  } else if (reach.available) {
+    const byDate: Record<string, number> = {};
+    for (const p of posts) {
+      const d = (p.published_at ?? "").slice(0, 10);
+      if (d) byDate[d] = (byDate[d] ?? 0) + p.likes + p.comments + p.shares + p.saves;
+    }
+    for (const d of dates) engagements[d] = d in reach.byDate ? byDate[d] ?? 0 : null;
+  } else {
+    for (const d of dates) engagements[d] = null;
+  }
+
+  const days: DayRow[] = dates.map((date) => ({
+    date,
+    followers: followers[date] ?? null,
+    reach: pickDay(reach, date),
+    impressions: null,
+    views: pickDay(views, date),
+    engagements: engagements[date] ?? null,
+    provisional: isProvisional(date, now),
+  }));
+  return { days, posts };
+}
+
+/** Audience breakdowns on the Instagram Login path (needs ~100 followers). */
+async function audienceInstagramLogin(acc: AccountRow, token: string, c: { calls: number }): Promise<Audience> {
+  const get = (params: Record<string, string>) => { c.calls++; return igGet("/me/insights", params, token); };
+  const demo = (breakdown: string) => optional(
+    () => get({ metric: "follower_demographics", period: "lifetime", timeframe: "this_month", breakdown, metric_type: "total_value" }).then(parseDemographics),
+    {} as Record<string, number>, { metric: "follower_demographics", breakdown, mode: "instagram_login" });
+
+  const [ageRaw, genderRaw, countryRaw] = await Promise.all([demo("age"), demo("gender"), demo("country")]);
+  const online = await optional(
+    () => get({ metric: "online_followers", period: "lifetime" }).then((j) => bucketOnline(j.data?.[0]?.values ?? [])),
+    emptyHeat(), { metric: "online_followers", mode: "instagram_login" });
+
+  return {
+    age: toShares(ageRaw), gender: normalizeGender(genderRaw),
+    countries: toShares(mapCountryNames(countryRaw)), devices: {}, active_hours: online,
+  };
 }
 
 async function audienceInstagram(acc: AccountRow, token: string, c: { calls: number }): Promise<Audience> {

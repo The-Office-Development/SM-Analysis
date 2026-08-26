@@ -22,6 +22,7 @@
     "../netlify/functions/_sync.ts",
     "../netlify/functions/_lib.ts",
     "../netlify/functions/_tokens.ts",
-    "../netlify/functions/meta-data-deletion.ts"
+    "../netlify/functions/meta-data-deletion.ts",
+    "../netlify/functions/_instagram.ts"
   ]
 }
