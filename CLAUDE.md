@@ -82,14 +82,20 @@ for the new callbacks, and nothing is deployed.
 
 ## 4. What is left
 
+> Commercial and strategic decisions — build vs buy, web vs native, the pilot
+> route, pricing and positioning — live in `docs/PROJECT-STATE.md`. The
+> step-by-step deployment path is `docs/DEPLOY-RUNBOOK.md`.
+
 **Blocking, technical (about a day):**
 - apply `supabase/migrations/0001` → `0005` in order
 - set `TOKEN_ENC_KEY` and `OAUTH_STATE_SECRET`; scope Netlify env vars to the production context
 - register the data-deletion and deauthorize callback URLs; turn on Require App Secret
 - set `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` (distinct from `META_APP_*`)
 - see `docs/SETUP-META.md` for the full administrative path
-- deploy, connect a real Instagram account, **reconcile a week of numbers against the
-  account's own Instagram insights** — this is the gate that matters most
+- deploy, connect a real Instagram account, then run
+  `node verify/reconcile.mjs --account <id>` and **compare settled days against the
+  account's own Instagram insights** — this is the gate that matters most, and no
+  client sees the product until the numbers agree
 
 **Blocking, administrative (not code, start first — it runs in parallel):**
 - Business Verification (typically 2–5 business days; Jordanian commercial registration,
