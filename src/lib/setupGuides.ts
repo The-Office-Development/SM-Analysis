@@ -28,7 +28,7 @@ export interface SetupGuide {
 export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
   facebook: {
     summary:
-      "One Meta app covers both Facebook and Instagram. Development Mode is enough to analyse Pages you administer — App Review is only needed to read other people's Pages.",
+      "For Facebook Pages. Development Mode is enough to analyse Pages you administer — App Review is only needed to read other people's Pages. Instagram no longer comes through here; it has its own row.",
     requires: ["A Facebook Page you administer"],
     steps: [
       {
@@ -52,29 +52,42 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
     ],
   },
 
+  /*
+   * Instagram has its OWN connection, on the Instagram Login path.
+   *
+   * This guide described the Facebook Login path until 2026-08 — it told people a
+   * linked Facebook Page was mandatory and pointed at /api/oauth-meta-callback
+   * with META_APP_* credentials. All of that was left behind when Instagram Login
+   * became the primary path, and the redirect URI is rendered straight into the
+   * Connections page, so anyone following it registered the wrong callback and
+   * the connection failed. The Page requirement is the specific thing this path
+   * exists to remove: a creator without a Page cannot connect at all on the
+   * Facebook path.
+   */
   instagram: {
     summary:
-      "Instagram analytics come through the Facebook Graph API, so Instagram shares the Meta app — and the Connect button — with Facebook. There is no separate Instagram connection.",
-    requires: [
-      "A Business or Creator Instagram account (a personal account cannot work)",
-      "That Instagram account linked to a Facebook Page you administer",
-    ],
+      "Instagram connects on its own, through Instagram Login. No Facebook Page is involved, and the permissions are read-only.",
+    requires: ["A Business or Creator Instagram account (a personal account cannot expose insights)"],
     steps: [
       { text: "In the Instagram mobile app: Settings → Account type and tools → Switch to professional account, then pick Business or Creator." },
       {
-        text:
-          "Still in Instagram, connect a Facebook Page. A brand-new, empty Page is fine — but the link is mandatory, because the Graph API reaches Instagram through the Page.",
+        text: "Create a Meta app, then add the Instagram product and choose API setup with Instagram login.",
+        link: { href: "https://developers.facebook.com/apps/", label: "developers.facebook.com/apps" },
       },
-      { text: "Complete the Facebook steps above — the same Meta app serves both platforms." },
-      { text: "Add the Instagram Graph API product to that same app." },
-      { text: "Press Connect on the Facebook row above: one OAuth grants the Page and its linked Instagram account together." },
+      { text: "Business login settings → add the callback URL below as a redirect URI, exactly as shown." },
+      { text: "Copy the Instagram app ID and secret into the environment variables below. These are NOT the Facebook app's App ID and secret." },
+      { text: "Set the app's display name — that is the name people see on the Instagram permission screen." },
+      { text: "App roles → Roles: add the account as a Tester, and accept the invitation from that account's own Instagram settings. Real data flows with no App Review." },
+      { text: "Come back here, press Connect on this row, and approve the permission prompt." },
     ],
-    redirectPath: "/api/oauth-meta-callback",
-    env: ["META_APP_ID", "META_APP_SECRET"],
+    redirectPath: "/api/oauth-instagram-callback",
+    env: ["INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET"],
     notes: [
-      "Permissions requested: instagram_basic, instagram_manage_insights.",
-      "Follower demographics need roughly 100 followers. Below that Meta refuses the call and the Audience page stays empty — that is Meta's limit, not a failed sync.",
+      "Permissions requested: instagram_business_basic and instagram_business_manage_insights. Both are read-only — this app cannot post, comment or message.",
+      "Follower demographics need roughly 100 followers. Below that Meta returns nothing and the Audience page stays empty — that is Meta's limit, not a failed sync.",
       "A new account has no history for Meta to backfill, so trends build up from your first sync onward.",
+      "History arrives in chunks over several syncs rather than all at once: only reach is available as a daily series, so every other metric costs one API call per day.",
+      "Connecting a Facebook Page is a separate row above, and still uses the Facebook app's credentials.",
     ],
   },
 

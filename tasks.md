@@ -32,6 +32,17 @@ Last updated: 2026-08-28.
 - [x] Share links documented honestly: they hold a snapshot, do not expire, and
       cannot be revoked individually. Written as a limitation with a contact
       route rather than a promise the code cannot keep.
+- [x] **Fixed the Instagram setup guide, which described the wrong OAuth path.**
+      `src/lib/setupGuides.ts` still documented the Facebook Login route: it said
+      a linked Facebook Page was mandatory, that there was "no separate Instagram
+      connection", and it gave `/api/oauth-meta-callback` with `META_APP_*`
+      credentials. The Connections page renders that redirect URI directly, so
+      anyone following it would have registered the wrong callback and the
+      connection would have failed. The Page requirement is the exact thing the
+      Instagram Login path exists to remove. Now matches the code: correct
+      callback, `INSTAGRAM_APP_*`, the real read-only scopes, and the Tester
+      route spelled out.
+
 - [ ] `[STATUTORY PERIOD]` — the PDPL response deadline is a legal fact, not a
       choice. Left for counsel rather than guessed.
 - [ ] `[REGIONS CONFIGURED ... TRANSFER BASIS]` — needs the Supabase and Netlify
