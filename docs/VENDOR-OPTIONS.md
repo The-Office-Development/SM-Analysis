@@ -1,6 +1,30 @@
 # Data source options — buy the pipe, or build it
 
-Status: **PROPOSED, not decided.** Gated on one unanswered question (§5).
+Status: **DEFERRED — not chosen for launch.** Decision taken 2026-08-28: the data
+source is Meta directly, via our own app and a Tester-role pilot. See
+`PROJECT-STATE.md` §0.
+
+This document is kept because the research is sound and the decision is revisitable.
+Three things ruled it out *for now*, none of which are objections to the vendors:
+
+1. App Review was never the blocker for client one — Tester roles already read real
+   data, so the vendor buys scale we do not yet need.
+2. The client authorises the **vendor's** name on Instagram's consent screen, which
+   reintroduces the discovery risk that got resale rejected in `PROJECT-STATE.md` §2.
+   §1's "the client only ever sees our product" is not accurate as written.
+3. Waiting on three companies to answer §5 in writing is slower than deploying.
+
+**Revisit when** Tester invitations become the bottleneck (~client three or four).
+If revisited, add two questions to the §5 email: whether **white-label or
+partner-branded OAuth** is available, and whether the API returns **true daily
+series** for `views`, `total_interactions` and follower movement — Meta exposes
+those only as `total_value` aggregates (see `API-VERIFICATION.md`), so a vendor that
+has solved the per-day fetching is offering something we cannot cheaply build.
+
+One caveat to record for that day: a vendor is an opaque layer between Instagram and
+a sponsor-facing number. `verify/reconcile.mjs` can still compare, but when the
+numbers disagree we can only file a ticket, not debug it — and "a wrong number is
+worse than an outage" is the project's first constraint.
 
 The blocker for launch has never been our code. It is Meta App Review: until the
 app is approved, only accounts holding a role on it can connect. A licensed data

@@ -16,62 +16,107 @@ current; it is the first thing a new session should read after `CLAUDE.md`.**
 
 | | |
 |---|---|
-| Legal entity | **Alhujra Technology LLC** — *spelling UNCONFIRMED* |
+| Legal entity (Arabic) | **شركة الحجرة لتقنية المعلومات /ذات مسؤولية محدودة** |
+| Legal entity (English) | **NOT YET DETERMINED** — see below |
+| Commercial registration | 83622 · national establishment no. 200214930 |
+| Registered | 30 July 2026, Companies Control Department, status `قائمة` (active) |
+| Registered address | **Amman only** — the registration gives no street address |
 | Brand / product | The Office · PulseBoard |
 | Website | `theoffice.it.com` |
 | Bank account | None yet |
 | Jurisdiction | Jordan (UTC+3, no DST) |
 
-**The legal name must be transcribed character for character from the commercial
-registration before anything is submitted to Meta.** A name mismatch is the most
-common verification rejection, and `LLC` vs `L.L.C.` is enough to fail it. Until
-someone confirms it from the document, treat the name above as a guess and do not
-paste it into a Meta form or into the legal pages.
+Confirmed 2026-08-26 from the registration PDF's text layer (not OCR); the name
+string is identical on both pages. The earlier guess `Alhujra Technology LLC` was
+wrong on two counts and must not be reused: the registration reads *Information*
+Technology (`لتقنية المعلومات`), and **no English name appears on the document at
+all**.
 
-Two consequences already identified:
+**The English name is now the blocking decision, and a translator makes it.**
+Meta's Business info field needs Latin script, and the only English rendering that
+will ever exist is the one on the certified translation. `الحجرة` can be rendered
+Al-Hujra, Alhujra, Al Hujrah or Al-Hijra; once the translation is stamped that
+spelling is the legal English name, on the Meta form, in the legal pages and in
+the site footer. **Choose the spelling and give it to the translator in writing
+before they translate.** Ask the Companies Control Department first whether an
+English extract already exists on file — that would outrank the translator's.
+
+Further consequences identified:
 
 - The legal pages still carry `[REGISTERED COMPANY NAME]` and
-  `[REGISTERED ADDRESS, JORDAN]` placeholders. Filling them puts the entity name
-  on our own domain, which is exactly the corroboration Meta's reviewer wants.
-- `theoffice.it.com` is a subdomain resold by the it.com registrar, not a
-  registrable domain we own. That may complicate Meta domain verification and a
-  business email on our own domain. A proper `.com` or `.jo` for Alhujra is cheap
-  insurance before submitting.
-- No bank account means the corroborating second document must be a tax
-  registration certificate, a chamber of commerce certificate, a utility bill for
-  the registered premises, or a second official registry document.
+  `[REGISTERED ADDRESS, JORDAN]` placeholders (`src/pages/Legal.tsx:13,15`, plus
+  retention placeholders at 73 and 76). They cannot be filled until the English
+  name is settled.
+- **The site must state the link between brand and entity.** A reviewer sees
+  "The Office Development" and an Arabic document naming `الحجرة`; that the brand
+  is roughly a translation of the legal name is invisible to a non-Arabic reader.
+  Put it in the footer explicitly, with registration number 83622.
+- **The registration has no street address.** The second corroborating document
+  now has a specific job: carry a real one. Prefer a utility bill for the
+  registered premises over another registry extract. No bank account, so a bank
+  statement is unavailable.
+- **The registration carries no stamp or seal, deliberately** — its own footer
+  says `صدرت الوثيقة الكترونيا ... ولا تحتاج الى توقيع او ختم`, with a QR code for
+  verification. `SETUP-META.md` §1 says Meta rejects unstamped documents; that is
+  inherited secondary-source guidance and it conflicts with how Jordan issues this
+  document. Submit as is; if rejected as "document not supported", request a
+  stamped paper copy rather than resubmitting the same PDF.
+- **Signature authority is joint** (`مجتمعين`) — Chairman and Vice-Chairman
+  together. Relevant if any Meta step wants an authorised representative.
+- **Registered activities help App Review:** 620101 website design, 620102
+  software development, 620301 business applications, 620902 website management.
+  The entity's registered purpose matches what the product does.
+- `theoffice.it.com` **is fine after all.** Verified 2026-08-26: it delegates to
+  its own nameservers, so DNS TXT records for Meta domain verification can be
+  added, and Zoho MX/SPF are already live, so business email on the domain exists.
+  The earlier worry that a resold `it.com` subdomain would block both was wrong.
+  Point `app.theoffice.it.com` at Netlify and keep the marketing site where it is.
 
-### The plan — two tracks, running in parallel
+### The plan — direct Meta, Tester-role pilot
 
-**Track A — get the client onto our dashboard in days.**
-Licence a data vendor's API (Metricool first choice), pull into our database,
-serve our dashboard. The client only ever sees our product. This needs no Meta
-approval, because the vendor already has it. Gated on the terms question in
-`VENDOR-OPTIONS.md` §5.
+**Decided 2026-08-28, superseding the two-track proposal.** The data source is
+**Meta directly**, through our own app and our own OAuth. The vendor route is
+deferred, not discarded; the research stands in `VENDOR-OPTIONS.md`.
 
-```
-Instagram -> vendor (official Meta partner) -> vendor API -> our DB -> our dashboard
-```
+Three things decided it:
 
-**Track B — independence in weeks.**
-Business Verification and App Review continue regardless. When approved, swap the
-data source from the vendor's API to Meta's direct API. Everything above the data
-layer is unchanged, so this is a configuration change if — and only if — Track A
-is built as a swappable provider (`VENDOR-OPTIONS.md` §7).
+1. **App Review was never the blocker for client one.** Tester roles read real
+   data today (§3). The vendor buys scale we do not need this week.
+2. **The vendor puts someone else's name on the consent screen.** The client
+   authorises *Metricool*, not us. That reintroduces precisely the discovery risk
+   that got resale rejected in §2, at the moment of connection. The operator's
+   stated preference is that this not be a thing.
+3. **It is slower.** The vendor path waits on three companies answering a terms
+   question in writing, then a subscription, then building the provider to the
+   §7 contract. One to three weeks. The direct path is about five days.
 
-**Why both.** Track A removes the deadline risk without reselling anyone's
-dashboard or exposing us to a discovery conversation. Track B removes the vendor
-dependency and is the long-term product. Neither blocks the other.
+The client needs one main Instagram account connected plus some test accounts,
+which Tester roles handle comfortably.
+
+**Revisit the vendor when** Tester invitations become the bottleneck — roughly
+client three or four — by which point App Review may have landed anyway. Keep the
+provider seam in `_sync.ts` clean so that stays a config change.
+
+**Test accounts cannot validate numbers.** They must be Business or Creator
+accounts to expose insights at all, and below ~100 followers the demographics come
+back empty. A fresh account has no settled history to compare, so the
+reconciliation gate runs against **our own real account**; test accounts exercise
+the connect flow and the UI only. Reconciling against an account that cannot fail
+the check is the same mistake as citing the old `verify/*.mjs` printers.
 
 ### Immediate next action
 
-1. **Send the API terms email to Metricool, Socialinsider and Minter.io**
-   (`VENDOR-OPTIONS.md` §5). One paragraph, decides the architecture.
-2. **Blocked on a human:** transcribe the legal name and registered address from
-   the commercial registration, exactly as printed, and confirm it carries an
-   official stamp or seal.
-3. Fill the legal page placeholders, deploy, submit Business Verification
-   (`SETUP-META.md` §1). Track B starts here and needs the website live first.
+1. **Deploy.** Apply migrations, set secrets, configure the Meta app, ship it.
+   Nothing else moves until the app is reachable. `DEPLOY-RUNBOOK.md` §3–§5.
+   The follower-reconstruction bug (4 failing tests) lands first — the
+   reconciliation in step 5 compares follower numbers.
+2. **Blocked on a human:** decide the English spelling of `الحجرة`, check with CCD
+   whether an English extract exists, then order the certified translation. The
+   Arabic name is already confirmed — see above; only the English is open.
+   In parallel: obtain the second corroborating document **with a street address**.
+3. Fill the legal page placeholders and the site footer, deploy, submit Business
+   Verification (`SETUP-META.md` §1). Track B starts here and needs the website
+   live first.
 4. On a positive terms answer: subscribe, get an API token, and run the first-hour
    checklist in `VENDOR-OPTIONS.md` §6 before committing a client.
 5. Either way: connect a real account, sync 3+ days, run
@@ -88,7 +133,16 @@ dependency and is the long-term product. Neither blocks the other.
 - That sandbox has **no OCR** (`pdftoppm`, `tesseract` absent), so scanned
   documents cannot be read. Ask the human to transcribe instead.
 - Running Claude Code locally (`brew install poppler tesseract`) removes both
-  limits and is worth doing before the Meta endpoint verification.
+  limits. Sessions from 2026-08-26 have run locally on macOS with `pdftotext`
+  available, which is how the registration was read.
+- **Government PDFs carry a text layer — extract it, do not read the image.**
+  The registration's text is stored as Arabic presentation forms
+  (`U+FE70–FEFF`); `pdftotext -layout` plus Python `unicodedata.normalize("NFKC", …)`
+  recovers the exact canonical string. That matters when a name has to match
+  character for character.
+
+> The registration PDF also lists both partners' national ID numbers. Those are
+> personal data: they belong in the Meta upload, not in this repository.
 
 ---
 

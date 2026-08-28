@@ -25,10 +25,17 @@ account against the name on your document and wants an *exact* match, not
 
 Gather:
 
-- [ ] **Commercial registration** (السجل التجاري) from the Ministry of Industry,
-      Trade and Supply, and/or your **certificate of registration** (شهادة تسجيل).
-      It must carry an official **stamp or seal** — Meta will not accept a
-      document without one.
+- [x] **Commercial registration** — *obtained.* `سجل معلومات الشركة` from the
+      Companies Control Department, reg. 83622, issued 30/07/2026. See
+      `PROJECT-STATE.md` §0 for the exact legal name and what it changed.
+
+      **Correction to the stamp rule below.** This guidance originally said the
+      document "must carry an official stamp or seal — Meta will not accept a
+      document without one." Our actual registration says the opposite in its own
+      footer: issued electronically, `لا تحتاج الى توقيع او ختم`, verified by QR
+      code instead. The stamp rule was assembled from secondary sources and is not
+      reliable for Jordanian e-filings. Submit the document as issued; only chase a
+      stamped paper copy if Meta actually rejects it as unsupported.
 - [ ] A **second corroborating document** showing the *same* legal name and the
       *same* address: a business bank statement or a utility bill. Submitting two
       documents that agree with each other is the single best thing you can do
