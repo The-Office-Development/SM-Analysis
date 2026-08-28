@@ -18,21 +18,29 @@ Last updated: 2026-08-28.
 
 ## 0. Before deploying — no accounts needed
 
-- [ ] **Reword the legal pages to describe what the system actually does.**
-      `src/pages/Legal.tsx` claims shared links "expire after `[SHARE LINK LIFETIME]`"
-      and that metrics are kept for `[RETENTION PERIOD]` — **neither feature
-      exists.** There is no expiry logic in `share.ts` and no purge function.
-      Filling those brackets with numbers would put a false statement in a privacy
-      policy that Meta checks against real behaviour. Either build both features or
-      say what actually happens; saying what happens is honest and takes minutes.
-- [ ] Set `CONTACT` to `privacy@theoffice.it.com` — Zoho mail is already live on
-      the domain, so this one is not blocked.
-- [ ] Decide `[LOG RETENTION]` and `[STATUTORY PERIOD]` (the PDPL response
-      deadline) and fill them.
-- [ ] `[DESCRIBE THE TRANSFER SAFEGUARD]` — needs the Supabase and Netlify region
-      choice plus a stated cross-border position. Counsel question, not a code one.
+- [x] **Reword the legal pages to describe what the system actually does.**
+      Done 2026-08-28. The policy claimed shared links expire and that records
+      are kept for a retention period after disconnection; neither feature
+      exists. Both statements are gone, replaced with the verified behaviour:
+      disconnecting deletes the token, metrics, posts, audience data and that
+      account's sync log **immediately** (`sync_log` cascades on the foreign
+      key), so there is no retention window because nothing is retained.
+- [x] Contact set to `privacy@theoffice.it.com` — Zoho is already live on the
+      domain, so this was never actually blocked.
+- [x] `[LOG RETENTION]` resolved — operational records are covered by the same
+      immediate deletion, so the separate claim was unnecessary.
+- [x] Share links documented honestly: they hold a snapshot, do not expire, and
+      cannot be revoked individually. Written as a limitation with a contact
+      route rather than a promise the code cannot keep.
+- [ ] `[STATUTORY PERIOD]` — the PDPL response deadline is a legal fact, not a
+      choice. Left for counsel rather than guessed.
+- [ ] `[REGIONS CONFIGURED ... TRANSFER BASIS]` — needs the Supabase and Netlify
+      region decision plus a stated cross-border position.
+- [ ] `[UPTIME COMMITMENT]` and `[LIABILITY POSITION]` in the terms — commercial
+      and legal decisions, not code ones.
 
-`OPERATOR` and `ADDRESS` stay bracketed until the translation lands (§4).
+`OPERATOR` and `ADDRESS` stay bracketed until the translation lands (§4). They
+are now the only two placeholders blocked on something other than counsel.
 
 ## 1. Stand it up — about two hours
 

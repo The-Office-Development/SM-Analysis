@@ -7,12 +7,22 @@ import ThemeToggle from "../components/ThemeToggle";
  * Public legal pages. Meta's App Review requires a reachable privacy policy and
  * a data-deletion route, and Jordan's PDPL requires the processing to be
  * described accurately. The content below describes what this system ACTUALLY
- * does — it is not boilerplate — but the bracketed details must be completed and
- * the whole thing reviewed by qualified counsel in Jordan before launch.
+ * does — it is not boilerplate.
+ *
+ * >>> EVERY STATEMENT HERE MUST BE TRUE OF THE CODE AS IT STANDS. <<<
+ * Two claims were removed in 2026-08 because they were not: that shared links
+ * expire, and that records are kept for a retention period after disconnection.
+ * Neither feature exists — there is no expiry column on `report_shares` and no
+ * purge job — and Meta checks a privacy policy against real behaviour. If
+ * expiry or retention is built later, describe it here THEN, not before.
+ *
+ * What remains bracketed is genuinely unresolved, not unwritten: the registered
+ * name and address wait on the certified translation of the commercial
+ * registration, and the rest are questions for counsel in Jordan.
  */
-const OPERATOR = "[REGISTERED COMPANY NAME]";
-const CONTACT = "[privacy@yourdomain]";
-const ADDRESS = "[REGISTERED ADDRESS, JORDAN]";
+const OPERATOR = "[REGISTERED COMPANY NAME]"; // blocked on the certified translation
+const CONTACT = "privacy@theoffice.it.com";
+const ADDRESS = "[REGISTERED ADDRESS, JORDAN]"; // registration gives only "Amman"
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   useEffect(() => { applyTheme(getTheme()); }, []);
@@ -67,13 +77,17 @@ export function Privacy() {
         <li><b>Netlify</b> — hosting and server logs.</li>
         <li><b>Anthropic</b> — powers the optional AI assistant. When you use it, a compact summary of your dashboard figures and the titles of your top posts is sent to produce an answer. Your access tokens and raw records are never sent. If you do not use the assistant, nothing is sent.</li>
       </ul>
-      <p>These providers operate outside Jordan, so using this service involves a transfer of your personal data abroad. [DESCRIBE THE TRANSFER SAFEGUARD RELIED ON AND THE REGIONS CONFIGURED.]</p>
+      <p>All three operate outside Jordan, so using this service involves transferring your personal data abroad. [REGIONS CONFIGURED FOR SUPABASE AND NETLIFY, AND THE TRANSFER BASIS RELIED ON UNDER THE PDPL — COUNSEL TO COMPLETE.]</p>
 
       <h3>How long we keep it</h3>
-      <p>Metrics and post records are kept while your account is connected and for [RETENTION PERIOD] afterwards. Tokens are deleted the moment you disconnect. Shared report links expire after [SHARE LINK LIFETIME]. Operational records are kept for [LOG RETENTION].</p>
+      <p>We keep what you connect for as long as you keep it connected, and no longer. <b>Disconnecting an account deletes it immediately</b> — the access token, every daily metric, every post record, the audience breakdowns and that account's sync history are removed at once, not after a delay. There is no retention window afterwards because there is nothing left to retain. Deleting your whole account removes everything above along with your goals, your recorded consents and any report links you created.</p>
+
+      <h3>Shared report links</h3>
+      <p>A shared link holds a <b>snapshot</b> of the figures as they stood when you created it; it does not update afterwards. Anyone holding the link can open it without signing in, so treat one as public once you have sent it.</p>
+      <p><b>Links do not currently expire, and there is no way to revoke a single link.</b> Deleting your account removes every link you have created. If you need a link withdrawn before then, write to {CONTACT} and we will remove it for you.</p>
 
       <h3>Your rights</h3>
-      <p>You may ask us for a copy of your data, ask us to correct or delete it, or withdraw consent. Use <b>Export my data</b> and <b>Delete my account</b> in your settings, or write to {CONTACT}; we respond within [STATUTORY PERIOD]. You may also complain to the competent Jordanian authority.</p>
+      <p>You may ask us for a copy of your data, ask us to correct or delete it, or withdraw consent. Use <b>Export my data</b> and <b>Delete my account</b> in your settings, or write to {CONTACT}; we respond within [STATUTORY PERIOD — COUNSEL TO CONFIRM UNDER THE PDPL]. You may also complain to the competent Jordanian authority.</p>
 
       <h3>Deleting your data</h3>
       <p>Disconnecting an account revokes our access at the platform and permanently deletes the metrics, posts and audience information we hold for it. See <a href="/data-deletion">Data deletion</a>.</p>
