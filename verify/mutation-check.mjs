@@ -67,6 +67,14 @@ const mutations = [
   { name: "short-lived Instagram token stored instead of long-lived", file: INSTA,
     find: "const accessToken = long.access_token || short.access_token;",
     replace: "const accessToken = short.access_token;" },
+  // The follower series is cumulative, so it is only as right as the ONE total it
+  // is derived from. Both of these restore ways of getting that total wrong.
+  { name: "follower series anchored on today's count for an old window", file: SYNC,
+    find: "const resolved = anchor ?? (reachesToday && liveTotal !== null ? { date: end, total: liveTotal } : null);",
+    replace: "const resolved = (liveTotal !== null ? { date: end, total: liveTotal } : null);" },
+  { name: "backfill overlap removed (no stored day anchors the chunk)", file: SYNC,
+    find: "        const end = earliest;",
+    replace: "        const end = addDays(earliest, -1);" },
 ];
 
 function runSuite() {

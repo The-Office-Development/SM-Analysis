@@ -9,10 +9,11 @@ import { GraphError, isThrottleError, log } from "./_lib";
  * scopes this product never uses.
  *
  * >>> EVERY ENDPOINT, SCOPE AND FIELD BELOW IS IN THIS ONE BLOCK ON PURPOSE. <<<
- * They were assembled from secondary sources because Meta's developer site was
- * unreachable when this was written. VERIFY EACH AGAINST THE OFFICIAL DOCS AND
- * ONE LIVE RESPONSE BEFORE CONNECTING A CLIENT ACCOUNT. If a name is wrong, it
- * is wrong only here.
+ * They were originally assembled from secondary sources because Meta's developer
+ * site was unreachable. They were checked against the official documentation on
+ * 2026-08-26 — see docs/API-VERIFICATION.md for the citations and what changed.
+ * Still NOT verified against a live response: documentation agreement is not the
+ * same as one real call. If a name is wrong, it is wrong only here.
  * ======================================================================== */
 export const IG = {
   /** Where the user is sent to authorise. */
@@ -29,15 +30,38 @@ export const IG = {
   SCOPES: ["instagram_business_basic", "instagram_business_manage_insights"],
   /** Profile fields. */
   ME_FIELDS: "user_id,username,name,profile_picture_url,followers_count,media_count",
-  /** Daily account metrics. Requested separately so one bad name cannot kill the rest. */
-  DAILY_METRICS: ["reach", "views", "follower_count", "total_interactions"],
+  /**
+   * The ONLY account metric that can be returned as a daily series.
+   *
+   * `metric_type=time_series` is sent explicitly: `reach` supports both types and
+   * the default is not documented.
+   */
+  SERIES_METRIC: "reach",
+  /**
+   * Account metrics that exist only as `total_value` — a single aggregate over
+   * the requested range, never a per-day series. A daily figure therefore costs
+   * one call per metric per day; see DAY_BUDGET in _sync.ts.
+   *
+   * `follower_count` and `online_followers` are NOT here: neither appears in the
+   * insights metrics table any more. `follows_and_unfollows` is the documented
+   * way to track follower movement, and it reports unfollows too, so the series
+   * it produces is a NET change rather than gross new follows.
+   */
+  TOTAL_VALUE_METRICS: ["views", "total_interactions", "follows_and_unfollows"] as string[],
+  /** Splits follows_and_unfollows into its two directions. */
+  FOLLOW_TYPE_BREAKDOWN: "follow_type",
   /** Demographic breakdowns (needs ~100 followers; capped at top 45 segments). */
   DEMOGRAPHIC_BREAKDOWNS: ["age", "gender", "country"],
   MEDIA_FIELDS: "id,caption,media_type,permalink,timestamp,like_count,comments_count",
   MEDIA_INSIGHT_METRICS: "reach,saved,shares,views",
 } as const;
 
-export const IG_VERSION = process.env.IG_API_VERSION ?? "v23.0";
+/**
+ * Pinned deliberately. Meta removes metrics between versions, so this is a
+ * decision to revisit on a schedule, not a default to drift. v26.0 is the latest
+ * documented version as of 2026-08-26.
+ */
+export const IG_VERSION = process.env.IG_API_VERSION ?? "v26.0";
 
 function base(): string { return `${IG.GRAPH}/${IG_VERSION}`; }
 

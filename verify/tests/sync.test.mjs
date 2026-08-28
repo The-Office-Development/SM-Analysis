@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { syncAccount, dayKeyFromEndTime, syncStart, seriesFrom } from "../build/_sync.js";
 import { makeDb } from "./fake-supabase.mjs";
-import { installGraphMock, trueValue, addDays } from "./mock-graph.mjs";
+import { installGraphMock, trueValue, trueNetFollows, addDays } from "./mock-graph.mjs";
 
 process.env.GRAPH_BACKOFF_BASE_MS = "1";
 process.env.TOKEN_ENC_KEY ??= Buffer.alloc(32, 7).toString("base64");
@@ -18,6 +18,22 @@ function seedDb(extra = {}) {
     metrics_daily: [],
     ...extra,
   });
+}
+
+/**
+ * Run the sync the way the cron does: repeatedly.
+ *
+ * Only `reach` has a daily series; every other account metric costs one call per
+ * day, so a run fetches a bounded window and the next run resumes where it
+ * stopped. A backfill therefore completes over several runs, and a test that
+ * syncs once and expects a month of history is testing a sync that would blow
+ * its function timeout on a real account.
+ */
+async function syncUntilCaughtUp(db, acc, opts, runs = 6) {
+  for (let i = 0; i < runs; i++) {
+    const mock = installGraphMock(opts);
+    try { await syncAccount(db, acc); } finally { mock.restore(); }
+  }
 }
 
 /* ---- the day-boundary oracle ------------------------------------------- */
@@ -63,18 +79,50 @@ test("syncStart still backfills a first sync and never runs past today", () => {
 for (const [label, offset] of [["Amman (+3)", 3], ["Los Angeles (-7)", -7], ["UTC", 0], ["Tokyo (+9)", 9]]) {
   test(`stored reach matches the platform's true value per day — ${label}`, async () => {
     const from = addDays(TODAY, -29);
-    const mock = installGraphMock({ offset, days: [from, TODAY] });
     const db = seedDb();
-    try {
-      await syncAccount(db, account);
-    } finally { mock.restore(); }
+    await syncUntilCaughtUp(db, account, { offset, days: [from, TODAY] });
 
     const rows = db._rows("metrics_daily");
     assert.ok(rows.length >= 25, `expected a month of rows, got ${rows.length}`);
     for (const r of rows) {
       assert.equal(r.reach, trueValue("reach", r.date), `reach on ${r.date}`);
-      assert.equal(r.views, trueValue("views", r.date), `views on ${r.date}`);
       assert.equal(r.account_id, "acc-1", "rows must belong to the syncing account");
+    }
+  });
+
+  /*
+   * `views` is total_value only, so its day boundaries come from the REQUEST.
+   * The mock aggregates by real-time overlap with each local day, exactly as the
+   * platform does, so asking for a UTC day on a UTC+3 account returns a blend of
+   * two days rather than an error. An exact match is therefore proof the window
+   * was built in the account's own timezone.
+   */
+  test(`total_value day windows are the account's own days — ${label}`, async () => {
+    const from = addDays(TODAY, -29);
+    const db = seedDb();
+    await syncUntilCaughtUp(db, account, { offset, days: [from, TODAY] });
+
+    const rows = db._rows("metrics_daily");
+    assert.ok(rows.length >= 25, `expected a month of rows, got ${rows.length}`);
+    for (const r of rows) {
+      assert.equal(r.views, trueValue("views", r.date), `views on ${r.date} — window misaligned by the account offset`);
+    }
+  });
+
+  test(`the follower series is rebuilt from net follows and unfollows — ${label}`, async () => {
+    const from = addDays(TODAY, -29);
+    const db = seedDb();
+    await syncUntilCaughtUp(db, account, { offset, days: [from, TODAY] });
+
+    const rows = db._rows("metrics_daily").slice().sort((a, b) => a.date.localeCompare(b.date));
+    const withFollowers = rows.filter((r) => r.followers !== null);
+    assert.ok(withFollowers.length >= 25, "a follower value per day, not one flat line");
+    // Day-over-day movement must equal follows minus unfollows for that day. A
+    // series that ignored unfollows would drift upward by the unfollow count.
+    for (let i = 1; i < withFollowers.length; i++) {
+      const expected = trueNetFollows(withFollowers[i].date);
+      assert.equal(withFollowers[i].followers - withFollowers[i - 1].followers, expected,
+        `net follower change on ${withFollowers[i].date}`);
     }
   });
 }
@@ -84,15 +132,14 @@ for (const [label, offset] of [["Amman (+3)", 3], ["Los Angeles (-7)", -7], ["UT
 test("a throttled metric never overwrites stored data with zeros", async () => {
   const from = addDays(TODAY, -29);
   // First sync: everything succeeds.
-  let mock = installGraphMock({ offset: 3, days: [from, TODAY] });
   const db = seedDb();
-  try { await syncAccount(db, account); } finally { mock.restore(); }
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] });
 
   const before = db._rows("metrics_daily");
   assert.ok(before.every((r) => r.reach > 0), "precondition: real values are stored");
 
   // Second sync: Meta rate limits us.
-  mock = installGraphMock({ offset: 3, days: [from, TODAY], failMetric: "reach" });
+  const mock = installGraphMock({ offset: 3, days: [from, TODAY], failMetric: "reach" });
   let threw = false;
   try { await syncAccount(db, account); } catch { threw = true; } finally { mock.restore(); }
 
@@ -106,9 +153,8 @@ test("a throttled metric never overwrites stored data with zeros", async () => {
 
 test("a metric the account does not expose is stored as unknown, not as zero", async () => {
   const from = addDays(TODAY, -29);
-  const mock = installGraphMock({ offset: 3, days: [from, TODAY], missing: ["total_interactions"] });
   const db = seedDb();
-  try { await syncAccount(db, account); } finally { mock.restore(); }
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY], missing: ["total_interactions"] });
 
   const rows = db._rows("metrics_daily");
   assert.ok(rows.length > 0);
@@ -120,9 +166,8 @@ test("a metric the account does not expose is stored as unknown, not as zero", a
 
 test("recent days are flagged provisional so the UI need not read them as a drop", async () => {
   const from = addDays(TODAY, -29);
-  const mock = installGraphMock({ offset: 3, days: [from, TODAY] });
   const db = seedDb();
-  try { await syncAccount(db, account); } finally { mock.restore(); }
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] });
 
   const rows = db._rows("metrics_daily");
   assert.equal(rows.find((r) => r.date === TODAY)?.provisional, true);
