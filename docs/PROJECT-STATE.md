@@ -3,7 +3,7 @@
 The living record. `CLAUDE.md` is the technical brief; this is the commercial
 and strategic one. Update it when a decision changes.
 
-Last updated: 2026-08-26.
+Last updated: 2026-08-26 (two-track plan added).
 
 ---
 
@@ -41,15 +41,41 @@ Two consequences already identified:
   registration certificate, a chamber of commerce certificate, a utility bill for
   the registered premises, or a second official registry document.
 
+### The plan — two tracks, running in parallel
+
+**Track A — get the client onto our dashboard in days.**
+Licence a data vendor's API (Metricool first choice), pull into our database,
+serve our dashboard. The client only ever sees our product. This needs no Meta
+approval, because the vendor already has it. Gated on the terms question in
+`VENDOR-OPTIONS.md` §5.
+
+```
+Instagram -> vendor (official Meta partner) -> vendor API -> our DB -> our dashboard
+```
+
+**Track B — independence in weeks.**
+Business Verification and App Review continue regardless. When approved, swap the
+data source from the vendor's API to Meta's direct API. Everything above the data
+layer is unchanged, so this is a configuration change if — and only if — Track A
+is built as a swappable provider (`VENDOR-OPTIONS.md` §7).
+
+**Why both.** Track A removes the deadline risk without reselling anyone's
+dashboard or exposing us to a discovery conversation. Track B removes the vendor
+dependency and is the long-term product. Neither blocks the other.
+
 ### Immediate next action
 
-1. **Blocked on a human:** transcribe the legal name and registered address from
+1. **Send the API terms email to Metricool, Socialinsider and Minter.io**
+   (`VENDOR-OPTIONS.md` §5). One paragraph, decides the architecture.
+2. **Blocked on a human:** transcribe the legal name and registered address from
    the commercial registration, exactly as printed, and confirm it carries an
    official stamp or seal.
-2. Then: fill the legal page placeholders, deploy, and submit Business
-   Verification (`SETUP-META.md` §1).
-3. Then: connect our own Instagram, sync for 3+ days, and run
-   `node verify/reconcile.mjs`. **No client sees the product until those numbers
+3. Fill the legal page placeholders, deploy, submit Business Verification
+   (`SETUP-META.md` §1). Track B starts here and needs the website live first.
+4. On a positive terms answer: subscribe, get an API token, and run the first-hour
+   checklist in `VENDOR-OPTIONS.md` §6 before committing a client.
+5. Either way: connect a real account, sync 3+ days, run
+   `node verify/reconcile.mjs`. **No client sees the product until the numbers
    agree with the Instagram app.**
 
 ### Environment gotchas that keep recurring
@@ -104,6 +130,8 @@ either, because a client on our dashboard can still find a cheaper tool.
 | **Instagram auth path** | **Instagram API with Instagram Login** | Needs no linked Facebook Page. On the Facebook Login path a creator without one **cannot connect at all** — a hard block, not friction. Smaller, entirely read-only permission set. Facebook Login retained for Pages. |
 | **Web or native app** | **Web, delivered as a PWA** | A native app adds a second gatekeeper (Apple/Google review) to a project already gated by Meta. Web gives same-day fixes when Meta deprecates a metric, natural OAuth redirects, one codebase, no store fee. A PWA recovers the home-screen icon and push notifications without store review. Revisit native only if a client actually asks. |
 | **Pilot delivery** | **Tester roles**, not App Review | Lets the first client use *our* software on real data within days. See §3. |
+| **Data source** | **PROPOSED:** licence a vendor API for launch, keep direct Meta as the destination | The blocker was never our code, it is App Review. A licensed vendor has already passed it, so buying their API buys their approval. Not decided — gated on whether their terms permit billing clients for a product built on it. See `VENDOR-OPTIONS.md`. |
+| **Scraping a vendor UI** | **Rejected** | Breaches vendor terms; termination takes every client dark at once. Both shortlisted vendors sell an official API for the same thing, so there is no reason to. |
 | **Scopes** | `instagram_business_basic`, `instagram_business_manage_insights` only | Both read-only. `business_management` was dropped: it is write-capable, unused, and turns a token leak from data exposure into asset compromise. |
 
 ### Rejected, and why it is recorded
@@ -218,6 +246,8 @@ reconciled against Instagram's own insights.
 | Client discovers cheaper tooling | **Mitigated by positioning**, not by secrecy — we sell the work, not the seat. |
 | App restricted by Meta | **Reduced** (read-only scopes, no `business_management`, callbacks implemented) but never zero. All clients share one app. |
 | Deadline pressure ships unverified numbers | **The one to watch.** A wrong number in a sponsor report costs the client relationship permanently; a late launch does not. |
+| Vendor dependency (if Track A proceeds) | **Accepted, bounded.** Mitigated by building the vendor as a swappable provider and by Track B continuing in parallel. Metricool is EU-based with corporate backing, so vanishing-vendor risk is low. |
+| Vendor terms forbid billing clients | **Open.** The gate on Track A. If all three refuse, fall back to Track B plus a tester-role pilot. |
 
 ---
 
@@ -232,3 +262,4 @@ reconciled against Instagram's own insights.
 | `REMEDIATION-STATUS.md` | Each P0 mapped to what was done |
 | `DATA-INTEGRITY.md` | The proven metric defects, with runnable proofs |
 | `JORDAN-CONTEXT.md` | What operating from Jordan changes |
+| `VENDOR-OPTIONS.md` | Data-source comparison, ban-risk analysis, the open terms question |

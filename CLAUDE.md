@@ -87,8 +87,10 @@ for the new callbacks, and nothing is deployed.
 ## 4. What is left
 
 > Commercial and strategic decisions — build vs buy, web vs native, the pilot
-> route, pricing and positioning — live in `docs/PROJECT-STATE.md`. The
-> step-by-step deployment path is `docs/DEPLOY-RUNBOOK.md`.
+> route, pricing and positioning — live in `docs/PROJECT-STATE.md`, which also
+> holds the current two-track plan. The data-source comparison is
+> `docs/VENDOR-OPTIONS.md`. The step-by-step deployment path is
+> `docs/DEPLOY-RUNBOOK.md`.
 
 **Blocking, technical (about a day):**
 - apply `supabase/migrations/0001` → `0005` in order
