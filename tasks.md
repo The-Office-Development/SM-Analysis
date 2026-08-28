@@ -130,10 +130,25 @@ are now the only two placeholders blocked on something other than counsel.
       Hand this over now — it is on their side and takes minutes.
 - [ ] Add their accounts as **Testers** (App roles → Roles). They accept from
       their own Instagram settings.
-- [ ] Note: test accounts cannot validate numbers. Below ~100 followers
-      demographics come back empty, and a fresh account has no settled history.
-      The reconciliation in §3 runs against our own real account; test accounts
-      exercise the connect flow and the UI only.
+- [x] Client has provided `iron_jor` (IRON_JO, calisthenics gear, Amman) as a
+      test account — **already a professional account**, ~1,483 followers, posts
+      from Jan–Jul 2026.
+- [ ] **Confirm we can open Instagram's own Insights on it.** This is what
+      decides whether it can serve as the §3 gate: reconciliation compares our
+      numbers against Instagram's for the same account, so we need to see both
+      sides. Login access is ideal; screenshots from the client work but are slow
+      to debug against.
+- [ ] Note: a *fresh* test account cannot validate numbers — below ~100 followers
+      demographics come back empty and there is no settled history to compare.
+      `iron_jor` is not that: it is a real account with real followers, so it can
+      carry the gate. Do not skip reconciliation on the assumption that a "test"
+      account cannot support it.
+- [ ] It is also the screencast account for App Review. A dashboard with real
+      followers and populated demographics reads as a product; an empty one reads
+      as a prototype.
+- [ ] The account has been quiet since 31 July. Posting two or three times during
+      the sync window gives real day-to-day movement, which is what makes a
+      one-day date-boundary error obvious rather than subtle.
 
 ## 6. Background — weeks, blocks nothing above
 
