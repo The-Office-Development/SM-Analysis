@@ -16,13 +16,23 @@ import ThemeToggle from "../components/ThemeToggle";
  * purge job — and Meta checks a privacy policy against real behaviour. If
  * expiry or retention is built later, describe it here THEN, not before.
  *
- * What remains bracketed is genuinely unresolved, not unwritten: the registered
- * name and address wait on the certified translation of the commercial
+ * The registered name and address are now settled from the certified translation
+ * (2026-08-19). What remains bracketed is genuinely unresolved, not unwritten:
+ * items that wait on counsel rather than on the certified translation of the
+ * commercial
  * registration, and the rest are questions for counsel in Jordan.
  */
-const OPERATOR = "[REGISTERED COMPANY NAME]"; // blocked on the certified translation
+// Exactly as it appears on the certified translation (Abu-Ghazaleh / AGATO,
+// 19 Aug 2026) of commercial registration 83622. Note it ends at "Limited
+// Liability", not "Limited Liability Company". Meta compares this against the
+// document character for character, so it must not be varied anywhere.
+const OPERATOR = "Al-Hujra Information Technology Company / Limited Liability";
 const CONTACT = "privacy@theoffice.it.com";
-const ADDRESS = "[REGISTERED ADDRESS, JORDAN]"; // registration gives only "Amman"
+// The registration states only "Amman" as the headquarters — there is no street
+// address on the document. Do not invent one; the corroborating second document
+// is what has to carry it.
+const ADDRESS = "Amman, Jordan";
+const REGISTRATION = "Commercial registration 83622 · national establishment 200214930";
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   useEffect(() => { applyTheme(getTheme()); }, []);
@@ -55,7 +65,7 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
 export function Privacy() {
   return (
     <Shell title="Privacy policy">
-      <p className="muted">Last updated: {new Date().toISOString().slice(0, 10)}. Controller: {OPERATOR}, {ADDRESS}. Contact: {CONTACT}.</p>
+      <p className="muted">Last updated: {new Date().toISOString().slice(0, 10)}. Controller: {OPERATOR}, {ADDRESS}. {REGISTRATION}. Contact: {CONTACT}.</p>
 
       <h3>What we hold</h3>
       <ul>
@@ -98,7 +108,7 @@ export function Privacy() {
 export function Terms() {
   return (
     <Shell title="Terms of service">
-      <p className="muted">Operator: {OPERATOR}. Contact: {CONTACT}.</p>
+      <p className="muted">Operator: {OPERATOR}, {ADDRESS}. {REGISTRATION}. Contact: {CONTACT}.</p>
       <h3>What this service does</h3>
       <p>PulseBoard reads analytics from social accounts you connect and presents them. It is a read-only analytics tool: it cannot post, comment, follow, message or otherwise act on your behalf, and it never holds your social media password.</p>
       <h3>Your responsibilities</h3>

@@ -3,7 +3,7 @@
 The living record. `CLAUDE.md` is the technical brief; this is the commercial
 and strategic one. Update it when a decision changes.
 
-Last updated: 2026-08-26 (two-track plan added).
+Last updated: 2026-08-28 (English legal name confirmed from the certified translation).
 
 ---
 
@@ -17,10 +17,13 @@ current; it is the first thing a new session should read after `CLAUDE.md`.**
 | | |
 |---|---|
 | Legal entity (Arabic) | **شركة الحجرة لتقنية المعلومات /ذات مسؤولية محدودة** |
-| Legal entity (English) | **NOT YET DETERMINED** — see below |
+| Legal entity (English) | **Al-Hujra Information Technology Company / Limited Liability** |
 | Commercial registration | 83622 · national establishment no. 200214930 |
 | Registered | 30 July 2026, Companies Control Department, status `قائمة` (active) |
-| Registered address | **Amman only** — the registration gives no street address |
+| Registered address | **Amman only** — no street address on the registration |
+| Certified translation | Abu-Ghazaleh (AGATO), stamped 19 Aug 2026 — settles the English name |
+| Officers | Malek Ahmed Hassan Ismaeil (Chairman) · Bader Rami Saleh Alhaj Hamad (Vice-Chairman) |
+| Registered objectives | 620101 website design · 620102 computer programming · 620301 business applications and software · 620902 website management |
 | Brand / product | The Office · PulseBoard |
 | Website | `theoffice.it.com` |
 | Bank account | None yet |
@@ -32,25 +35,26 @@ wrong on two counts and must not be reused: the registration reads *Information*
 Technology (`لتقنية المعلومات`), and **no English name appears on the document at
 all**.
 
-**The English name is now the blocking decision, and a translator makes it.**
-Meta's Business info field needs Latin script, and the only English rendering that
-will ever exist is the one on the certified translation. `الحجرة` can be rendered
-Al-Hujra, Alhujra, Al Hujrah or Al-Hijra; once the translation is stamped that
-spelling is the legal English name, on the Meta form, in the legal pages and in
-the site footer. **Choose the spelling and give it to the translator in writing
-before they translate.** Ask the Companies Control Department first whether an
-English extract already exists on file — that would outrank the translator's.
+**The English name is settled.** The certified translation (Abu-Ghazaleh / AGATO,
+19 Aug 2026) of registration 83622 renders it
+**`Al-Hujra Information Technology Company / Limited Liability`**. Note the string
+ends at *Limited Liability*, not *Limited Liability Company*. Meta compares this
+against the document character for character, so it must be used verbatim
+everywhere and never varied — it is now in `src/pages/Legal.tsx` and the app footer.
+
+The registered objectives are a gift for App Review: website design, computer
+programming, business applications and software, and website management services.
+They corroborate that the entity and the product belong together, which a reviewer
+otherwise has to take on trust.
 
 Further consequences identified:
 
-- The legal pages still carry `[REGISTERED COMPANY NAME]` and
-  `[REGISTERED ADDRESS, JORDAN]` placeholders (`src/pages/Legal.tsx:13,15`, plus
-  retention placeholders at 73 and 76). They cannot be filled until the English
-  name is settled.
-- **The site must state the link between brand and entity.** A reviewer sees
-  "The Office Development" and an Arabic document naming `الحجرة`; that the brand
-  is roughly a translation of the legal name is invisible to a non-Arabic reader.
-  Put it in the footer explicitly, with registration number 83622.
+- ~~The legal pages carry name and address placeholders.~~ **Done 2026-08-28.**
+  `OPERATOR`, `ADDRESS` and a registration line are filled from the certified
+  translation. What remains bracketed waits on counsel, not on the translation.
+- ~~The site must state the link between brand and entity.~~ **Done 2026-08-28.**
+  The app footer now names the entity, Amman and registration 83622 beneath the
+  legal links.
 - **The registration has no street address.** The second corroborating document
   now has a specific job: carry a real one. Prefer a utility bill for the
   registered premises over another registry extract. No bank account, so a bank

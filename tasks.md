@@ -107,21 +107,21 @@ are now the only two placeholders blocked on something other than counsel.
 
 ## 4. Blocked on a human
 
-- [ ] **Decide the English spelling of `الحجرة`** — Al-Hujra, Alhujra, Al Hujrah.
-      The registration is Arabic-only with no English name, so whatever the
-      certified translator writes becomes the legal English name permanently, on
-      the Meta form and in the legal pages. Brief them in writing before they
-      translate.
-- [ ] Ask the Companies Control Department whether an English extract already
-      exists on file. If it does, that spelling outranks the translator's.
-- [ ] Order the certified translation. Longest lead time of anything here.
+- [x] **Decide the English spelling of `الحجرة`** — settled by the certified
+      translation, which already existed: `Al-Hujra Information Technology
+      Company / Limited Liability`. Ends at *Limited Liability*.
+- [x] ~~Ask the Companies Control Department whether an English extract exists~~
+      — moot; the certified translation is in hand.
+- [x] ~~Order the certified translation~~ — done, AGATO, stamped 19 Aug 2026.
+- [x] Fill `OPERATOR` and `ADDRESS` in `Legal.tsx` and state the brand/entity
+      link in the footer with registration 83622. Done 2026-08-28.
+- [ ] **Use the name verbatim in Meta Business Manager** when verification is
+      submitted: `Al-Hujra Information Technology Company / Limited Liability`.
+      A name mismatch is the most common rejection, and this string ends at
+      *Limited Liability* — not *Limited Liability Company*.
 - [ ] Obtain a second corroborating document **carrying a street address** — the
       registration gives only "Amman". A utility bill for the registered premises
       is the best fit; no bank account exists, so a statement is unavailable.
-- [ ] Once the English name lands: fill `OPERATOR` and `ADDRESS` in `Legal.tsx`,
-      and state the brand/entity link in the site footer with registration number
-      83622. A reviewer sees "The Office Development" and an Arabic document
-      naming `الحجرة`, and nothing currently connects them.
 
 ## 5. The client
 

@@ -1,5 +1,15 @@
 # Brief for the certified translator
 
+> **RESOLVED 2026-08-28 — this brief was overtaken by events.** The certified
+> translation already existed (Abu-Ghazaleh / AGATO, stamped 19 Aug 2026) and
+> renders the name **`Al-Hujra Information Technology Company / Limited Liability`**.
+> Note it ends at *Limited Liability*: the recommendation below proposed
+> *Limited Liability Company*, and the document wins. Use the document string
+> verbatim everywhere.
+>
+> Kept as the record of how the decision was framed, and as the template if a
+> further certified document is ever ordered.
+
 Hand this to the translation agency **in writing, before they begin**. The
 registration is Arabic-only and carries no English name, so whatever the
 translator writes becomes the company's legal English name permanently — on the
