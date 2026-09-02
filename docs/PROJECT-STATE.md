@@ -317,3 +317,5 @@ reconciled against Instagram's own insights.
 | `DATA-INTEGRITY.md` | The proven metric defects, with runnable proofs |
 | `JORDAN-CONTEXT.md` | What operating from Jordan changes |
 | `VENDOR-OPTIONS.md` | Data-source comparison, ban-risk analysis, the open terms question |
+| `TRANSLATOR-BRIEF.md` | The written brief that fixes the English legal name |
+| `CLIENT-MESSAGE.md` | What to ask the client for, English and Arabic |
