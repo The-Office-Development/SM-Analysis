@@ -209,6 +209,7 @@ either, because a client on our dashboard can still find a cheaper tool.
 | **Pilot delivery** | **Tester roles**, not App Review | Lets the first client use *our* software on real data within days. See §3. |
 | **Data source** | **PROPOSED:** licence a vendor API for launch, keep direct Meta as the destination | The blocker was never our code, it is App Review. A licensed vendor has already passed it, so buying their API buys their approval. Not decided — gated on whether their terms permit billing clients for a product built on it. See `VENDOR-OPTIONS.md`. |
 | **Scraping a vendor UI** | **Rejected** | Breaches vendor terms; termination takes every client dark at once. Both shortlisted vendors sell an official API for the same thing, so there is no reason to. |
+| **Supabase region** | **Frankfurt `eu-central-1`** | Measured from Amman on 2026-09-03: Frankfurt 72ms TCP connect against Tokyo's 353ms — the signup default had landed the project in `ap-northeast-1`. Supabase has **no Middle East region**, so Frankfurt is the closest reachable. Moved while the project was still empty because **Supabase cannot change a project's region**; the only route is a new project plus a full data migration, which is free today and a downtime window once a client's history exists. |
 | **Scopes** | `instagram_business_basic`, `instagram_business_manage_insights` only | Both read-only. `business_management` was dropped: it is write-capable, unused, and turns a token leak from data exposure into asset compromise. |
 
 ### Rejected, and why it is recorded
@@ -316,7 +317,9 @@ reconciled against Instagram's own insights.
 ### Organisational, needs people not code
 - [ ] DPO question under Jordan's PDPL
 - [ ] Cross-border transfer file (Supabase, Netlify, Anthropic all outside Jordan)
-- [ ] Supabase and Netlify region choice, recorded with a reason
+- [x] ~~Supabase region choice~~ — **decided 2026-09-03: `eu-central-1`
+      (Frankfurt).** Reason recorded in §2. Netlify's function region is still
+      open and matters less; its default `us-east-1` is ~90ms from Frankfurt.
 - [ ] Alerting and an on-call rota — the 24-hour PDPL breach deadline is
       unmeetable without someone watching
 - [ ] Counsel sign-off on the PDPL analysis and the bracketed legal pages
