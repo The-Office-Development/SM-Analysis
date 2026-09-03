@@ -3,7 +3,7 @@
 The living record. `CLAUDE.md` is the technical brief; this is the commercial
 and strategic one. Update it when a decision changes.
 
-Last updated: 2026-08-26 (two-track plan added).
+Last updated: 2026-09-03 (API verification folded in; counts corrected).
 
 ---
 
@@ -44,13 +44,17 @@ English extract already exists on file — that would outrank the translator's.
 Further consequences identified:
 
 - The legal pages still carry `[REGISTERED COMPANY NAME]` and
-  `[REGISTERED ADDRESS, JORDAN]` placeholders (`src/pages/Legal.tsx:13,15`, plus
-  retention placeholders at 73 and 76). They cannot be filled until the English
-  name is settled.
-- **The site must state the link between brand and entity.** A reviewer sees
-  "The Office Development" and an Arabic document naming `الحجرة`; that the brand
-  is roughly a translation of the legal name is invisible to a non-Arabic reader.
-  Put it in the footer explicitly, with registration number 83622.
+  `[REGISTERED ADDRESS, JORDAN]` placeholders in the policy body
+  (`src/pages/Legal.tsx`), plus the counsel placeholders. They cannot be filled
+  until the English name is settled.
+- **The site states the link between brand and entity** — done 2026-09-03. A
+  reviewer sees "PulseBoard" and an Arabic document naming `الحجرة`; that the
+  brand is roughly a translation of the legal name is invisible to a non-Arabic
+  reader. Every public legal page now carries a footer naming the Arabic legal
+  entity and commercial registration 83622. Arabic only on purpose: no English
+  name exists on the registration, so any English here would be an unattested
+  guess on a page Meta reads. **Add the English beside the Arabic when the
+  certified translation lands — do not replace it.**
 - **The registration has no street address.** The second corroborating document
   now has a specific job: carry a real one. Prefer a utility bill for the
   registered premises over another registry extract. No bank account, so a bank
@@ -222,15 +226,17 @@ App Review remains the path to client two onward.
 
 ## 4. Where it stands
 
-**The software.** On `main`, all green: typecheck, build, 40 tests, mutation
-score 18/18. A pre-launch audit found 24 P0 findings; 19 are fixed, 1 mitigated,
+**The software.** On `main`, all green: typecheck, build, 48 tests, mutation
+score 20/20. A pre-launch audit found 24 P0 findings; 19 are fixed, 1 mitigated,
 4 partly done or organisational. Detail in `REMEDIATION-STATUS.md`.
 
 **Never run against the live API.** Every test uses a mock built on Meta's
-*documented* conventions. `developers.facebook.com` has been unreachable from
-every session so far, so the Instagram Login endpoints in
-`netlify/functions/_instagram.ts` are assembled from secondary sources. **This is
-the single largest open risk**, and only a real connection settles it.
+*documented* conventions. The endpoints in `netlify/functions/_instagram.ts` were
+checked against `developers.facebook.com` on 2026-08-26 — the first session able
+to reach it — and the daily metric set was found wrong three ways; see
+`API-VERIFICATION.md` and the fix in `5d6c34a`. That closes the secondary-source
+risk but not the live one: **no line of this code has ever seen a real Instagram
+response**, and only a real connection settles that.
 
 **Nothing is deployed.** Migrations unapplied, secrets unset (the code fails
 closed without them), Meta app not configured.
@@ -269,11 +275,24 @@ reconciled against Instagram's own insights.
 - [ ] PWA polish: manifest, icons, installability
 
 ### Open questions
-- [ ] **Instagram `online_followers` hour keys** — account-local or a fixed
-      platform timezone? Unresolved; the Planner labels rather than implies.
-      Highest-value single verification left.
-- [ ] Verify every endpoint in the `IG` block of `_instagram.ts` against the
-      official docs and one live response.
+- [x] ~~**Instagram `online_followers` hour keys**~~ — closed 2026-08-26, and not
+      the way it was asked: the metric is no longer requestable at all, so the
+      timezone question is moot. What the Planner should recommend instead is now
+      a product question. `API-VERIFICATION.md` §2.
+- [x] ~~Verify every endpoint in the `IG` block of `_instagram.ts` against the
+      official docs~~ — done 2026-08-26; three of four daily metrics were wrong
+      and are fixed. **Against one live response: still open**, and that is the
+      reconciliation gate above, not a separate task.
+- [ ] **What the Planner recommends now.** Its best-time-to-post advice had
+      `online_followers` behind it and now has nothing. Either derive a weaker
+      recommendation from per-post reach by publish hour and say so plainly, or
+      remove the recommendation. A confident-looking suggestion with no data
+      under it is the failure mode `CLAUDE.md` §2 exists to prevent.
+- [ ] **Reels average watch time** — `avg_watch_seconds` is hard-coded `null`, so
+      the Content table shows `—` for every row, but `ig_reels_avg_watch_time`
+      exists at the media level (`API-VERIFICATION.md` §3.6). It is Reels-only,
+      so it needs its own call rather than joining `MEDIA_INSIGHT_METRICS`, where
+      a metric the media type does not support fails the whole query (§3.3).
 
 ### Organisational, needs people not code
 - [ ] DPO question under Jordan's PDPL

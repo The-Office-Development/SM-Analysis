@@ -24,6 +24,28 @@ const OPERATOR = "[REGISTERED COMPANY NAME]"; // blocked on the certified transl
 const CONTACT = "privacy@theoffice.it.com";
 const ADDRESS = "[REGISTERED ADDRESS, JORDAN]"; // registration gives only "Amman"
 
+/**
+ * The brand is not the legal name, and to a non-Arabic reader the connection is
+ * invisible: a reviewer sees "PulseBoard" here and an Arabic registration
+ * document naming الحجرة in the Business Verification upload, with nothing
+ * linking them. This footer is that link, and it is why it appears on every
+ * public page rather than only in the policy body.
+ *
+ * Arabic only, deliberately. No English name appears on the registration
+ * document at all, and the only English rendering that will ever be
+ * authoritative is the one on the certified translation. Adding a guess here
+ * would put an unattested spelling on a page Meta reads. When the translation is
+ * stamped, add the English beside the Arabic — do not replace it.
+ *
+ * The registry prints the name as `شركة الحجرة لتقنية المعلومات /ذات مسؤولية محدودة`,
+ * where the slash separates the name from the legal form. It is dropped below
+ * because it reads as a typo mid-sentence in English prose; the words are
+ * otherwise identical to the registration PDF's text layer. If a Meta reviewer
+ * ever queries the match, restore the slash rather than arguing the point.
+ */
+const LEGAL_NAME_AR = "شركة الحجرة لتقنية المعلومات ذات مسؤولية محدودة";
+const REGISTRATION_NO = "83622";
+
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   useEffect(() => { applyTheme(getTheme()); }, []);
   return (
@@ -46,6 +68,13 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
           </div>
           <h1 style={{ fontSize: 24, marginTop: 0 }}>{title}</h1>
           {children}
+          <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "28px 0 16px" }} />
+          <p className="muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
+            PulseBoard and The Office are trading names of{" "}
+            <b lang="ar" dir="rtl">{LEGAL_NAME_AR}</b>, a limited liability
+            company registered in Amman, Jordan under commercial registration
+            no. {REGISTRATION_NO}. Contact: {CONTACT}.
+          </p>
         </div>
       </div>
     </div>

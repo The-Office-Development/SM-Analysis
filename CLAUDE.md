@@ -42,7 +42,7 @@ organisational. Per-finding status in `docs/REMEDIATION-STATUS.md`. Headlines:
 - `business_management` dropped; tokens encrypted at rest; secrets fail closed
 - disconnect revokes at the platform and deletes; token refresh under a lock
 - data-deletion and deauthorize callbacks, legal pages, consent capture, data export
-- a test suite that can actually fail: 35 assertions, mutation score 16/16, gating CI
+- a test suite that can actually fail: 48 assertions, mutation score 20/20, gating CI
 
 ---
 
@@ -67,7 +67,7 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, 35 tests, mutation 16/16.
+Code is on `main`, all green: typecheck, build, 48 tests, mutation 20/20.
 
 **Nothing has ever run against the live Instagram API.** Every test runs against
 a mock built on Meta's *documented* conventions. The correctness fixes are
@@ -78,7 +78,7 @@ connection is an experiment, not a formality.
 for accounts holding a role on the Meta app. That is a platform rule, not a
 limitation of this code.
 
-Not yet done by anyone: migrations `0001`–`0004` have not been applied, secrets
+Not yet done by anyone: migrations `0001`–`0005` have not been applied, secrets
 are not set (the code fails closed without them), the Meta app is not configured
 for the new callbacks, and nothing is deployed.
 
@@ -108,10 +108,13 @@ for the new callbacks, and nothing is deployed.
   stamped English translation if needed)
 - App Review with a screencast, Data Use Checkup, Data Protection Assessment
 
-**One verification that changes code.** Instagram's `online_followers` hour keys:
-account-local, or a fixed platform timezone? Unresolved. The Planner currently
-labels its recommendation rather than implying local time. One real API response
-settles it. Highest-value open question.
+**The `online_followers` question is closed, and not the way it was asked.**
+It was long recorded here as the highest-value open question — are its hour keys
+account-local or a fixed platform timezone? The 2026-08-26 documentation check
+found the metric is no longer requestable at all: neither `online_followers` nor
+`follower_count` appears in the insights metrics table. The timezone question is
+moot, and what the Planner recommends is now a product question rather than a
+timezone one. See `docs/API-VERIFICATION.md` §2.
 
 **Decided and built: Instagram API with Instagram Login is the primary path.**
 It requires no linked Facebook Page — on the Facebook Login path a creator
@@ -119,11 +122,15 @@ without one cannot connect at all — and needs a smaller, entirely read-only
 permission set (`instagram_business_basic`, `instagram_business_manage_insights`,
 no `pages_*`). The Facebook Login path is retained unchanged for Facebook Pages.
 
-**Its endpoints are unverified.** Every URL, scope and field name lives in the
-`IG` block at the top of `netlify/functions/_instagram.ts`, deliberately in one
-place, because they were assembled from secondary sources. Check them against the
-official docs and one live response before a client account connects; if a name
-is wrong, it is wrong only there.
+**Its endpoints are verified against the documentation, not against a live
+response.** Every URL, scope and field name lives in the `IG` block at the top of
+`netlify/functions/_instagram.ts`, deliberately in one place, because they were
+originally assembled from secondary sources. They were checked against
+`developers.facebook.com` on 2026-08-26 and three of the four daily metrics were
+found wrong; the finding, the citations and the fix are in
+`docs/API-VERIFICATION.md`. **Documentation agreement is not a live call** — the
+reconciliation gate below still stands, and if a name is wrong it is wrong only
+there.
 
 **Organisational.** DPO question under Jordan's PDPL, cross-border transfer file
 (Supabase, Netlify and Anthropic are all outside Jordan), region choice, alerting
@@ -138,9 +145,9 @@ queue-backed sync for scale; remaining optimistic claims in `src/lib/setupGuides
 
 ### Run this before you claim anything works
 ```bash
-npm test        # typecheck, build, 35 assertions, then the mutation gate
+npm test        # typecheck, build, 48 assertions, then the mutation gate
 ```
-The mutation check injects 16 real defects and requires every one to be caught.
+The mutation check injects 20 real defects and requires every one to be caught.
 **If you fix a defect the suite would not otherwise catch, add a mutation for it.**
 
 ### Invariants — do not "simplify" these back into bugs
