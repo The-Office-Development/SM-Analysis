@@ -32,14 +32,27 @@ wrong on two counts and must not be reused: the registration reads *Information*
 Technology (`لتقنية المعلومات`), and **no English name appears on the document at
 all**.
 
-**The English name is now the blocking decision, and a translator makes it.**
-Meta's Business info field needs Latin script, and the only English rendering that
-will ever exist is the one on the certified translation. `الحجرة` can be rendered
-Al-Hujra, Alhujra, Al Hujrah or Al-Hijra; once the translation is stamped that
-spelling is the legal English name, on the Meta form, in the legal pages and in
-the site footer. **Choose the spelling and give it to the translator in writing
-before they translate.** Ask the Companies Control Department first whether an
-English extract already exists on file — that would outrank the translator's.
+**The English name is NOT a blocker for Meta, and the translator is off the
+critical path. Corrected 2026-09-03 against Meta's own documentation.**
+
+The claim above — that "Meta's Business info field needs Latin script" — was an
+assumption, and it was wrong. Meta publishes the supported document languages and
+**Arabic is on the list**. A certified English translation is required only for
+documents in an *unsupported* language. The registration is submitted as issued,
+and the Arabic legal name is typed into Business info exactly as printed.
+
+**Getting this backwards would have been actively harmful, not merely slow.**
+Entering a translator's English rendering into the form would put a string there
+that appears on no submitted document — manufacturing the name mismatch the
+translation was supposed to prevent. Meta also warns that submitting false or
+misleading information is itself a rejection reason, and an unattested spelling
+of a name is a bad place to be imprecise.
+
+The English name is still genuinely needed — for the legal pages, the footer and
+anything a non-Arabic reader must understand — and `الحجرة` can be rendered
+Al-Hujra, Alhujra, Al Hujrah or Al-Hijra. Ask the Companies Control Department
+whether an English extract already exists on file; that would outrank a
+translator's. But **order it in parallel, and do not wait on it to submit.**
 
 Further consequences identified:
 
@@ -55,10 +68,13 @@ Further consequences identified:
   name exists on the registration, so any English here would be an unattested
   guess on a page Meta reads. **Add the English beside the Arabic when the
   certified translation lands — do not replace it.**
-- **The registration has no street address.** The second corroborating document
-  now has a specific job: carry a real one. Prefer a utility bill for the
-  registered premises over another registry extract. No bank account, so a bank
-  statement is unavailable.
+- **The registration has no street address**, and this is now the real blocker
+  in the pack. The second document has a specific job: carry a real one. A
+  utility bill is the right instrument and, with no bank account, the only one
+  available — but Meta accepts a utility bill for **address and phone only**, and
+  requires the **legal business name to appear on it**. So it must be a bill in
+  the company's name; a partner's personal bill will not do. The registration
+  stays the document that proves the name.
 - **The registration carries no stamp or seal, deliberately** — its own footer
   says `صدرت الوثيقة الكترونيا ... ولا تحتاج الى توقيع او ختم`, with a QR code for
   verification. `SETUP-META.md` §1 says Meta rejects unstamped documents; that is
@@ -114,10 +130,11 @@ the check is the same mistake as citing the old `verify/*.mjs` printers.
    Nothing else moves until the app is reachable. `DEPLOY-RUNBOOK.md` §3–§5.
    The follower-reconstruction bug (4 failing tests) lands first — the
    reconciliation in step 5 compares follower numbers.
-2. **Blocked on a human:** decide the English spelling of `الحجرة`, check with CCD
-   whether an English extract exists, then order the certified translation. The
-   Arabic name is already confirmed — see above; only the English is open.
-   In parallel: obtain the second corroborating document **with a street address**.
+2. **Blocked on a human:** obtain a **utility bill in the company's name showing
+   a street address** — this is now the only genuinely missing item in the
+   verification pack. The certified translation is *not* needed to submit
+   (corrected 2026-09-03); order it in parallel for the legal pages and footer,
+   and ask CCD first whether an English extract exists on file.
 3. Fill the legal page placeholders and the site footer, deploy, submit Business
    Verification (`SETUP-META.md` §1). Track B starts here and needs the website
    live first.
@@ -145,8 +162,10 @@ the check is the same mistake as citing the old `verify/*.mjs` printers.
   recovers the exact canonical string. That matters when a name has to match
   character for character.
 
-> The registration PDF also lists both partners' national ID numbers. Those are
-> personal data: they belong in the Meta upload, not in this repository.
+> The registration PDF lists both partners' national ID numbers. Keep them out of
+> this repository — **and out of the Meta upload too.** Meta's instruction is to
+> cover personal information it does not need, naming the local equivalent of a
+> social security number specifically. Black them out before uploading.
 
 ---
 

@@ -36,18 +36,46 @@ Gather:
       code instead. The stamp rule was assembled from secondary sources and is not
       reliable for Jordanian e-filings. Submit the document as issued; only chase a
       stamped paper copy if Meta actually rejects it as unsupported.
-- [ ] A **second corroborating document** showing the *same* legal name and the
-      *same* address: a business bank statement or a utility bill. Submitting two
-      documents that agree with each other is the single best thing you can do
-      for approval odds.
-- [ ] A **certified English translation** with a recognised translation agency's
-      stamp, unless your documents are already in a language Meta supports.
-      Order this now — it is the step most likely to add days.
+- [ ] A **second corroborating document carrying a street address.** The
+      registration gives only "Amman", and Business info wants an address.
+      **A utility bill is the right instrument and the only one available to us**
+      — there is no bank account. Read the constraint precisely, from Meta's own
+      page: *"A utility bill is accepted only for Business Address and Phone
+      number. The Legal Business Name must be on the utility bill. A utility bill
+      is not an acceptable document for Legal Business Name verification."* So the
+      bill must be **in the company's name**, and it proves address only; the
+      registration remains the document proving the name.
+- [x] ~~A **certified English translation**~~ — **NOT required. Corrected
+      2026-09-03 against Meta's own documentation.** Meta lists the supported
+      document languages explicitly and **Arabic is among them** (with Bengali,
+      English, French, German, Greek, Hebrew, Hindi, Indonesian, Italian,
+      Japanese, Korean, Malaysian, Mandarin, Polish, Portuguese, Russian,
+      Spanish, Thai, Turkish, Vietnamese). Translation is required only when the
+      document is *not* in a supported language. The registration is Arabic, so
+      it is submitted as issued.
+
+      **This inverts the earlier plan, and the inversion matters.** Ordering a
+      translation and typing its English name into Business info would put a
+      string in the form that appears on *no* submitted document, manufacturing
+      precisely the name mismatch that guidance was meant to avoid. Enter the
+      Arabic legal name exactly as the registration prints it. The English
+      spelling of `الحجرة` is still needed for the legal pages and the footer —
+      it is simply **not on the critical path for verification**.
+- [ ] **Redact the partners' national ID numbers before uploading.** Meta's
+      instruction is explicit: *"Remember to cover any additional personal
+      information that we do not need to verify your business, such as a social
+      security number or the local equivalent in your country."* The registration
+      PDF lists both partners' national IDs. Black them out.
 - [ ] A **business phone number** that can receive a call or SMS.
-- [ ] A **business email on your own domain** (not gmail).
-- [ ] A **live website on that domain.** Meta looks for a real, working web
-      presence, so deploy first — the privacy and terms pages built into this
-      app help here.
+- [ ] A **confirmation method.** Meta accepts email, phone, text, WhatsApp **or
+      domain verification** (a DNS record or meta tag). `theoffice.it.com`
+      delegates to its own nameservers, so the DNS route works and does not
+      depend on a mailbox existing.
+- [ ] A **live website on that domain, over HTTPS, with no broken links.** This
+      is not a soft preference. Meta's published rejection reasons name it
+      directly: *"Having a website that fails to load, is not HTTPS compliant ...
+      or contains a link that leads to an error message."* Deploy first, then
+      click every link on the public pages.
 
 Document freshness rules:
 - Registration certificates: no more than **1 year** old.
@@ -90,6 +118,17 @@ PDF scan beats a phone photo. "File is not viewable" is a rejection reason.
 
 ### Phase 4 — If it is rejected
 
+**Meta's own published list of rejection reasons is shorter than the table
+below**, and worth knowing first because these are the ones stated on the record:
+submitting false or misleading information; claiming a portfolio you are not
+authorised to represent; circumventing the review system; and **a website that
+fails to load, is not HTTPS, or contains a link leading to an error**.
+
+The table that follows was assembled from secondary sources — practitioner
+write-ups, not Meta documentation. It plausibly reflects what document review
+actually returns, and it is useful for mapping a rejection message to a fix, but
+**do not cite it as policy.** Where the two disagree, Meta's own page wins.
+
 Meta names the reason. Map it:
 
 | Reason given | Fix |
@@ -98,8 +137,8 @@ Meta names the reason. Map it:
 | Address missing or does not match | Use the registered address, not the trading address, and make both documents agree |
 | Phone number missing or does not match | The number in Business info must also appear on a submitted document |
 | Document expired | Registration under 1 year; utility/bank under 90 days |
-| Document not supported / self-created | Must be government or bank issued, with a stamp or seal |
-| Language not supported | Add the stamped certified English translation |
+| Document not supported / self-created | Must be government or bank issued. **The "stamp or seal" half is contradicted by our own document** — see the correction in Phase 0; Jordanian e-filings carry a QR code instead |
+| Language not supported | Should not arise: Arabic is a supported language (Phase 0). If it does, that is a signal the document was unreadable, not untranslated |
 | File not viewable | Rescan: full page, higher resolution, no glare |
 | Additional documents required | Send the second corroborating document |
 
