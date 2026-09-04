@@ -303,11 +303,19 @@ reconciled against Instagram's own insights.
       official docs~~ — done 2026-08-26; three of four daily metrics were wrong
       and are fixed. **Against one live response: still open**, and that is the
       reconciliation gate above, not a separate task.
-- [ ] **What the Planner recommends now.** Its best-time-to-post advice had
-      `online_followers` behind it and now has nothing. Either derive a weaker
-      recommendation from per-post reach by publish hour and say so plainly, or
-      remove the recommendation. A confident-looking suggestion with no data
-      under it is the failure mode `CLAUDE.md` §2 exists to prevent.
+- [ ] **The day boundary — now the highest-value open question.** First live
+      call (2026-09-04) returned `end_time` of `07:00:00+0000`: midnight US
+      Pacific, not Amman. Days on that account run 10:00-10:00 Amman time.
+      Whether the boundary follows the account's own timezone setting or is fixed
+      platform-side decides whether this is a non-issue or a labelling
+      requirement. Settle it by running `verify/probe-live.mjs` against an
+      account set to Amman. `API-VERIFICATION.md` §6.2.
+- [ ] **`online_followers` is back** — it answered a live call, so the Planner
+      can have real data behind its best-time-to-post advice after all, and the
+      hour-key timezone question is re-opened. Undocumented but working, so it
+      needs a fallback rather than a hard dependency. `API-VERIFICATION.md` §6.1.
+- [ ] **`follower_count` is back too**, and may replace the reconstructed
+      follower line — the most visible number in a media kit. Same caveat.
 - [ ] **Reels average watch time** — `avg_watch_seconds` is hard-coded `null`, so
       the Content table shows `—` for every row, but `ig_reels_avg_watch_time`
       exists at the media level (`API-VERIFICATION.md` §3.6). It is Reels-only,

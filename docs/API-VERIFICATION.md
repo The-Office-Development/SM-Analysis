@@ -152,3 +152,85 @@ Meta's own "no data" into a client's "you reached nobody". The rule in
 - Business Login for Instagram — authorize and token exchange endpoints
 - Access Token / Refresh Access Token references — `ig_exchange_token`, `ig_refresh_token`, hosts, 24-hour and 60-day rules
 - Meta developer blog, 24 Mar 2025, user and media insights on Instagram API with Instagram Login — `instagram_business_manage_insights`, Advanced access
+
+---
+
+## 6. First contact with the live API — 2026-09-04
+
+The probe in `verify/probe-live.mjs` made the first real Instagram calls this
+project has ever made, using a token generated from the App Dashboard rather
+than through OAuth. No deploy, no client, no risk.
+
+**Every endpoint, scope and field name in the `IG` block is correct: 11 of 11,
+zero failures.** `/me` with `ME_FIELDS`, `reach` as `time_series`, `views` and
+`total_interactions` as `total_value`, `follows_and_unfollows` with the
+`follow_type` breakdown, `/me/media` with its insights expansion, and all three
+demographic breakdowns. The largest standing risk in `PROJECT-STATE.md` §4 —
+"never run against the live API" — is closed for the contract, though not for
+the numbers (see 6.3).
+
+### 6.1 Correction: `follower_count` and `online_followers` are NOT removed
+
+Section 2 of this document concluded, from the metrics table, that neither metric
+is requestable. **That conclusion is wrong.** Both answered a live call, each
+returning a `values` array with `end_time`, and a localised `title` and
+`description`:
+
+```
+follower_count   {"name":"follower_count","period":"day","values":[{"value":0,"end_time":"2026-09-03T07:00:00+0000"}], ...}
+online_followers {"name":"online_followers","period":"day","values":[{"value":0,"end_time":"2026-09-03T07:00:00+0000"}], ...}
+```
+
+Absence from the documentation table is not absence from the API. The §2 reading
+was careful and still wrong, which is the argument for the reconciliation gate in
+one line.
+
+What re-opens:
+
+- **The `online_followers` hour-key timezone question**, long recorded as the
+  highest-value open question and prematurely retired as moot. It is live again.
+- **`follower_count` as a real daily series**, which would replace the
+  reconstructed follower line anchored on today's count. That line is the single
+  most visible number in a sponsor-facing media kit.
+
+What does not change: both metrics are **undocumented but working**. Meta removes
+such metrics without notice, so neither may become a hard dependency. Anything
+built on them keeps the `optional()` treatment and a fallback.
+
+### 6.2 The day boundary is not Amman, and this is now the top open question
+
+`reach` returned `end_time` of `2026-08-29T07:00:00+0000`. That is midnight
+**US Pacific**, not midnight Amman, which would be `21:00:00+0000` the previous
+day.
+
+`dayKeyFromEndTime` handled it correctly — it derives the offset from `end_time`
+itself rather than assuming, so it read `-7` and filed the bucket as
+`2026-08-28`. No defect. But the consequence is real:
+
+> On this account, a "day" in the dashboard runs **10:00 to 10:00 Amman time**.
+
+Two possibilities, and they have different fixes:
+
+1. **The boundary follows the account's own Instagram timezone setting.** This
+   test account is simply set to Pacific. A Jordanian business account set to
+   Amman would return `+3` and everything is already correct.
+2. **The boundary is fixed platform-side.** Then every Jordanian client's daily
+   figures are bucketed on a US day, and the dashboard must label that honestly
+   rather than implying local days.
+
+**The test is cheap and decisive:** run `verify/probe-live.mjs` against a second
+account whose Instagram timezone is set to Amman and read the derived offset the
+probe now prints. Until then, treat this as unresolved.
+
+### 6.3 The probe validated the contract, not the numbers
+
+The account used (`heath_ens21`) has **101 followers, 0 media, and zero activity**:
+every metric returned `0`, the media list was empty, and all three demographic
+breakdowns returned 0 segments despite the follower count sitting right at the
+~100 threshold.
+
+So this settles what the API *is called* and what shape it returns. It settles
+nothing about whether the numbers are right. `PROJECT-STATE.md` §0 already warns
+that test accounts cannot validate numbers, and this is that warning arriving on
+schedule. **The reconciliation gate still stands, unchanged, and still needs a
+real account with real history.**

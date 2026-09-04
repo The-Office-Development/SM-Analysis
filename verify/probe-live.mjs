@@ -110,6 +110,23 @@ if (reach) {
   if (v[0]) console.log(`        first: ${j(v[0])}`);
   if (!v[0]?.end_time) {
     notes.push("reach values carry no end_time — offsetFrom() cannot learn the account's UTC offset, and dayKeyFromEndTime depends on it");
+  } else {
+    // The whole daily-bucketing design rests on this. end_time is local midnight
+    // of the FOLLOWING day, so the UTC hour of end_time IS the account's offset,
+    // negated. Surface it, because a wrong day boundary is invisible in the data
+    // and files every number under the wrong date.
+    const et = v[0].end_time;
+    const d = new Date(et.replace(/([+-]\d{2})(\d{2})$/, "$1:$2"));
+    let off = -(d.getUTCHours() + d.getUTCMinutes() / 60);
+    if (off <= -12) off += 24;
+    const label = off === 3 ? "Amman (UTC+3) — matches the account's own local day"
+      : off === -7 ? "US Pacific (UTC-7) — NOT Amman; days run 10:00-10:00 Amman time"
+      : off === -8 ? "US Pacific standard (UTC-8) — NOT Amman"
+      : off === 0 ? "UTC" : "unexpected";
+    console.log(`        derived day-boundary offset: UTC${off >= 0 ? "+" : ""}${off}  -> ${label}`);
+    if (off !== 3) {
+      notes.push(`day boundary is UTC${off >= 0 ? "+" : ""}${off}, not Amman's +3. Every daily figure is bucketed on that boundary. Run this probe against a second account whose Instagram timezone is set to Amman: if that one reports +3, the boundary follows the ACCOUNT and this is just this account's setting. If it also reports ${off}, the boundary is fixed platform-side and the dashboard must say so rather than implying local days.`);
+    }
   }
 }
 
@@ -129,12 +146,23 @@ const fu = await call("follows_and_unfollows (breakdown=follow_type)", "/me/insi
 }, { optional: true });
 if (fu) console.log(`        ${j(fu.data?.[0]?.total_value)?.slice(0, 300)}`);
 
-console.log("\nMETRICS THE DOCS SAY ARE GONE (expected to fail — a pass means the docs are wrong)");
+console.log("\nMETRICS THE DOCS SAY ARE GONE (2026-09-04: both answered — finding re-opened)");
+// docs/API-VERIFICATION.md recorded these as absent from the metrics table.
+// A live call on 2026-09-04 returned both, with a values array. Undocumented and
+// working is not the same as supported, so they are probed over a MULTI-DAY
+// window here: a real daily series is what would let follower_count replace the
+// reconstructed follower line, which is the most visible number in a media kit.
 for (const metric of ["follower_count", "online_followers"]) {
-  const r = await call(metric, "/me/insights", {
-    metric, period: "day", since: oneDaySince, until: oneDayUntil,
+  const r = await call(`${metric} (7-day window)`, "/me/insights", {
+    metric, period: "day", since: String(since), until: String(until),
   }, { optional: true });
-  if (r) notes.push(`*** ${metric} ANSWERED. It is documented as removed. Re-open that finding: ${j(r.data?.[0])?.slice(0, 200)}`);
+  if (r) {
+    const vals = r.data?.[0]?.values ?? [];
+    const nonZero = vals.filter((x) => x?.value !== 0 && x?.value != null).length;
+    console.log(`        ${vals.length} day(s), ${nonZero} non-zero`);
+    if (vals[0]) console.log(`        first: ${j(vals[0])?.slice(0, 220)}`);
+    notes.push(`${metric} ANSWERED over ${vals.length} day(s) — docs/API-VERIFICATION.md §2 says it is not requestable. That finding is wrong and is re-opened.`);
+  }
 }
 
 console.log("\nMEDIA");

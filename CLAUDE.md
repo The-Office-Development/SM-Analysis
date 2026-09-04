@@ -108,13 +108,23 @@ for the new callbacks, and nothing is deployed.
   stamped English translation if needed)
 - App Review with a screencast, Data Use Checkup, Data Protection Assessment
 
-**The `online_followers` question is closed, and not the way it was asked.**
-It was long recorded here as the highest-value open question — are its hour keys
-account-local or a fixed platform timezone? The 2026-08-26 documentation check
-found the metric is no longer requestable at all: neither `online_followers` nor
-`follower_count` appears in the insights metrics table. The timezone question is
-moot, and what the Planner recommends is now a product question rather than a
-timezone one. See `docs/API-VERIFICATION.md` §2.
+**`online_followers` and `follower_count` are REQUESTABLE after all — the
+documentation check was wrong, and a live call proved it.**
+The 2026-08-26 pass read the insights metrics table, found neither metric listed,
+and concluded both were removed. On 2026-09-04 the first live call this project
+has ever made requested both and **both answered**, with a `values` array and a
+localised title. Documentation absence is not API absence, and this is the
+cleanest demonstration in the repo of why the reconciliation gate exists.
+
+Consequences, all open:
+- The `online_followers` hour-key timezone question is **re-opened**, not moot.
+- `follower_count` may be able to replace the reconstructed follower line, which
+  is the most visible number in a sponsor-facing media kit.
+- Both are **undocumented but working**. That is not the same as supported —
+  Meta removes such metrics without notice, so anything built on them needs the
+  `optional()` treatment and a fallback, never a hard dependency.
+
+See `docs/API-VERIFICATION.md` §2 and §6.
 
 **Decided and built: Instagram API with Instagram Login is the primary path.**
 It requires no linked Facebook Page — on the Facebook Login path a creator
@@ -164,6 +174,13 @@ P0 finding. There is a test and a mutation guarding every one.
   derives the account's offset from `end_time` itself, because `end_time` is
   local midnight of the *following* day. Slicing filed every day one day late for
   every account at UTC offset ≤ 0 — the whole of the Americas.
+  **Confirmed live 2026-09-04, and it matters more than expected:** the first
+  real account returned `end_time` of `2026-08-29T07:00:00+0000`, which is
+  midnight *US Pacific*, not midnight Amman. The derivation handled it correctly
+  and filed the bucket as `2026-08-28`, but it means a "day" on that account runs
+  10:00→10:00 Amman time. Whether that boundary follows the account's own
+  Instagram timezone setting or is fixed platform-side is **unresolved and is now
+  the highest-value open question** — see `docs/API-VERIFICATION.md` §6.
 - **Never accept an OAuth state without the cookie nonce.** The signature alone
   lets an attacker replay their own state into a victim's browser and attach the
   victim's accounts to the attacker's tenant.
