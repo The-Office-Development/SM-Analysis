@@ -75,6 +75,19 @@ const mutations = [
   { name: "backfill overlap removed (no stored day anchors the chunk)", file: SYNC,
     find: "        const end = earliest;",
     replace: "        const end = addDays(earliest, -1);" },
+  // Restores the defect found on the first live call: the account's calendar day
+  // taken from the platform's own bucketing. A Jordanian account came back on US
+  // Pacific midnight, so every daily figure covered 10:00-10:00 Amman under a
+  // label that said otherwise. Both Instagram paths, because one insights
+  // reference governs both and the defect was in both.
+  { name: "day boundary taken from the platform instead of the account", file: SYNC,
+    find: `    const offset = accountOffsetHours(acc);
+    const metaOffset = offsetFrom(reachJson, ctx);`,
+    replace: `    const offset = offsetFrom(reachJson, ctx);
+    const metaOffset = offset;` },
+  { name: "unset account timezone silently inherits the platform's boundary", file: SYNC,
+    find: "  return (typeof m === \"number\" && Number.isFinite(m) ? m : DEFAULT_TZ_OFFSET_MINUTES) / 60;",
+    replace: "  return (typeof m === \"number\" && Number.isFinite(m) ? m : 0) / 60;" },
 ];
 
 function runSuite() {

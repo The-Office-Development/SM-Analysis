@@ -48,7 +48,7 @@ export const handler: Handler = async (event) => {
   const db = admin();
   const { data: accounts, error } = await db
     .from("social_accounts")
-    .select("id,platform,external_id,username,last_synced_at")
+    .select("id,platform,external_id,username,last_synced_at,tz_offset_minutes")
     .eq("user_id", uid)
     .eq("status", "connected")
     .limit(200);

@@ -76,7 +76,15 @@ test("syncStart still backfills a first sync and never runs past today", () => {
 
 /* ---- end-to-end, against the oracle ------------------------------------- */
 
+/*
+ * Each case is an account whose OWN calendar day is `offset`, and whose platform
+ * reports on that same boundary. Before 0007 the code inferred the account's day
+ * from the platform's end_time, so these two were never separable. They are now,
+ * and the account states its own timezone — which is why every case passes
+ * tz_offset_minutes rather than relying on the Amman default.
+ */
 for (const [label, offset] of [["Amman (+3)", 3], ["Los Angeles (-7)", -7], ["UTC", 0], ["Tokyo (+9)", 9]]) {
+  const account = { id: "acc-1", platform: "instagram", external_id: "1784100", username: "creator", tz_offset_minutes: offset * 60 };
   test(`stored reach matches the platform's true value per day — ${label}`, async () => {
     const from = addDays(TODAY, -29);
     const db = seedDb();
@@ -201,4 +209,63 @@ test("a TikTok success response is not mistaken for an error", async () => {
   assert.equal(rows[0].followers, 4321);
   // Lifetime video views are not a day's reach and must not be recorded as one.
   assert.equal(rows[0].reach, null);
+});
+
+/* ---- 0007: the day boundary belongs to the account, not to the platform ---- */
+
+/**
+ * The defect this guards, observed live on 2026-09-04.
+ *
+ * `offsetFrom()` read the account's UTC offset out of a time_series `end_time`.
+ * A Jordanian account came back with `end_time: 2026-08-29T07:00:00+0000` —
+ * midnight US PACIFIC, not midnight Amman. So the sync derived -7 and built
+ * every per-day `total_value` window on a Pacific boundary. Nothing errored.
+ * Every daily figure simply covered 10:00→10:00 Amman time while carrying a
+ * label that said otherwise.
+ *
+ * Reading Meta's buckets from end_time is correct. DEFINING a day from them is
+ * not, and the difference is invisible in the stored data — which is exactly the
+ * failure mode this project treats as worse than an outage.
+ */
+test("day windows follow the account's timezone, not the platform's bucketing", async () => {
+  const from = addDays(TODAY, -3);
+  const db = seedDb();
+  // The account keeps Amman days. The platform reports on US Pacific.
+  const amman = { id: "acc-1", platform: "instagram", external_id: "1784100", username: "creator", tz_offset_minutes: 180 };
+  const mock = installGraphMock({ offset: -7, days: [from, TODAY] });
+  let calls;
+  try { await syncAccount(db, amman); } finally { calls = mock.calls; mock.restore(); }
+
+  const windows = calls
+    .map((u) => new URL(u))
+    .filter((u) => u.searchParams.get("metric_type") === "total_value" && u.searchParams.get("since"))
+    .map((u) => Number(u.searchParams.get("since")));
+  assert.ok(windows.length > 0, "expected per-day total_value windows to be requested");
+
+  // Amman midnight is 21:00 UTC the previous day; Pacific midnight is 07:00 UTC.
+  // The UTC hour of every window start says which boundary was used.
+  for (const since of windows) {
+    const hour = new Date(since * 1000).getUTCHours();
+    assert.equal(hour, 21,
+      `window starts at ${hour}:00 UTC — Amman days start at 21:00 UTC. ` +
+      `07:00 means the platform's Pacific boundary was used instead of the account's.`);
+  }
+});
+
+test("an account with no stored timezone falls back to Amman, never to the platform's", async () => {
+  const from = addDays(TODAY, -3);
+  const db = seedDb();
+  // No tz_offset_minutes at all, and a platform reporting Pacific days.
+  const unset = { id: "acc-1", platform: "instagram", external_id: "1784100", username: "creator" };
+  const mock = installGraphMock({ offset: -7, days: [from, TODAY] });
+  let calls;
+  try { await syncAccount(db, unset); } finally { calls = mock.calls; mock.restore(); }
+
+  const hours = calls
+    .map((u) => new URL(u))
+    .filter((u) => u.searchParams.get("metric_type") === "total_value" && u.searchParams.get("since"))
+    .map((u) => new Date(Number(u.searchParams.get("since")) * 1000).getUTCHours());
+  assert.ok(hours.length > 0, "expected per-day total_value windows to be requested");
+  assert.ok(hours.every((h) => h === 21),
+    "an unset timezone must default to the operator's own (+3), not silently inherit the platform's");
 });

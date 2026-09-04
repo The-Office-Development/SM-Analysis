@@ -33,9 +33,37 @@ const SETTLING_DAYS = 2;
  * window.
  */
 const DAY_BUDGET = Number(process.env.IG_DAY_BUDGET ?? 10);
+/**
+ * Asia/Amman, UTC+3, no DST — the operator's own zone and every client's, per
+ * PROJECT-STATE.md §1. Used only when an account has no stored offset.
+ */
+export const DEFAULT_TZ_OFFSET_MINUTES = 180;
+/**
+ * The account's day boundary, in hours east of UTC.
+ *
+ * >>> NEVER derive this from a response's `end_time`. <<<
+ * `end_time` tells you the timezone META aggregated in, which the first live
+ * call proved is not the account's: a Jordanian account came back bucketed on
+ * US Pacific midnight. Reading days out of Meta's buckets is correct; DEFINING
+ * a day from them files every figure under a label that is 10 hours out.
+ */
+export function accountOffsetHours(acc: Pick<AccountRow, "tz_offset_minutes">): number {
+  const m = acc.tz_offset_minutes;
+  return (typeof m === "number" && Number.isFinite(m) ? m : DEFAULT_TZ_OFFSET_MINUTES) / 60;
+}
 
 export interface AccountRow {
   id: string; platform: string; external_id: string; username: string;
+  /**
+   * Minutes east of UTC defining THIS account's calendar day. Every daily
+   * window is built from it.
+   *
+   * Not optional by accident: an account whose day boundary nobody set is an
+   * account whose daily numbers nobody can defend. Absent, it falls back to
+   * DEFAULT_TZ_OFFSET_MINUTES rather than to whatever timezone Meta happens to
+   * aggregate in — see dayWindow and migration 0007.
+   */
+  tz_offset_minutes?: number | null;
 }
 export interface SyncResult { calls: number; rowsWritten: number; }
 
@@ -295,14 +323,32 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
   const reachJson = await optional(
     () => insights({ metric: "reach", period: "day", metric_type: "time_series", since, until }),
     null as any, { metric: "reach", ...ctx });
-  const reach = reachJson ? seriesFrom(reachJson, "reach") : UNAVAILABLE;
-  const offset = offsetFrom(reachJson, ctx);
+  let reach = reachJson ? seriesFrom(reachJson, "reach") : UNAVAILABLE;
+
+  // The day boundary is the ACCOUNT's, not the platform's — same fix and same
+  // reasoning as the Instagram Login path above, because one insights reference
+  // governs both. See migration 0007 and API-VERIFICATION.md §6.2.
+  const offset = accountOffsetHours(acc);
+  const metaOffset = offsetFrom(reachJson, ctx);
+  if (reachJson && metaOffset !== offset) {
+    log("sync.day_boundary_mismatch", {
+      ...ctx, account_offset_hours: offset, meta_offset_hours: metaOffset,
+      detail: "platform aggregates on a different day boundary than this account's; reach is re-fetched per day to match",
+    });
+  }
 
   // views, total_interactions and follows_and_unfollows are total_value ONLY —
-  // one call per day each. `follower_count` is gone from the metrics table.
+  // one call per day each.
   const views = await totalValuePerDay(insights, "views", dates, offset, (j) => totalValueOf(j, "views"), ctx);
   const inter = await totalValuePerDay(insights, "total_interactions", dates, offset, (j) => totalValueOf(j, "total_interactions"), ctx);
   const delta = await totalValuePerDay(insights, "follows_and_unfollows", dates, offset, netFollowDelta, ctx, { breakdown: IG.FOLLOW_TYPE_BREAKDOWN });
+
+  // reach supports total_value as well as time_series, so when the platform
+  // buckets on a different boundary it can be re-cut onto the account's own.
+  if (reachJson && metaOffset !== offset) {
+    const perDay = await totalValuePerDay(insights, "reach", dates, offset, (j) => totalValueOf(j, "reach"), ctx);
+    if (perDay.available) reach = perDay;
+  }
 
   const media = await optional(() => get(`/${acc.external_id}/media`, {
     fields: "id,caption,media_type,permalink,timestamp,like_count,comments_count,insights.metric(reach,saved,shares,views)",
@@ -381,15 +427,49 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
   const reachJson = await optional(
     () => get("/me/insights", { metric: IG.SERIES_METRIC, period: "day", metric_type: "time_series", since, until }),
     null as any, { metric: IG.SERIES_METRIC, account: acc.id, mode: "instagram_login" });
-  const reach = reachJson ? seriesFrom(reachJson, IG.SERIES_METRIC) : UNAVAILABLE;
+  let reach = reachJson ? seriesFrom(reachJson, IG.SERIES_METRIC) : UNAVAILABLE;
 
   const igInsights = (params: Record<string, string>) => get("/me/insights", params);
   const ctx = { account: acc.id, mode: "instagram_login" };
-  const offset = offsetFrom(reachJson, ctx);
+
+  // THE DAY BOUNDARY IS THE ACCOUNT'S, NOT META'S.
+  // The time_series response above is still read for its numbers, but its
+  // end_time no longer decides what a day is. Meta aggregates in a timezone of
+  // its own choosing — the first live call returned US Pacific midnight for a
+  // Jordanian account — so deriving the boundary from it labelled every figure
+  // with a day 10 hours away from the client's own. See migration 0007.
+  const offset = accountOffsetHours(acc);
+
+  // Diagnostic, not control flow. If Meta's bucketing disagrees with the
+  // account's configured day, the reach series below is cut on a different
+  // boundary from every total_value metric, and a client comparing against
+  // their own app will find figures that nearly agree. Nearly is the dangerous
+  // kind. Log it loudly so it surfaces before a client does.
+  const metaOffset = offsetFrom(reachJson, ctx);
+  if (reachJson && metaOffset !== offset) {
+    log("sync.day_boundary_mismatch", {
+      ...ctx, account_offset_hours: offset, meta_offset_hours: metaOffset,
+      detail: "platform aggregates on a different day boundary than this account's; reach is re-fetched per day to match",
+    });
+  }
 
   const views = await totalValuePerDay(igInsights, "views", dates, offset, (j) => totalValueOf(j, "views"), ctx);
   const inter = await totalValuePerDay(igInsights, "total_interactions", dates, offset, (j) => totalValueOf(j, "total_interactions"), ctx);
   const delta = await totalValuePerDay(igInsights, "follows_and_unfollows", dates, offset, netFollowDelta, ctx, { breakdown: IG.FOLLOW_TYPE_BREAKDOWN });
+
+  // `reach` is the only account metric with a time_series form, which is why it
+  // was fetched in one call above. But time_series comes on META's boundary. If
+  // that differs from the account's, one cheap call per day on `total_value`
+  // — the docs list reach as supporting both types — buys a reach series cut on
+  // the same boundary as views, interactions and follows. Mixed boundaries on a
+  // single chart are worse than either boundary consistently applied.
+  if (reachJson && metaOffset !== offset) {
+    const perDay = await totalValuePerDay(igInsights, IG.SERIES_METRIC, dates, offset, (j) => totalValueOf(j, IG.SERIES_METRIC), ctx);
+    // Only adopt it if it worked. A failed re-fetch leaves the time_series
+    // reach in place: a series on the wrong boundary still beats no series,
+    // and the mismatch is already logged above.
+    if (perDay.available) reach = perDay;
+  }
 
   const media = await optional(
     () => get("/me/media", { fields: `${IG.MEDIA_FIELDS},insights.metric(${IG.MEDIA_INSIGHT_METRICS})`, limit: "25" }),

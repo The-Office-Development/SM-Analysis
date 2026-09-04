@@ -42,7 +42,7 @@ organisational. Per-finding status in `docs/REMEDIATION-STATUS.md`. Headlines:
 - `business_management` dropped; tokens encrypted at rest; secrets fail closed
 - disconnect revokes at the platform and deletes; token refresh under a lock
 - data-deletion and deauthorize callbacks, legal pages, consent capture, data export
-- a test suite that can actually fail: 48 assertions, mutation score 20/20, gating CI
+- a test suite that can actually fail: 50 assertions, mutation score 22/22, gating CI
 
 ---
 
@@ -67,7 +67,7 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, 48 tests, mutation 20/20.
+Code is on `main`, all green: typecheck, build, 50 tests, mutation 22/22.
 
 **Nothing has ever run against the live Instagram API.** Every test runs against
 a mock built on Meta's *documented* conventions. The correctness fixes are
@@ -78,7 +78,7 @@ connection is an experiment, not a formality.
 for accounts holding a role on the Meta app. That is a platform rule, not a
 limitation of this code.
 
-Not yet done by anyone: migrations `0001`–`0005` have not been applied, secrets
+Not yet done by anyone: migrations `0001`–`0007` have not been applied, secrets
 are not set (the code fails closed without them), the Meta app is not configured
 for the new callbacks, and nothing is deployed.
 
@@ -93,7 +93,7 @@ for the new callbacks, and nothing is deployed.
 > `docs/DEPLOY-RUNBOOK.md`.
 
 **Blocking, technical (about a day):**
-- apply `supabase/migrations/0001` → `0005` in order
+- apply `supabase/migrations/0001` → `0007` in order
 - set `TOKEN_ENC_KEY` and `OAUTH_STATE_SECRET`; scope Netlify env vars to the production context
 - register the data-deletion and deauthorize callback URLs; turn on Require App Secret
 - set `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` (distinct from `META_APP_*`)
@@ -155,9 +155,9 @@ queue-backed sync for scale; remaining optimistic claims in `src/lib/setupGuides
 
 ### Run this before you claim anything works
 ```bash
-npm test        # typecheck, build, 48 assertions, then the mutation gate
+npm test        # typecheck, build, 50 assertions, then the mutation gate
 ```
-The mutation check injects 20 real defects and requires every one to be caught.
+The mutation check injects 22 real defects and requires every one to be caught.
 **If you fix a defect the suite would not otherwise catch, add a mutation for it.**
 
 ### Invariants — do not "simplify" these back into bugs
@@ -174,13 +174,17 @@ P0 finding. There is a test and a mutation guarding every one.
   derives the account's offset from `end_time` itself, because `end_time` is
   local midnight of the *following* day. Slicing filed every day one day late for
   every account at UTC offset ≤ 0 — the whole of the Americas.
-  **Confirmed live 2026-09-04, and it matters more than expected:** the first
-  real account returned `end_time` of `2026-08-29T07:00:00+0000`, which is
-  midnight *US Pacific*, not midnight Amman. The derivation handled it correctly
-  and filed the bucket as `2026-08-28`, but it means a "day" on that account runs
-  10:00→10:00 Amman time. Whether that boundary follows the account's own
-  Instagram timezone setting or is fixed platform-side is **unresolved and is now
-  the highest-value open question** — see `docs/API-VERIFICATION.md` §6.
+  **Confirmed live 2026-09-04:** the first real account returned `end_time` of
+  `2026-08-29T07:00:00+0000` — midnight *US Pacific*, not midnight Amman.
+- **Never take the day boundary from the platform's own bucketing.** Reading
+  Meta's buckets via `dayKeyFromEndTime` is correct; *defining* a day from them
+  is not. `accountOffsetHours()` returns the account's stored
+  `tz_offset_minutes` (default 180 — Asia/Amman, no DST), and every per-day
+  window is built from it. The live call above proved why: deriving the boundary
+  from `end_time` gave a Jordanian account US Pacific days, so every figure
+  covered 10:00→10:00 Amman under a label saying otherwise. Nothing errors —
+  the numbers are simply for a different day. Fixed in **both** Instagram paths,
+  because one insights reference governs both. Two mutations guard it.
 - **Never accept an OAuth state without the cookie nonce.** The signature alone
   lets an attacker replay their own state into a victim's browser and attach the
   victim's accounts to the attacker's tenant.

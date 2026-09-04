@@ -23,7 +23,7 @@ const run: Handler = async () => {
   const db = admin();
   const { data: accounts, error } = await db
     .from("social_accounts")
-    .select("id,platform,external_id,username,user_id,last_synced_at")
+    .select("id,platform,external_id,username,user_id,last_synced_at,tz_offset_minutes")
     .eq("status", "connected")
     .order("last_synced_at", { ascending: true, nullsFirst: true })
     .limit(BATCH);
