@@ -165,6 +165,43 @@ for (const metric of ["follower_count", "online_followers"]) {
   }
 }
 
+/* ---- what can this token actually DO? ---------------------------------- */
+/*
+ * A token is only as safe as its scopes, and the two ways to get one do NOT
+ * grant the same thing. The OAuth flow requests exactly the two read scopes in
+ * the IG block. The App Dashboard's "Generate token" button bypasses OAuth
+ * entirely, so nothing in this codebase constrains it — which makes it worth
+ * checking rather than assuming.
+ *
+ * Everything below is a GET. Nothing here posts, deletes, edits or sends. The
+ * test for a write-capable scope is to READ an endpoint that scope gates: if the
+ * API refuses, the token does not hold it.
+ */
+console.log("\nTOKEN SCOPE AUDIT (reads only — nothing is modified)");
+
+// Definitive if the host supports it: the granted permission list.
+const perms = await call("GET /me/permissions", "/me/permissions", {}, { optional: true });
+if (perms) {
+  const granted = (perms.data ?? []).filter((p) => p.status === "granted").map((p) => p.permission);
+  console.log(`        granted: ${granted.join(", ") || "(none listed)"}`);
+  for (const w of ["instagram_business_content_publish", "instagram_business_manage_messages",
+                   "instagram_business_manage_comments", "business_management", "pages_manage_posts"]) {
+    if (granted.includes(w)) notes.push(`*** TOKEN HOLDS WRITE SCOPE ${w} — it can do more than read.`);
+  }
+} else {
+  console.log("        /me/permissions not available on this host — falling back to a gated read");
+}
+
+// Fallback probe: conversations require instagram_business_manage_messages, a
+// scope this app never requests. A refusal proves the token lacks it.
+const convo = await call("GET /me/conversations (needs a messaging scope)", "/me/conversations", {}, { optional: true });
+if (convo) {
+  notes.push("*** /me/conversations ANSWERED — this token carries a messaging scope the app never requests. " +
+             "A dashboard-generated token is broader than an OAuth one; treat it as sensitive and let it expire.");
+} else {
+  console.log("        refused, as it should be — no messaging scope on this token");
+}
+
 console.log("\nMEDIA");
 const media = await call("GET /me/media + insights", "/me/media", {
   fields: `${MEDIA_FIELDS},insights.metric(${MEDIA_INSIGHT_METRICS})`, limit: "5",
