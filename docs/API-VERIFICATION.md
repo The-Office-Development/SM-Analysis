@@ -234,3 +234,50 @@ nothing about whether the numbers are right. `PROJECT-STATE.md` §0 already warn
 that test accounts cannot validate numbers, and this is that warning arriving on
 schedule. **The reconciliation gate still stands, unchanged, and still needs a
 real account with real history.**
+
+### 6.4 Second live run, 2026-09-04 — through the real OAuth flow
+
+The first run used a token generated in the App Dashboard. This one used a token
+obtained through **PulseBoard's own OAuth flow** — the first time `exchangeCode`
+has ever executed against Meta. Same result: **11 of 11, zero failures.**
+
+Three findings.
+
+**The day boundary is −7 again, on a Jordanian account.** `end_time` came back
+`2026-08-29T07:00:00+0000` — midnight US Pacific — for an account created and
+used in Jordan. One account is not proof, but this now leans toward the boundary
+being **fixed platform-side** rather than following the account's own timezone.
+That was the more expensive of the two possibilities and it is the one the
+evidence favours.
+
+If it holds, the 0007 fix is doing the right thing rather than a redundant one:
+every `total_value` metric is requested with an explicit per-day window in the
+account's timezone, and the docs state the API "will only include data created
+within this range", so those windows produce genuine Amman days regardless of
+how Meta buckets its own `time_series`. `reach` is re-fetched the same way when
+the boundaries disagree. **What is still unverified is whether an arbitrary
+window really is honoured**, and only an account with real activity can show
+that — a zero-activity account returns zero for every window.
+
+**`follower_count` returns real per-day data.** Six days, one of them non-zero,
+each with its own `end_time`. It is a usable daily series, which means it can
+replace the reconstructed follower line — the most visible number in a media
+kit — rather than the current reconstruction from `follows_and_unfollows`. Still
+undocumented, so it needs `optional()` and a fallback, never a hard dependency.
+
+**`online_followers` returns six days, all zero.** Expected on an account with
+101 followers and no posts. It confirms the metric is requestable and says
+nothing yet about the hour keys, which is the question the Planner depends on.
+
+### 6.5 What this account can and cannot settle
+
+`heath_ens21`: 101 followers, **zero media**, every metric zero, demographics
+empty. It has now proved, end to end:
+
+- the OAuth flow, including the token exchange and encrypted storage
+- every endpoint, scope and field name in the `IG` block
+- that the sync runs without throwing against live responses
+
+It cannot prove a single **number**. The reconciliation gate needs an account
+with real history, and until one is connected the correctness of the day
+windows, the discovery split and the follower series remains unverified.
