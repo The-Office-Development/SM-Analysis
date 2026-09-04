@@ -26,6 +26,26 @@ export const handler: Handler = async (event) => {
 
   try {
     const redirectUri = `${process.env.VITE_SITE_URL ?? process.env.URL ?? ""}/api/oauth-instagram-callback`;
+
+    /*
+     * Diagnostic for the code exchange, which is the step with the least
+     * informative errors in the whole flow. Meta answers a wrong client_secret,
+     * a mismatched redirect_uri and a reused code with variations on the SAME
+     * message, so the log has to distinguish them instead.
+     *
+     * Nothing secret is recorded. client_id is public — it travels in the
+     * authorize URL the browser follows — and redirect_uri is public for the
+     * same reason. The secret appears only as a LENGTH, which is enough to tell
+     * "unset" from "set" from "someone pasted the wrong one", and useless to an
+     * attacker. Never log the value itself.
+     */
+    log("oauth.exchange_attempt", {
+      provider: "instagram",
+      client_id: process.env.INSTAGRAM_APP_ID ?? "<unset>",
+      secret_len: (process.env.INSTAGRAM_APP_SECRET ?? "").length,
+      redirect_uri: redirectUri,
+    });
+
     const tokens = await exchangeCode(
       process.env.INSTAGRAM_APP_ID ?? "",
       process.env.INSTAGRAM_APP_SECRET ?? "",
