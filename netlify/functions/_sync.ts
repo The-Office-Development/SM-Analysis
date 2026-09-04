@@ -73,6 +73,13 @@ interface DayRow {
   date: string;
   followers: Metric; reach: Metric; impressions: Metric;
   views: Metric; engagements: Metric;
+  /**
+   * Gross follows and unfollows, not the net. "+20" and "gained 412, lost 392"
+   * are the same net and completely different businesses.
+   */
+  follows: Metric; unfollows: Metric;
+  /** The discovery split of reach — see migration 0008. */
+  reach_followers: Metric; reach_non_followers: Metric;
   provisional: boolean;
 }
 interface Post {
@@ -141,6 +148,49 @@ async function totalValuePerDay(
     if (v !== null) byDate[dates[i]] = v;
   }
   return { available: !failedFirst, byDate };
+}
+
+/**
+ * Like `totalValuePerDay`, but keeps each day's raw response so SEVERAL series
+ * can be derived from ONE fetch per day.
+ *
+ * follows_and_unfollows carries both directions and their net; reach with a
+ * follow_type breakdown carries the follower and non-follower halves. Parsing
+ * each of those out of separate calls would multiply the per-day call count
+ * against a 30-second function ceiling for data already in hand.
+ */
+async function totalValuePerDayRaw(
+  get: (params: Record<string, string>) => Promise<any>,
+  metric: string,
+  dates: string[],
+  offsetHours: number,
+  ctx: Record<string, unknown>,
+  extra: Record<string, string> = {},
+): Promise<{ available: boolean; jsonByDate: Record<string, any> }> {
+  const jsonByDate: Record<string, any> = {};
+  let failedFirst = false;
+  for (let i = 0; i < dates.length; i++) {
+    const w = dayWindow(dates[i], offsetHours);
+    const j = await optional(
+      () => get({ metric, period: "day", metric_type: "total_value", ...extra, since: w.since, until: w.until }),
+      null as any, { ...ctx, metric, date: dates[i] });
+    if (j === null) { failedFirst = i === 0; break; }
+    jsonByDate[dates[i]] = j;
+  }
+  return { available: !failedFirst, jsonByDate };
+}
+
+/** Project one derived figure out of the raw per-day responses. */
+function seriesFromRaw(
+  raw: { available: boolean; jsonByDate: Record<string, any> },
+  pick: (j: any) => number | null,
+): Series {
+  const byDate: Record<string, number> = {};
+  for (const [date, j] of Object.entries(raw.jsonByDate)) {
+    const v = pick(j);
+    if (v !== null) byDate[date] = v;
+  }
+  return { available: raw.available, byDate };
 }
 
 /**
@@ -271,7 +321,7 @@ async function mergeWithStored(db: Db, acc: AccountRow, days: DayRow[]) {
   const dates = days.map((d) => d.date).sort();
   const { data: existing } = await db
     .from("metrics_daily")
-    .select("date,followers,reach,impressions,views,engagements")
+    .select("date,followers,reach,impressions,views,engagements,follows,unfollows,reach_followers,reach_non_followers")
     .eq("account_id", acc.id)
     .gte("date", dates[0])
     .lte("date", dates[dates.length - 1]);
@@ -292,11 +342,20 @@ async function mergeWithStored(db: Db, acc: AccountRow, days: DayRow[]) {
       impressions: pick(d.impressions, "impressions"),
       views: pick(d.views, "views"),
       engagements: pick(d.engagements, "engagements"),
+      follows: pick(d.follows, "follows"),
+      unfollows: pick(d.unfollows, "unfollows"),
+      reach_followers: pick(d.reach_followers, "reach_followers"),
+      reach_non_followers: pick(d.reach_non_followers, "reach_non_followers"),
       provisional: d.provisional,
       updated_at: new Date().toISOString(),
     };
-    // Nothing known and nothing stored: do not create a row of nulls.
-    const known = [row.followers, row.reach, row.impressions, row.views, row.engagements].some((v) => v !== null);
+    // Nothing known and nothing stored: do not create a row of nulls. The new
+    // breakdowns count as "known" too — a day where only the discovery split
+    // came back is still a day worth keeping.
+    const known = [
+      row.followers, row.reach, row.impressions, row.views, row.engagements,
+      row.follows, row.unfollows, row.reach_followers, row.reach_non_followers,
+    ].some((v) => v !== null);
     if (known) out.push(row);
   }
   return out;
@@ -341,7 +400,21 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
   // one call per day each.
   const views = await totalValuePerDay(insights, "views", dates, offset, (j) => totalValueOf(j, "views"), ctx);
   const inter = await totalValuePerDay(insights, "total_interactions", dates, offset, (j) => totalValueOf(j, "total_interactions"), ctx);
-  const delta = await totalValuePerDay(insights, "follows_and_unfollows", dates, offset, netFollowDelta, ctx, { breakdown: IG.FOLLOW_TYPE_BREAKDOWN });
+  // ONE fetch per day, three series out of it: gross follows, gross unfollows,
+  // and the net the follower line is rebuilt from. Storing only the net hides
+  // churn, and churn is the actionable half.
+  const followRaw = await totalValuePerDayRaw(insights, "follows_and_unfollows", dates, offset, ctx, { breakdown: IG.FOLLOW_TYPE_BREAKDOWN });
+  const delta = seriesFromRaw(followRaw, netFollowDelta);
+  const follows = seriesFromRaw(followRaw, (j) => followDirections(j).follows);
+  const unfollows = seriesFromRaw(followRaw, (j) => followDirections(j).unfollows);
+
+  // The discovery split: reach among people who do NOT already follow this
+  // account is new audience, and it is what a sponsor is buying. Optional by
+  // construction — if the breakdown is unavailable the columns stay null and
+  // the UI says so, rather than implying every impression was discovery.
+  const reachSplit = await totalValuePerDayRaw(insights, "reach", dates, offset, ctx, { breakdown: IG.FOLLOW_TYPE_BREAKDOWN });
+  const reachFollowers = seriesFromRaw(reachSplit, (j) => reachByFollowType(j).followers);
+  const reachNonFollowers = seriesFromRaw(reachSplit, (j) => reachByFollowType(j).nonFollowers);
 
   // reach supports total_value as well as time_series, so when the platform
   // buckets on a different boundary it can be re-cut onto the account's own.
@@ -400,6 +473,10 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
     impressions: null,           // Meta removed IG impressions; `views` replaces it.
     views: pickDay(views, date),
     engagements: engagements[date] ?? null,
+    follows: pickDay(follows, date),
+    unfollows: pickDay(unfollows, date),
+    reach_followers: pickDay(reachFollowers, date),
+    reach_non_followers: pickDay(reachNonFollowers, date),
     provisional: isProvisional(date, now),
   }));
   return { days, posts };
@@ -455,7 +532,21 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
 
   const views = await totalValuePerDay(igInsights, "views", dates, offset, (j) => totalValueOf(j, "views"), ctx);
   const inter = await totalValuePerDay(igInsights, "total_interactions", dates, offset, (j) => totalValueOf(j, "total_interactions"), ctx);
-  const delta = await totalValuePerDay(igInsights, "follows_and_unfollows", dates, offset, netFollowDelta, ctx, { breakdown: IG.FOLLOW_TYPE_BREAKDOWN });
+  // ONE fetch per day, three series out of it: gross follows, gross unfollows,
+  // and the net the follower line is rebuilt from. Storing only the net hides
+  // churn, and churn is the actionable half.
+  const followRaw = await totalValuePerDayRaw(igInsights, "follows_and_unfollows", dates, offset, ctx, { breakdown: IG.FOLLOW_TYPE_BREAKDOWN });
+  const delta = seriesFromRaw(followRaw, netFollowDelta);
+  const follows = seriesFromRaw(followRaw, (j) => followDirections(j).follows);
+  const unfollows = seriesFromRaw(followRaw, (j) => followDirections(j).unfollows);
+
+  // The discovery split: reach among people who do NOT already follow this
+  // account is new audience, and it is what a sponsor is buying. Optional by
+  // construction — if the breakdown is unavailable the columns stay null and
+  // the UI says so, rather than implying every impression was discovery.
+  const reachSplit = await totalValuePerDayRaw(igInsights, "reach", dates, offset, ctx, { breakdown: IG.FOLLOW_TYPE_BREAKDOWN });
+  const reachFollowers = seriesFromRaw(reachSplit, (j) => reachByFollowType(j).followers);
+  const reachNonFollowers = seriesFromRaw(reachSplit, (j) => reachByFollowType(j).nonFollowers);
 
   // `reach` is the only account metric with a time_series form, which is why it
   // was fetched in one call above. But time_series comes on META's boundary. If
@@ -517,6 +608,10 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
     impressions: null,
     views: pickDay(views, date),
     engagements: engagements[date] ?? null,
+    follows: pickDay(follows, date),
+    unfollows: pickDay(unfollows, date),
+    reach_followers: pickDay(reachFollowers, date),
+    reach_non_followers: pickDay(reachNonFollowers, date),
     provisional: isProvisional(date, now),
   }));
   return { days, posts };
@@ -612,6 +707,9 @@ async function syncFacebook(acc: AccountRow, token: string, start: string, c: { 
     date,
     followers: followers[date] ?? null,
     reach: null,                 // Page reach is not available on the current metric set.
+    // The follow_type and follows_and_unfollows breakdowns are Instagram
+    // metrics. NULL because unknown, never 0: a Page has not "gained nobody".
+    follows: null, unfollows: null, reach_followers: null, reach_non_followers: null,
     impressions: null,
     views: pickDay(views, date),
     engagements: pickDay(eng, date),
@@ -679,6 +777,8 @@ async function syncTiktok(acc: AccountRow, token: string, c: { calls: number }):
   const days: DayRow[] = [{
     date: today(), followers: user.follower_count ?? null,
     reach: null, impressions: null, views: null, engagements: null,
+    // TikTok exposes no follower-direction or discovery breakdown.
+    follows: null, unfollows: null, reach_followers: null, reach_non_followers: null,
     provisional: true,
   }];
   return { days, posts };
@@ -868,7 +968,15 @@ export function totalValueOf(json: any, name: string): number | null {
  * negative side. An unrecognised set of keys returns null — an unknown delta,
  * never a fabricated zero, which would render as "flat" on the follower chart.
  */
-export function netFollowDelta(json: any): number | null {
+/**
+ * Both directions of the follows_and_unfollows breakdown.
+ *
+ * The gross figures were previously parsed here and thrown away in favour of the
+ * net. They are the more useful pair: churn is invisible in a net, and a client
+ * losing 392 followers a day while gaining 412 has a retention problem that
+ * "+20" actively conceals.
+ */
+export function followDirections(json: any): { follows: number | null; unfollows: number | null } {
   const breakdowns = json?.data?.[0]?.total_value?.breakdowns ?? [];
   let follows: number | null = null, unfollows: number | null = null;
   for (const b of breakdowns) {
@@ -876,12 +984,39 @@ export function netFollowDelta(json: any): number | null {
       const key = String((r.dimension_values ?? []).join(" ")).toLowerCase();
       const value = typeof r.value === "number" ? r.value : null;
       if (value === null) continue;
+      // Order matters: "unfollow" contains "follow".
       if (key.includes("unfollow")) unfollows = (unfollows ?? 0) + value;
       else if (key.includes("follow")) follows = (follows ?? 0) + value;
     }
   }
+  return { follows, unfollows };
+}
+
+export function netFollowDelta(json: any): number | null {
+  const { follows, unfollows } = followDirections(json);
   if (follows === null && unfollows === null) return null;
   return (follows ?? 0) - (unfollows ?? 0);
+}
+
+/**
+ * Reach among accounts that do NOT already follow this one — the half of reach
+ * a sponsor is actually buying. Meta returns FOLLOWER, NON_FOLLOWER and an
+ * UNKNOWN bucket, so these two do not necessarily sum to total reach.
+ */
+export function reachByFollowType(json: any): { followers: number | null; nonFollowers: number | null } {
+  const breakdowns = json?.data?.[0]?.total_value?.breakdowns ?? [];
+  let followers: number | null = null, nonFollowers: number | null = null;
+  for (const b of breakdowns) {
+    for (const r of b.results ?? []) {
+      const key = String((r.dimension_values ?? []).join(" ")).toUpperCase();
+      const value = typeof r.value === "number" ? r.value : null;
+      if (value === null) continue;
+      if (key.includes("NON_FOLLOWER") || key.includes("NON-FOLLOWER")) nonFollowers = (nonFollowers ?? 0) + value;
+      else if (key.includes("FOLLOWER")) followers = (followers ?? 0) + value;
+      // UNKNOWN is deliberately dropped rather than folded into either side.
+    }
+  }
+  return { followers, nonFollowers };
 }
 
 /** insight json -> { 'YYYY-MM-DD': value }, keyed by the account's own day. */

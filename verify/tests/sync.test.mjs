@@ -269,3 +269,69 @@ test("an account with no stored timezone falls back to Amman, never to the platf
   assert.ok(hours.every((h) => h === 21),
     "an unset timezone must default to the operator's own (+3), not silently inherit the platform's");
 });
+
+/* ---- 0008: the figures a sponsor actually asks about --------------------- */
+
+/**
+ * The net hides the business. "+20" and "gained 412, lost 392" are the same
+ * number and completely different situations, and only the second one tells a
+ * client they have a retention problem.
+ *
+ * Both figures were already being parsed out of the follows_and_unfollows
+ * breakdown before 0008 and then discarded in favour of their difference.
+ */
+test("gross follows and unfollows are stored, not just the net", async () => {
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] });
+
+  const rows = db._rows("metrics_daily").filter((r) => r.follows !== null);
+  assert.ok(rows.length >= 25, `expected gross follow figures, got ${rows.length}`);
+  for (const r of rows) {
+    assert.equal(r.follows, trueValue("follows", r.date), `follows on ${r.date}`);
+    assert.equal(r.unfollows, trueValue("unfollows", r.date), `unfollows on ${r.date}`);
+    // The pair must reconstruct the net the follower line is built from, or the
+    // two series on the dashboard would contradict each other.
+    assert.equal(r.follows - r.unfollows, trueNetFollows(r.date), `net on ${r.date}`);
+  }
+});
+
+/**
+ * Reach among people who do NOT already follow the account is the half a sponsor
+ * is buying. Meta returns FOLLOWER, NON_FOLLOWER and UNKNOWN, and the mock's
+ * UNKNOWN bucket is non-zero on purpose: a parser that folded it into either
+ * side would inflate that side and pass a laxer test.
+ */
+test("reach splits into followers and non-followers, and UNKNOWN is not folded in", async () => {
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] });
+
+  const rows = db._rows("metrics_daily").filter((r) => r.reach_non_followers !== null);
+  assert.ok(rows.length >= 25, `expected a discovery split, got ${rows.length}`);
+  for (const r of rows) {
+    assert.equal(r.reach_followers, trueValue("reach_followers", r.date), `follower reach on ${r.date}`);
+    assert.equal(r.reach_non_followers, trueValue("reach_non_followers", r.date), `non-follower reach on ${r.date}`);
+  }
+});
+
+/**
+ * A breakdown that stops being returned must not erase what was already stored.
+ * This is the `?? 0` defect in another costume: the failure writes nothing
+ * rather than a zero, and the previously fetched value survives.
+ */
+test("a breakdown that disappears does not blank the stored discovery split", async () => {
+  const from = addDays(TODAY, -6);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] });
+  const before = db._rows("metrics_daily").filter((r) => r.reach_non_followers !== null).length;
+  assert.ok(before > 0, "precondition: some discovery figures were stored");
+
+  // Now the platform stops answering for reach entirely.
+  const mock = installGraphMock({ offset: 3, days: [from, TODAY], failMetric: "reach" });
+  try { await syncAccount(db, account); } catch { /* reach failing is allowed to throw */ }
+  finally { mock.restore(); }
+
+  const after = db._rows("metrics_daily").filter((r) => r.reach_non_followers !== null).length;
+  assert.equal(after, before, "stored discovery figures must survive a failed re-fetch");
+});

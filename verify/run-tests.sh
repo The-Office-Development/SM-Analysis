@@ -18,6 +18,17 @@ for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){
   if(o!==s)fs.writeFileSync(p,o);
 }'
 ./node_modules/.bin/tsc src/lib/csv.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
+# The interpretation layer produces the numbers a client is shown and a sponsor
+# is quoted, so it is tested like the sync is. Type-only imports are stripped by
+# the compiler, so analytics.ts builds without dragging in the React tree.
+./node_modules/.bin/tsc src/lib/insights.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
+node -e '
+const fs=require("fs"),d="verify/build-lib";
+for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){
+  const p=d+"/"+f,s=fs.readFileSync(p,"utf8");
+  const o=s.replace(/(from\s+")(\.\/[A-Za-z0-9_\-]+)(")/g,"$1$2.js$3");
+  if(o!==s)fs.writeFileSync(p,o);
+}'
 
 echo "### tests"
 node --test verify/tests/*.test.mjs

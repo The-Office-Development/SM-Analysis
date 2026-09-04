@@ -32,9 +32,16 @@ export const trueValue = (metric, iso) => {
     views: 2000 + day,
     total_interactions: 300 + day,
     // follows_and_unfollows is reported as two directions; the net is what the
-    // follower series is rebuilt from.
+    // follower series is rebuilt from, but the gross pair is what shows churn.
     follows: 20 + 2 * day,
     unfollows: day,
+    // reach split by follow_type. These deliberately do NOT sum to `reach`:
+    // Meta returns an UNKNOWN bucket too, and its own limitations note warns
+    // that summing a breakdown can come to less than the total. A mock whose
+    // parts summed exactly would hide a parser that folded UNKNOWN into one
+    // side.
+    reach_followers: 400 + day,
+    reach_non_followers: 500 + day,
   }[metric] ?? 0;
 };
 /** Net follower change on `iso` — follows minus unfollows. */
@@ -87,13 +94,24 @@ export function installGraphMock(opts) {
     return Math.round(total);
   };
 
-  const totalValue = (metric, since, until) => {
+  const totalValue = (metric, since, until, breakdown) => {
     if (metric === "follows_and_unfollows") {
       return { data: [{ name: metric, period: "day", total_value: { breakdowns: [{
         dimension_keys: ["follow_type"],
         results: [
           { dimension_values: ["FOLLOWER"], value: overlapTotal("follows", since, until) },
           { dimension_values: ["UNFOLLOWER"], value: overlapTotal("unfollows", since, until) },
+        ],
+      }] } }] };
+    }
+    if (metric === "reach" && breakdown === "follow_type") {
+      return { data: [{ name: metric, period: "day", total_value: { breakdowns: [{
+        dimension_keys: ["follow_type"],
+        results: [
+          { dimension_values: ["FOLLOWER"], value: overlapTotal("reach_followers", since, until) },
+          { dimension_values: ["NON_FOLLOWER"], value: overlapTotal("reach_non_followers", since, until) },
+          // The bucket that must NOT be folded into either side.
+          { dimension_values: ["UNKNOWN"], value: 7 },
         ],
       }] } }] };
     }
@@ -123,7 +141,7 @@ export function installGraphMock(opts) {
       if (metricType === "total_value") {
         const since = Number(q.get("since")), until = Number(q.get("until"));
         if (!Number.isFinite(since) || !Number.isFinite(until)) return err("(#100) since/until required");
-        return ok(totalValue(metric, since, until));
+        return ok(totalValue(metric, since, until, q.get("breakdown")));
       }
       return ok(series(metric));
     }

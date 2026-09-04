@@ -74,7 +74,25 @@ export const demoMetrics: MetricPoint[] = (() => {
       const impressions = Math.round(reach * (1.25 + r() * 0.25));
       const views = Math.round(followers * a.viewMul * weekend * wobble * spike);
       const engagements = Math.round((reach * a.er) / 100 * (0.85 + r() * 0.3));
-      rows.push({ account_id: a.id, platform: a.platform, date, followers: Math.round(followers), reach, impressions, views, engagements });
+
+      // The breakdowns the sponsor-facing panels read. Modelled, not copied from
+      // anyone's real account: a healthy-but-not-flawless mix, so the demo shows
+      // what the panels do rather than an implausibly perfect one.
+      // The two reach halves deliberately fall short of `reach` — the platform
+      // returns an UNKNOWN bucket, and a demo that summed exactly would teach
+      // the wrong expectation.
+      const discoveryShare = 0.55 + (r() - 0.5) * 0.18;
+      const attributed = Math.round(reach * (0.88 + r() * 0.07));
+      const reach_non_followers = Math.round(attributed * discoveryShare);
+      const reach_followers = attributed - reach_non_followers;
+      const follows = Math.round(followers * growth * (1.6 + r() * 0.7)) + 3;
+      const unfollows = Math.round(follows * (0.45 + r() * 0.3));
+
+      rows.push({
+        account_id: a.id, platform: a.platform, date,
+        followers: Math.round(followers), reach, impressions, views, engagements,
+        follows, unfollows, reach_followers, reach_non_followers,
+      });
     }
   }
   return rows;

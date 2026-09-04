@@ -85,6 +85,19 @@ const mutations = [
     const metaOffset = offsetFrom(reachJson, ctx);`,
     replace: `    const offset = offsetFrom(reachJson, ctx);
     const metaOffset = offset;` },
+  // 0008. Both restore a way of reporting a number that looks right and is not.
+  { name: "churn discarded — only the net follower change kept", file: SYNC,
+    find: "    const follows = seriesFromRaw(followRaw, (j) => followDirections(j).follows);",
+    replace: "    const follows = seriesFromRaw(followRaw, () => null);" },
+  { name: "UNKNOWN folded into follower reach, inflating the discovery split", file: SYNC,
+    find: `            if (key.includes("NON_FOLLOWER") || key.includes("NON-FOLLOWER"))
+                nonFollowers = (nonFollowers ?? 0) + value;
+            else if (key.includes("FOLLOWER"))
+                followers = (followers ?? 0) + value;`,
+    replace: `            if (key.includes("NON_FOLLOWER") || key.includes("NON-FOLLOWER"))
+                nonFollowers = (nonFollowers ?? 0) + value;
+            else
+                followers = (followers ?? 0) + value;` },
   { name: "unset account timezone silently inherits the platform's boundary", file: SYNC,
     find: "  return (typeof m === \"number\" && Number.isFinite(m) ? m : DEFAULT_TZ_OFFSET_MINUTES) / 60;",
     replace: "  return (typeof m === \"number\" && Number.isFinite(m) ? m : 0) / 60;" },

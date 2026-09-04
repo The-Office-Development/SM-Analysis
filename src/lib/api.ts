@@ -31,7 +31,7 @@ export async function fetchMetrics(range: Range): Promise<MetricPoint[]> {
   // days — a multi-account dashboard simply stopped a week short.
   const { data, error } = await supabase
     .from("metrics_daily")
-    .select("account_id,platform,date,followers,reach,impressions,views,engagements,provisional")
+    .select("account_id,platform,date,followers,reach,impressions,views,engagements,follows,unfollows,reach_followers,reach_non_followers,provisional")
     .gte("date", isoDaysAgo(range))
     .order("date", { ascending: false })
     .limit(20000);

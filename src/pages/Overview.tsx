@@ -11,6 +11,7 @@ import LineChart, { type Series } from "../components/charts/LineChart";
 import BarList from "../components/BarList";
 import EmptyState from "../components/EmptyState";
 import { PlatformBadge } from "../components/PlatformTile";
+import { DiscoveryPanel, ChurnPanel, FormatPanel, ReachDriversPanel } from "../components/SponsorPanels";
 import { IcPlug, IcRefresh, IcSpark, IcClock, IcContent, IcAlert } from "../lib/icons";
 
 export default function Overview() {
@@ -37,6 +38,20 @@ export default function Overview() {
   const reachTotal = sum(reachSeries);
   const engTotal = sum(engSeries);
   const scopedContent = dash.content.filter((c) => scope === "all" ? platforms.includes(c.platform) : c.platform === scope);
+
+  /*
+   * Split the fetched window in half to compare like with like — the same
+   * approach periodCompare() uses, and for the same reason: only one range of
+   * data is fetched, so the "previous period" has to come out of it. Reach is
+   * summed over each half and posts are bucketed by the midpoint date, so the
+   * two halves are equal-length and directly comparable.
+   */
+  const midpoint = reachSeries.length >= 4 ? reachSeries[Math.floor(reachSeries.length / 2) - 1]?.date ?? null : null;
+  const half = Math.floor(reachSeries.length / 2);
+  const priorReach = midpoint ? reachSeries.slice(0, half).reduce((a, x) => a + x.value, 0) : null;
+  const currentReach = midpoint ? reachSeries.slice(reachSeries.length - half).reduce((a, x) => a + x.value, 0) : null;
+  const priorContent = midpoint ? scopedContent.filter((c) => c.published_at.slice(0, 10) <= midpoint) : [];
+  const recentContent = midpoint ? scopedContent.filter((c) => c.published_at.slice(0, 10) > midpoint) : [];
   const deep = scopedContent.reduce((s, c) => s + c.shares + c.saves, 0);
   const funnel = [
     { k: "Impressions", v: impressions, c: "var(--fb)" },
@@ -106,6 +121,21 @@ export default function Overview() {
             }))} />
           </div>
         </section>
+
+        {/*
+          * The interpretation layer — the reason this costs 50 JD and not $20.
+          * Everything above is a chart any tool draws; these four answer the
+          * questions a client actually asks and a sponsor actually pays for.
+          */}
+        <DiscoveryPanel metrics={metrics} scope={scope} />
+        <ChurnPanel metrics={metrics} scope={scope} />
+        <FormatPanel content={scopedContent} />
+        <ReachDriversPanel
+          current={recentContent}
+          previous={priorContent}
+          currentReach={currentReach}
+          previousReach={priorReach}
+        />
 
         <section className="panel col-3">
           <div className="panel__head"><h3>Top performing content</h3><span className="spacer" /><Link className="btn btn--sm btn--ghost" to="/content">View all</Link></div>

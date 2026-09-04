@@ -48,7 +48,15 @@ export const IG = {
    * it produces is a NET change rather than gross new follows.
    */
   TOTAL_VALUE_METRICS: ["views", "total_interactions", "follows_and_unfollows"] as string[],
-  /** Splits follows_and_unfollows into its two directions. */
+  /**
+   * Splits follows_and_unfollows into its two directions, and splits `reach`
+   * into followers vs non-followers.
+   *
+   * On reach this is the discovery split — the share of reach that went to
+   * accounts which do NOT already follow this one. Documented values are
+   * FOLLOWER, NON_FOLLOWER and UNKNOWN, so the parts do not necessarily sum to
+   * the total; Meta's own limitations note says as much.
+   */
   FOLLOW_TYPE_BREAKDOWN: "follow_type",
   /** Demographic breakdowns (needs ~100 followers; capped at top 45 segments). */
   DEMOGRAPHIC_BREAKDOWNS: ["age", "gender", "country"],

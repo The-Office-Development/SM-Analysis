@@ -25,6 +25,15 @@ export interface MetricPoint {
   impressions: number | null;
   views: number | null;
   engagements: number | null;
+  /** Gross follows and unfollows. null = the platform did not report it. */
+  follows?: number | null;
+  unfollows?: number | null;
+  /**
+   * Reach split by whether the viewer already follows the account. These do NOT
+   * sum to `reach` — Meta returns an UNKNOWN bucket as well.
+   */
+  reach_followers?: number | null;
+  reach_non_followers?: number | null;
   /** The day is still settling; treat it as incomplete, not as a decline. */
   provisional?: boolean;
 }
