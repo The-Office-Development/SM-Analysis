@@ -7,6 +7,21 @@
 [functions]
   node_bundler = "esbuild"
 
+# Netlify's secrets scanner fails the build when an env var's value appears in
+# the repo or the build output. For `VITE_`-prefixed vars that is guaranteed and
+# harmless: Vite inlines them into the browser bundle by design, so they are
+# public by construction. The site URL is in the address bar, the Supabase URL
+# and publishable key are meant to ship to every visitor, and RLS — not secrecy —
+# is what protects the data behind them.
+#
+# >>> ONLY these three. Never add a server-side secret to this list. <<<
+# SUPABASE_SERVICE_ROLE_KEY, TOKEN_ENC_KEY, OAUTH_STATE_SECRET and
+# INSTAGRAM_APP_SECRET must stay scanned: if one of those ever turns up in the
+# repo or in `dist`, the build SHOULD fail. That is the scanner doing its job,
+# and the audit found a published-secret defect once already.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SITE_URL,VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY"
+
 # Security headers. None were set at all: no CSP, no HSTS, no nosniff, and no
 # referrer policy on a site that holds platform credentials.
 [[headers]]
