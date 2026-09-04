@@ -26,6 +26,19 @@ a sponsor-facing number. `verify/reconcile.mjs` can still compare, but when the
 numbers disagree we can only file a ticket, not debug it — and "a wrong number is
 worse than an outage" is the project's first constraint.
 
+> **Provenance warning — every price and plan detail below is third-hand.**
+> They come from comparison sites via web search, **not from the vendors**.
+> `metricool.com`, `help.metricool.com` and Meta's developer site are all blocked
+> by the egress proxy in the environment this was researched from, so no vendor
+> pricing page or API document has ever actually been read. If this decision is
+> revisited, re-check every number at source first — it takes thirty seconds and
+> this file does not substitute for it.
+>
+> Two things were therefore never verified, and the second is the larger risk:
+> whether the terms permit billing clients for a product built on the API (§5),
+> and whether the API returns true daily series at all (§6). If it returns only
+> period totals, the daily charts and the Planner do not work.
+
 The blocker for launch has never been our code. It is Meta App Review: until the
 app is approved, only accounts holding a role on it can connect. A licensed data
 vendor has already been through that process, so buying their API buys their

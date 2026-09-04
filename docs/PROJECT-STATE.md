@@ -3,7 +3,7 @@
 The living record. `CLAUDE.md` is the technical brief; this is the commercial
 and strategic one. Update it when a decision changes.
 
-Last updated: 2026-09-03 (API verification folded in; counts corrected).
+Last updated: 2026-09-04 (first live API call; day-boundary fix; deploy pipeline reconnected).
 
 ---
 
@@ -17,10 +17,13 @@ current; it is the first thing a new session should read after `CLAUDE.md`.**
 | | |
 |---|---|
 | Legal entity (Arabic) | **شركة الحجرة لتقنية المعلومات /ذات مسؤولية محدودة** |
-| Legal entity (English) | **NOT YET DETERMINED** — see below |
+| Legal entity (English) | **Al-Hujra Information Technology Company / Limited Liability** |
 | Commercial registration | 83622 · national establishment no. 200214930 |
 | Registered | 30 July 2026, Companies Control Department, status `قائمة` (active) |
-| Registered address | **Amman only** — the registration gives no street address |
+| Registered address | **Amman only** — no street address on the registration |
+| Certified translation | Abu-Ghazaleh (AGATO), stamped 19 Aug 2026 — settles the English name |
+| Officers | Malek Ahmed Hassan Ismaeil (Chairman) · Bader Rami Saleh Alhaj Hamad (Vice-Chairman) |
+| Registered objectives | 620101 website design · 620102 computer programming · 620301 business applications and software · 620902 website management |
 | Brand / product | The Office · PulseBoard |
 | Website | `theoffice.it.com` |
 | Bank account | None yet |
@@ -32,49 +35,47 @@ wrong on two counts and must not be reused: the registration reads *Information*
 Technology (`لتقنية المعلومات`), and **no English name appears on the document at
 all**.
 
-**The English name is NOT a blocker for Meta, and the translator is off the
-critical path. Corrected 2026-09-03 against Meta's own documentation.**
+**The English name is settled.** The certified translation (Abu-Ghazaleh / AGATO,
+19 Aug 2026) of registration 83622 renders it
+**`Al-Hujra Information Technology Company / Limited Liability`**. Note the string
+ends at *Limited Liability*, not *Limited Liability Company*. Meta compares this
+against the document character for character, so it must be used verbatim
+everywhere and never varied — it is now in `src/pages/Legal.tsx` and the app footer.
 
-The claim above — that "Meta's Business info field needs Latin script" — was an
-assumption, and it was wrong. Meta publishes the supported document languages and
-**Arabic is on the list**. A certified English translation is required only for
-documents in an *unsupported* language. The registration is submitted as issued,
-and the Arabic legal name is typed into Business info exactly as printed.
+**It was never the blocker this file recorded, though, and that correction must
+survive.** The note here long claimed "Meta's Business info field needs Latin
+script", which was an assumption written down as fact. Meta publishes its
+supported document languages and **Arabic is on the list**; a certified
+translation is required only for documents in an *unsupported* language. So the
+registration could always have been submitted as issued, and a future session
+must not re-derive a translator as a blocker on a Jordanian document.
 
-**Getting this backwards would have been actively harmful, not merely slow.**
-Entering a translator's English rendering into the form would put a string there
-that appears on no submitted document — manufacturing the name mismatch the
-translation was supposed to prevent. Meta also warns that submitting false or
-misleading information is itself a rejection reason, and an unattested spelling
-of a name is a bad place to be imprecise.
+The translation is still worth having — it is what fills the legal pages and lets
+a non-Arabic reader connect brand to entity — and now that it exists, use it. But
+had it been slow, submission should not have waited on it.
 
-The English name is still genuinely needed — for the legal pages, the footer and
-anything a non-Arabic reader must understand — and `الحجرة` can be rendered
-Al-Hujra, Alhujra, Al Hujrah or Al-Hijra. Ask the Companies Control Department
-whether an English extract already exists on file; that would outrank a
-translator's. But **order it in parallel, and do not wait on it to submit.**
+The registered objectives are a gift for App Review: website design, computer
+programming, business applications and software, and website management services.
+They corroborate that the entity and the product belong together, which a reviewer
+otherwise has to take on trust.
 
 Further consequences identified:
 
-- The legal pages still carry `[REGISTERED COMPANY NAME]` and
-  `[REGISTERED ADDRESS, JORDAN]` placeholders in the policy body
-  (`src/pages/Legal.tsx`), plus the counsel placeholders. They cannot be filled
-  until the English name is settled.
-- **The site states the link between brand and entity** — done 2026-09-03. A
-  reviewer sees "PulseBoard" and an Arabic document naming `الحجرة`; that the
-  brand is roughly a translation of the legal name is invisible to a non-Arabic
-  reader. Every public legal page now carries a footer naming the Arabic legal
-  entity and commercial registration 83622. Arabic only on purpose: no English
-  name exists on the registration, so any English here would be an unattested
-  guess on a page Meta reads. **Add the English beside the Arabic when the
-  certified translation lands — do not replace it.**
-- **The registration has no street address**, and this is now the real blocker
-  in the pack. The second document has a specific job: carry a real one. A
-  utility bill is the right instrument and, with no bank account, the only one
-  available — but Meta accepts a utility bill for **address and phone only**, and
-  requires the **legal business name to appear on it**. So it must be a bill in
-  the company's name; a partner's personal bill will not do. The registration
-  stays the document that proves the name.
+- ~~The legal pages carry name and address placeholders.~~ **Done 2026-08-28.**
+  `OPERATOR`, `ADDRESS` and a registration line are filled from the certified
+  translation. What remains bracketed waits on counsel, not on the translation.
+- ~~The site must state the link between brand and entity.~~ **Done.** The app
+  footer names the entity, Amman and registration 83622 beneath the legal links,
+  and the public legal pages carry the Arabic legal name with the registration
+  number. A reviewer holding an Arabic document and reading an English page can
+  now join the two without knowing Arabic.
+- **The registration has no street address**, and it is now the only genuinely
+  missing item in the verification pack. The second document has a specific job:
+  carry a real one. A utility bill is the right instrument and, with no bank
+  account, the only one available — but Meta accepts a utility bill for **address
+  and phone only**, and requires the **legal business name to appear on it**. So
+  it must be a bill in the company's name; a partner's personal bill will not do.
+  The registration stays the document that proves the name.
 - **The registration carries no stamp or seal, deliberately** — its own footer
   says `صدرت الوثيقة الكترونيا ... ولا تحتاج الى توقيع او ختم`, with a QR code for
   verification. `SETUP-META.md` §1 says Meta rejects unstamped documents; that is
@@ -367,3 +368,5 @@ reconciled against Instagram's own insights.
 | `DATA-INTEGRITY.md` | The proven metric defects, with runnable proofs |
 | `JORDAN-CONTEXT.md` | What operating from Jordan changes |
 | `VENDOR-OPTIONS.md` | Data-source comparison, ban-risk analysis, the open terms question |
+| `TRANSLATOR-BRIEF.md` | The written brief that fixes the English legal name |
+| `CLIENT-MESSAGE.md` | What to ask the client for, English and Arabic |

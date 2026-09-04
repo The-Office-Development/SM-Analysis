@@ -99,6 +99,12 @@ export default function AppLayout() {
             <a className="muted" href="/terms" target="_blank" rel="noreferrer">Terms</a>
             <a className="muted" href="/data-deletion" target="_blank" rel="noreferrer">Data deletion</a>
           </div>
+          {/* A reviewer sees the brand "The Office" and an Arabic registration
+              naming الحجرة; nothing otherwise connects them. State it. */}
+          <div className="muted" style={{ paddingTop: 6, fontSize: 10.5, lineHeight: 1.45 }}>
+            The Office is a product of Al-Hujra Information Technology Company / Limited Liability,
+            Amman, Jordan · commercial registration 83622
+          </div>
       </aside>
 
       <div className="main">
