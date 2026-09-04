@@ -145,3 +145,93 @@ Record the screencast now that real data appears, and submit. See
 | OAuth returns `already_connected_elsewhere` | That account belongs to another tenant |
 | Dashboard empty after sync | Check `sync_log`; a failed run records `error_code` |
 | Numbers off by exactly one day | `dayKeyFromEndTime` — see `docs/DATA-INTEGRITY.md` D2 |
+
+---
+
+## What actually went wrong on the first deploy — 2026-09-04
+
+Every failure below was configuration, not code. The code that had never run in
+production ran correctly the first time it was given valid inputs. They are
+recorded because each one presented as something other than what it was, and
+between them they cost most of a day.
+
+### The site was six weeks stale and nobody could tell
+
+The repo was transferred from a personal account to the `The-Office-Development`
+org. GitHub redirects `git clone` after a transfer, so nothing looked broken —
+but **Netlify's GitHub App integration does not follow a transfer**, so its
+webhook silently stopped firing. The last deploy was six weeks old.
+
+The symptom was endpoints returning 404 that plainly existed in the repo, which
+reads exactly like a broken build. It was not: those functions had simply not
+been written yet at the commit still being served.
+
+> **If endpoints 404, check the deployed commit before you debug the code.**
+> Netlify → Deploys shows the commit and the source repo. A function that
+> existed at that commit but 404s is a build problem; one that did not is a
+> staleness problem, and they need completely different fixes.
+
+### Pasted URLs arrived as markdown links
+
+`VITE_SITE_URL` was set to `[https://app.theoffice.it.com](https://app.theoffice.it.com)`
+— a URL auto-linked by a chat client and pasted whole. It is not absolute, so
+the browser resolved it relative to `/api/`, producing a redirect to
+`/api/[https://...](...)/connections` and an unreadable 404.
+
+The same paste pattern hit a Supabase URL earlier in the same session.
+
+> **After pasting any env var, look at the saved value for `[` or `(`.**
+> Anything with brackets is mangled. This is invisible until something builds a
+> URL out of it.
+
+### The Instagram App ID is not the Meta App ID
+
+Instagram Login authenticates against an **Instagram app ID** — a different
+number from the Meta app ID on App settings → Basic. Using the Meta one produces
+`Invalid request: Request parameters are invalid: Invalid platform app` on
+instagram.com, which names neither field.
+
+Both IDs and both secrets live in **Instagram → API setup with Instagram business
+login → Business login settings**. Take all four from that panel.
+
+### The secret failed later than the ID, and blamed the wrong thing
+
+With the correct ID and the *wrong* secret, the authorize step succeeds — the ID
+is all Instagram checks there — and the failure lands at the token exchange with:
+
+> "Error validating verification code. Please make sure your redirect_uri is
+> identical to the one you used in the OAuth dialog request"
+
+**That message is misleading.** The redirect URI was provably correct on both
+sides. Meta returns this same text for a wrong client secret, a mismatched
+redirect URI, and a reused authorization code.
+
+`oauth-instagram-callback` now logs `client_id`, a `cred_fp` fingerprint of the
+secret and the `redirect_uri` before calling out, which separates those three in
+one run. Two live attempts were spent guessing before that existed.
+
+### The secrets scanner failed the build over a public value
+
+Netlify fails a build when an env var's value appears in the repo or build
+output. `VITE_SITE_URL` is in `tasks.md`, so the build failed — but a site URL
+is in the browser address bar and in the Meta app config, and `VITE_`-prefixed
+vars are inlined into the browser bundle *by design*.
+
+`netlify.toml` now sets `SECRETS_SCAN_OMIT_KEYS` for exactly the three public
+`VITE_` vars. **Scanning stays on for everything else**, and it should: the audit
+found a secret published in this repository once already.
+
+### Env changes need a redeploy
+
+Netlify snapshots environment variables per deploy. Changing one in the UI does
+not reach the already-running functions. Every env fix above needed a redeploy
+before it took effect, and forgetting that makes a correct fix look like a
+failed one.
+
+### The five-minute OAuth window was too short for a human
+
+`STATE_TTL_MS` and the nonce cookie were both 5 minutes. That window has to cover
+logging into Instagram, clearing 2FA and reading the consent screen. It failed a
+genuine first connection, and it failed as `bad_state` — which reads like a
+defect rather than "you took too long". Now 15 minutes, with the cookie's
+lifetime derived from the TTL so the two cannot drift apart.

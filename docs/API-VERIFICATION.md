@@ -281,3 +281,80 @@ empty. It has now proved, end to end:
 It cannot prove a single **number**. The reconciliation gate needs an account
 with real history, and until one is connected the correctness of the day
 windows, the discovery split and the follower series remains unverified.
+
+---
+
+## 7. Token scopes — what a connection can actually do
+
+The pitch to a creator with a six-figure following is that connecting cannot put
+their account at risk. That claim needs evidence, and the two ways to obtain a
+token **do not grant the same thing**.
+
+### 7.1 The OAuth token is provably read-only
+
+`authorizeUrl()` requests exactly `instagram_business_basic` and
+`instagram_business_manage_insights`. Meta enforces scopes server-side, so a
+token issued from that flow cannot publish, message, moderate comments, or
+change anything. A test asserts the scope list and explicitly rejects
+`business_management` and `instagram_business_content_publish`; a mutation adds a
+write scope and confirms the test fires. This is the token a client's connection
+produces.
+
+### 7.2 The App Dashboard token is NOT the same, and grants far more
+
+"Generate token" bypasses OAuth entirely — nothing in this codebase constrains
+it, and **it does not ask the operator to choose permissions**. After generating
+one for `@heath_ens21`, Instagram's own Apps and Websites screen listed the app
+as holding:
+
+| Permission | State |
+|---|---|
+| Basic business information | Required |
+| **Business message information** | granted |
+| **Publish content as a business** | granted |
+| Manage insights | granted |
+| **Business comment information** | granted |
+
+Three of those are write-capable and **the product never requests any of them**.
+They came from the dashboard flow, which grants what the app is configured for
+rather than what a caller asks for.
+
+**Consequences:**
+
+- Treat a dashboard-generated token as materially more dangerous than an OAuth
+  one. Use it for probing, then let it expire — it is long-lived (60 days).
+- A client will never see this, because they authorise through the OAuth flow
+  whose consent screen lists only the two scopes we request.
+- The excess permissions can be revoked per-account at
+  **Instagram → Settings → Apps and websites → (the app) → toggles**.
+
+### 7.3 What the product needs, exhaustively
+
+| Call | Scope |
+|---|---|
+| `/me` — username, followers_count, media_count, avatar | `instagram_business_basic` |
+| `/me/media` — caption, type, permalink, timestamp, like_count, **comments_count** | `instagram_business_basic` |
+| media `insights` — reach, saved, shares, views | `instagram_business_manage_insights` |
+| `/me/insights` — reach, views, total_interactions, follows_and_unfollows | `instagram_business_manage_insights` |
+| `follower_demographics` — age, gender, country | `instagram_business_manage_insights` |
+
+Nothing else. In particular **`comments_count` is a number on the media object
+under `basic`** — reading comment *text* would need the `/comments` edge, which
+this codebase never calls. Revoking "business comment information" therefore
+costs nothing.
+
+**Verify rather than trust that last claim.** `comments: m.comments_count ?? 0`
+means a field that stopped being returned would show as **0 comments, not as
+unknown** — a quiet failure, not a loud one. After revoking, sync an account with
+real posts and confirm the Content page still shows comment counts.
+
+### 7.4 Auditing a live token
+
+`verify/audit-token.mjs` decrypts the stored token from `account_secrets` and
+audits it: the three reads the product depends on should succeed, and every
+write-gated endpoint must be refused. Every call is a GET — a write capability is
+proved by reading an endpoint that capability gates, never by attempting the
+write.
+
+It exits non-zero if any write capability is allowed, and it is the thing to run
+in front of a sceptical client.

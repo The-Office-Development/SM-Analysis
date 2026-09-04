@@ -42,7 +42,7 @@ organisational. Per-finding status in `docs/REMEDIATION-STATUS.md`. Headlines:
 - `business_management` dropped; tokens encrypted at rest; secrets fail closed
 - disconnect revokes at the platform and deletes; token refresh under a lock
 - data-deletion and deauthorize callbacks, legal pages, consent capture, data export
-- a test suite that can actually fail: 50 assertions, mutation score 22/22, gating CI
+- a test suite that can actually fail: 65 assertions, mutation score 24/24, gating CI
 
 ---
 
@@ -67,20 +67,30 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, 50 tests, mutation 22/22.
+Code is on `main`, all green: typecheck, build, 65 tests, mutation 24/24.
 
-**Nothing has ever run against the live Instagram API.** Every test runs against
-a mock built on Meta's *documented* conventions. The correctness fixes are
-validated against that model, not against real responses. The first real
-connection is an experiment, not a formality.
+**It is deployed, and one real account is connected.** As of 2026-09-04
+`app.theoffice.it.com` serves the app and its functions, and `@heath_ens21`
+authorised through PulseBoard's own OAuth flow — the first time `exchangeCode`
+has executed against Meta. `verify/probe-live.mjs` reports **11 of 11** against
+the live API: every endpoint, scope and field name in the `IG` block is correct.
+
+**No number has been validated.** That account has 101 followers and **zero
+posts**, so every metric is legitimately zero and the reconciliation gate has
+had nothing to check. The mock is still the only oracle the tests have. Until an
+account with real history is connected, correctness of the day windows, the
+discovery split and the follower series is unverified.
 
 **No client account can connect yet.** Until App Review passes, OAuth only works
 for accounts holding a role on the Meta app. That is a platform rule, not a
 limitation of this code.
 
-Not yet done by anyone: migrations `0001`–`0007` have not been applied, secrets
-are not set (the code fails closed without them), the Meta app is not configured
-for the new callbacks, and nothing is deployed.
+Done 2026-09-04: migrations `0001`–`0008` applied to a Frankfurt Supabase
+project, secrets set, the Meta app configured, deployed to
+`app.theoffice.it.com`, and one Instagram account connected end to end.
+
+Not done: the reconciliation gate (needs an account with real posts), Business
+Verification (blocked on a utility bill in the company's name), and App Review.
 
 ---
 
@@ -155,9 +165,9 @@ queue-backed sync for scale; remaining optimistic claims in `src/lib/setupGuides
 
 ### Run this before you claim anything works
 ```bash
-npm test        # typecheck, build, 50 assertions, then the mutation gate
+npm test        # typecheck, build, 65 assertions, then the mutation gate
 ```
-The mutation check injects 22 real defects and requires every one to be caught.
+The mutation check injects 24 real defects and requires every one to be caught.
 **If you fix a defect the suite would not otherwise catch, add a mutation for it.**
 
 ### Invariants — do not "simplify" these back into bugs

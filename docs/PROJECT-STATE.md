@@ -127,6 +127,25 @@ the check is the same mistake as citing the old `verify/*.mjs` printers.
 
 ### Immediate next action
 
+**Updated 2026-09-04, end of day.** Deployed, connected, and the plumbing is
+proven. The gate is not.
+
+1. **Connect an account with real posts.** `@heath_ens21` has zero media, so
+   every metric is legitimately zero and nothing can be reconciled. A friend's
+   account is the intended route: invite it as an **Instagram Tester**, they
+   accept from their own Instagram settings, and they authorise **on their own
+   device** — never on ours, because asking a creator to type their Instagram
+   password on someone else's machine is a reasonable thing to refuse.
+2. **Run the gate.** `verify/reconcile.mjs`, comparing settled days against the
+   Instagram app with the account holder reading the numbers back.
+3. **Settle the day boundary.** `verify/probe-live.mjs` prints the derived
+   offset. Two accounts have now reported `-7`; a third from Jordan reporting
+   `+3` would mean the boundary follows the account, and `-7` again would mean it
+   is fixed platform-side and the dashboard must say so. `API-VERIFICATION.md` §6.2.
+4. **Then drinkat**, via the provisioned-workspace pattern in §3.
+
+### Superseded next actions (kept for the record)
+
 1. **Deploy.** Apply migrations, set secrets, configure the Meta app, ship it.
    Nothing else moves until the app is reachable. `DEPLOY-RUNBOOK.md` §3–§5.
    The follower-reconstruction bug (4 failing tests) lands first — the
@@ -248,23 +267,23 @@ App Review remains the path to client two onward.
 
 ## 4. Where it stands
 
-**The software.** On `main`, all green: typecheck, build, 48 tests, mutation
-score 20/20. A pre-launch audit found 24 P0 findings; 19 are fixed, 1 mitigated,
+**The software.** On `main`, all green: typecheck, build, 65 tests, mutation
+score 24/24. A pre-launch audit found 24 P0 findings; 19 are fixed, 1 mitigated,
 4 partly done or organisational. Detail in `REMEDIATION-STATUS.md`.
 
-**Never run against the live API.** Every test uses a mock built on Meta's
-*documented* conventions. The endpoints in `netlify/functions/_instagram.ts` were
-checked against `developers.facebook.com` on 2026-08-26 — the first session able
-to reach it — and the daily metric set was found wrong three ways; see
-`API-VERIFICATION.md` and the fix in `5d6c34a`. That closes the secondary-source
-risk but not the live one: **no line of this code has ever seen a real Instagram
-response**, and only a real connection settles that.
+**Deployed and connected — 2026-09-04.** `app.theoffice.it.com` serves the app
+and its functions from a Frankfurt Supabase project with migrations `0001`–`0008`
+applied. `@heath_ens21` authorised through PulseBoard's own OAuth flow, which is
+the first time the token exchange has ever run against Meta. The live probe
+reports **11 of 11**: every endpoint, scope and field name in the `IG` block is
+correct.
 
-**Nothing is deployed.** Migrations unapplied, secrets unset (the code fails
-closed without them), Meta app not configured.
-
-**Nothing is verified.** No account has ever connected; no number has been
-reconciled against Instagram's own insights.
+**Not one number has been validated.** That account has 101 followers and **zero
+posts**, so every metric is correctly zero and the reconciliation gate has had
+nothing to check. This is the single remaining technical risk, and it is the same
+one `CLAUDE.md` §2 names: a wrong number is worse than an outage. **The next
+milestone is connecting an account with real history** — a friend's account is
+the intended route, then drinkat's.
 
 ---
 
