@@ -1,4 +1,5 @@
 import type { Handler } from "@netlify/functions";
+import { createHash } from "node:crypto";
 import {
   verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
   backToApp, encryptToken, log, AccountOwnedByAnotherTenant,
@@ -39,10 +40,18 @@ export const handler: Handler = async (event) => {
      * "unset" from "set" from "someone pasted the wrong one", and useless to an
      * attacker. Never log the value itself.
      */
+    const cred = process.env.INSTAGRAM_APP_SECRET ?? "";
     log("oauth.exchange_attempt", {
       provider: "instagram",
       client_id: process.env.INSTAGRAM_APP_ID ?? "<unset>",
-      secret_len: (process.env.INSTAGRAM_APP_SECRET ?? "").length,
+      // Length alone cannot tell a Meta app secret from an Instagram one — both
+      // are 32 hex characters — so log a FINGERPRINT instead: the first 8 hex of
+      // its SHA-256. That identifies which secret is deployed without revealing
+      // it, and is comparable against a hash computed from the dashboard value.
+      // The key is deliberately not named "secret": the log scrubber redacts by
+      // key name, which is how the previous attempt lost its own diagnostic.
+      cred_len: cred.length,
+      cred_fp: cred ? createHash("sha256").update(cred).digest("hex").slice(0, 8) : "<unset>",
       redirect_uri: redirectUri,
     });
 
