@@ -135,3 +135,26 @@ test("a deploy preview refuses to use production database credentials", async ()
     process.env.VITE_SUPABASE_URL = saved.url; process.env.SUPABASE_SERVICE_ROLE_KEY = saved.key;
   }
 });
+
+/**
+ * The OAuth window has to cover a real detour through the platform: Instagram
+ * login, 2FA, and reading the permission screen. Five minutes failed a genuine
+ * first connection on 2026-09-04 and surfaced as `bad_state`, which reads like a
+ * defect rather than "you took too long".
+ *
+ * The pair below is the part that must not drift: if the cookie dies before the
+ * state does, the state is expired by proxy and the failure is misattributed.
+ */
+test("the nonce cookie outlives the state it is bound to", async () => {
+  const { setNonceCookie } = await import("../build/_lib.js");
+  const cookie = setNonceCookie("abc123");
+
+  const maxAge = Number(/Max-Age=(\d+)/.exec(cookie)?.[1]);
+  assert.ok(Number.isFinite(maxAge), `no Max-Age in: ${cookie}`);
+  assert.ok(maxAge >= 15 * 60, `cookie lives ${maxAge}s — too short for Instagram login plus 2FA`);
+
+  // The attributes that make it a CSRF control rather than a convenience.
+  for (const attr of ["HttpOnly", "Secure", "SameSite=Lax", "Path=/"]) {
+    assert.ok(cookie.includes(attr), `nonce cookie must set ${attr}: ${cookie}`);
+  }
+});

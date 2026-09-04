@@ -104,7 +104,23 @@ export async function userIdFromToken(token: string | undefined): Promise<string
  * tenant. The signature alone does not prevent this.
  * ------------------------------------------------------------------------- */
 export const STATE_COOKIE = "pb_oauth";
-const STATE_TTL_MS = 5 * 60 * 1000;
+/**
+ * How long an OAuth state stays valid.
+ *
+ * Was 5 minutes, which failed a real first-time connection on 2026-09-04. That
+ * window has to cover the whole detour through the platform: logging into
+ * Instagram, clearing 2FA, and actually READING the permission screen. Five
+ * minutes punishes the careful user and anyone doing it on a phone — and the
+ * failure surfaces as `bad_state`, which reads like a bug rather than "you took
+ * too long".
+ *
+ * Fifteen still bounds the replay window tightly. The security here is carried
+ * by the nonce cookie, not the clock: a signed state alone is worthless without
+ * the matching HttpOnly cookie from the same browser, which is the invariant in
+ * CLAUDE.md §5 and has a mutation guarding it. The TTL is defence in depth, so
+ * it can afford to be humane.
+ */
+const STATE_TTL_MS = 15 * 60 * 1000;
 
 export function newNonce(): string {
   return crypto.randomBytes(18).toString("base64url");
@@ -152,7 +168,10 @@ export function readCookie(header: string | undefined, name: string): string | u
 }
 
 export function setNonceCookie(nonce: string): string {
-  return `${STATE_COOKIE}=${nonce}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=300`;
+  // Max-Age tracks STATE_TTL_MS deliberately. If the cookie dies first, the state
+  // is expired by proxy and the user gets `bad_state` while the state itself was
+  // still perfectly valid — a confusing failure with a correct-looking cause.
+  return `${STATE_COOKIE}=${nonce}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${STATE_TTL_MS / 1000}`;
 }
 export function clearNonceCookie(): string {
   return `${STATE_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
