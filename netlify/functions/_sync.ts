@@ -4,7 +4,20 @@ import { igGet, IG } from "./_instagram";
 export const today = () => new Date().toISOString().slice(0, 10);
 
 /** How many days of history to pull on the first sync of an account. */
-const MAX_BACKFILL = 30;
+/*
+ * How far back a first sync reaches, in days.
+ *
+ * 30 is OUR choice, not Meta's limit. The account-insights reference documents
+ * no maximum for since/until — "the API will only include data created within
+ * this range (inclusive)" — and caps only online_followers, at 30 days.
+ * Demographics ignore since/until entirely and use timeframe.
+ *
+ * Raise IG_MAX_BACKFILL to reach further and find the real ceiling by
+ * observation: an undocumented cap shows up as days that come back empty while
+ * nearer days return data. Cost is linear — DAY_BUDGET days per run, so 90 days
+ * needs nine syncs rather than three.
+ */
+const MAX_BACKFILL = Math.max(1, Number(process.env.IG_MAX_BACKFILL ?? 30));
 /**
  * How many recent days to re-fetch on EVERY sync.
  *
