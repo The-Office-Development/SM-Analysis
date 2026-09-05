@@ -75,11 +75,21 @@ authorised through PulseBoard's own OAuth flow — the first time `exchangeCode`
 has executed against Meta. `verify/probe-live.mjs` reports **11 of 11** against
 the live API: every endpoint, scope and field name in the `IG` block is correct.
 
-**No number has been validated.** That account has 101 followers and **zero
-posts**, so every metric is legitimately zero and the reconciliation gate has
-had nothing to check. The mock is still the only oracle the tests have. Until an
-account with real history is connected, correctness of the day windows, the
-discovery split and the follower series is unverified.
+**The first reconciliation ran on 2026-09-05 and found three things.** The most
+important is about oracles, not numbers: **Meta serves pre-conversion insight
+data over the API while its own app refuses to display it**, so an account
+converted *for testing* yields API figures with nothing to check them against. A
+valid oracle is an account that has been Business or Creator for **months**.
+
+It also found that the stored follower series contradicts its own deltas — one
+follower vanishes on a day whose recorded change is zero — and that `unfollows`
+and `reach_non_followers` have been null on every day ever stored, which means
+**churn and the discovery split have never held real data.** Both panels are
+unproven. Full record in `docs/DATA-INTEGRITY.md`.
+
+The mock is still the only oracle the tests have. Until a months-old
+professional account is connected, correctness of the day windows, the discovery
+split and the follower series remains unverified.
 
 **No client account can connect yet.** Until App Review passes, OAuth only works
 for accounts holding a role on the Meta app. That is a platform rule, not a

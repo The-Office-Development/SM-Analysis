@@ -127,22 +127,36 @@ the check is the same mistake as citing the old `verify/*.mjs` printers.
 
 ### Immediate next action
 
-**Updated 2026-09-04, end of day.** Deployed, connected, and the plumbing is
-proven. The gate is not.
+**Updated 2026-09-05.** Deployed, connected, and the first reconciliation has
+been run. It found what the gate exists to find.
 
-1. **Connect an account with real posts.** `@heath_ens21` has zero media, so
-   every metric is legitimately zero and nothing can be reconciled. A friend's
-   account is the intended route: invite it as an **Instagram Tester**, they
-   accept from their own Instagram settings, and they authorise **on their own
-   device** — never on ours, because asking a creator to type their Instagram
-   password on someone else's machine is a reasonable thing to refuse.
-2. **Run the gate.** `verify/reconcile.mjs`, comparing settled days against the
-   Instagram app with the account holder reading the numbers back.
-3. **Settle the day boundary.** `verify/probe-live.mjs` prints the derived
-   offset. Two accounts have now reported `-7`; a third from Jordan reporting
-   `+3` would mean the boundary follows the account, and `-7` again would mean it
-   is fixed platform-side and the dashboard must say so. `API-VERIFICATION.md` §6.2.
-4. **Then drinkat**, via the provisioned-workspace pattern in §3.
+**The oracle requirement, learned the hard way.** Meta serves pre-conversion
+insight data over the API while its own app refuses to display it. An account
+converted *for testing* therefore produces API numbers with nothing to check
+them against — the same position the mock already put us in. **A valid oracle is
+an account that has been Business or Creator for months**, so the Instagram app
+itself holds the history. Detail and evidence in `DATA-INTEGRITY.md`.
+
+That ruled out two candidates — the operator's own account (converted days ago)
+and a family member's (personal). It does not require a large account: any
+months-old professional account with displayed history will do.
+
+**The plan, in order.**
+
+1. **Tonight — a friend's account, professional for a long time.** Invite as an
+   Instagram Tester, he accepts and authorises on his own device, sync three
+   times, then run `verify/reconcile.mjs` and compare settled days against his
+   Instagram app. This is the gate.
+2. **Then the client's single account.** That is the one carrying real
+   non-follower reach, and therefore the only thing that can populate churn and
+   the discovery split — the two panels the product sells on, which have never
+   once held real data.
+3. **Also outstanding:** whether a real Jordanian account reports a `+3` or `-7`
+   day boundary. Two accounts have said `-7`. `verify/probe-live.mjs` prints it.
+
+**Open, not closed:** what our tokens can actually do. Provably read-only by
+request; not yet verified by audit against a live stored token. `tasks.md` §6b
+carries the full question and what would settle it.
 
 ### Superseded next actions (kept for the record)
 

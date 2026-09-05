@@ -166,6 +166,60 @@ does not: its permissions objection grows with client count while its cost
 objection shrinks. App Review is the scale answer, and it has a long lead time —
 so start §4 now even though nothing this week waits on it.
 
+## 6b. Open question — what our tokens can actually do
+
+**Status: open. Partly answered, not settled. Do not repeat the claim to a
+client until the audit has been run on a live token.**
+
+This came up when asked, reasonably, whether a creator handing over access is
+handing over control of an account they have spent years building. It deserves a
+better answer than a policy paragraph.
+
+**What is settled.**
+
+- The OAuth flow requests exactly `instagram_business_basic` and
+  `instagram_business_manage_insights`. Both read-only. A test asserts the list
+  and rejects `business_management` and `instagram_business_content_publish`; a
+  mutation adds a write scope and confirms the test fires.
+- Meta enforces scopes server-side, so a token from that flow cannot publish,
+  message, moderate or modify. Not "we choose not to" — the calls are refused.
+- Every call the product makes maps to those two scopes. `API-VERIFICATION.md`
+  §7.3 has the exhaustive table.
+
+**What is NOT settled.**
+
+- [ ] **Does a token issued by our OAuth flow inherit permissions granted
+      earlier by other means?** The App Dashboard's "Generate token" button asks
+      the operator to choose nothing and granted `publish content as a business`,
+      `business message information` and `business comment information` on
+      `@heath_ens21`. Whether an OAuth token issued afterwards carries those is
+      unknown. Run `verify/audit-token.mjs --account <id>` against a live stored
+      token to find out. **This is the one that matters** — if tokens do inherit,
+      the read-only claim is wrong as stated and the design needs revisiting.
+- [ ] **Revoke the excess on `@heath_ens21`** (Instagram → Settings → Apps and
+      websites → toggles), then re-run the audit and confirm the write-gated
+      endpoints go from whatever they were to refused. That second run is the
+      demonstration to give a client.
+- [ ] **Confirm nothing breaks after revoking.** `comments_count` is a media
+      field under `basic`, so revoking comment access should cost nothing — but
+      `comments: m.comments_count ?? 0` means a field that stopped arriving would
+      read as **0 comments, not unknown**. A quiet failure. Verify on an account
+      with real posts and real comments.
+- [ ] **Decide the standing policy on dashboard-generated tokens.** They are
+      long-lived (60 days), broader than OAuth tokens, and not constrained by
+      anything in this codebase. Current thinking: use for probing, then let
+      expire and never treat as equivalent to a user token.
+- [ ] **Write the client-facing answer** once the above is done: the scope list,
+      what each is for, what the token cannot do, and that the audit can be run
+      in front of them. Against tools that ask for a password, this is the
+      strongest thing the product can say — which is exactly why it must be true
+      before it is said.
+
+**Why this is open-ended rather than a task with a tick box.** The honest answer
+today is "provably read-only by request, not yet verified by audit on a live
+token." That gap is small but real, and the difference between those two
+sentences is the difference between a claim and evidence.
+
 ## 7. Known gaps, deliberately deferred
 
 - [ ] Share-link expiry and revocation — **not built.** See §0.
