@@ -163,3 +163,76 @@ suite tests a *first* sync (30 complete days) and never simulates the second day
 
 Any fix should land with the corresponding proof script promoted to an assertion, plus a test that
 runs two consecutive syncs and checks that day one's value is corrected on day two.
+
+---
+
+## The first real reconciliation, 2026-09-05 — three findings
+
+The first comparison of stored numbers against an account's own Instagram app.
+It found the thing the gate exists to find, though not where it was expected.
+
+### 1. The Instagram app does not show pre-conversion data. The API does.
+
+`@heath_ens21` was converted to a professional account a few days before
+2026-09-05. Over 2026-08-06 → 09-04 the two sources disagree flatly:
+
+| Source | New followers | Views |
+|---|---|---|
+| PulseBoard (from the API) | +8 (92 → 100) | 11 |
+| Instagram app | 0 | 1 |
+
+The API returned non-zero `follows` on 11, 12, 22, 23 and 26 August — days
+before the conversion — so **Meta holds pre-conversion data and serves it over
+the API while its own app declines to display it.**
+
+**This is the finding that matters for planning, and it inverts the earlier
+advice.** An account converted specifically for testing yields API data with
+**nothing to check it against**, which is the position the mock already put us
+in. The reconciliation gate therefore requires an account that has been Business
+or Creator for **months**, so that the app itself holds the history to compare.
+
+Do not read the disagreement as proof our numbers are wrong. It shows only that
+the app cannot serve as an oracle for days before conversion.
+
+### 2. The follower series contradicts its own deltas
+
+Walking forward from the first stored total, applying each day's stored
+`follows - unfollows`:
+
+```
+2026-08-28    99 stored    99 expected    delta 0
+2026-08-29    98 stored    99 expected    delta 0    *** -1
+...            (the -1 persists through 2026-09-05)
+```
+
+One follower disappears on a day whose recorded change is zero, and the series
+never reconciles again.
+
+The parsing is not at fault — `followDirections` checks `unfollow` before
+`follow`, and `netFollowDelta` derives the net from the same JSON. The likely
+cause is that **Meta's historical `follows_and_unfollows` response is not
+stable**: the unfollow was reported when queried near-live, and is absent when
+the same day is re-queried weeks later. The reconstruction anchored on a live
+total that included it, while the columns were later overwritten from a response
+that did not.
+
+If that holds, it is a property of the data source rather than a coding defect,
+and it means **a reconstructed follower line drifts from the platform's own
+count over time**. `follower_count` — which answered live on 2026-09-04, against
+the documentation — would replace the reconstruction with a measured value and
+remove the drift entirely. That is now the strongest argument for adopting it.
+
+**Unverified on numbers this small.** One follower on a 100-follower account is
+also consistent with an anchor-timing artifact. It needs an account with real
+churn to characterise, and it should not be presented as settled before then.
+
+### 3. `unfollows` and `reach_non_followers` are null on all 31 days
+
+Both are the second dimension of a `follow_type` breakdown, and both are null
+throughout while their first dimensions carry values.
+
+The nulls are honest: Meta documents returning an empty data set rather than a
+zero for absent data, so nothing is being fabricated. But the consequence is
+that **churn and the discovery split — the two panels the product sells on —
+have never once been populated with real data.** Neither can be considered
+working until an account with genuine non-follower reach is connected.
