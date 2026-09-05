@@ -358,3 +358,40 @@ write.
 
 It exits non-zero if any write capability is allowed, and it is the thing to run
 in front of a sceptical client.
+
+### 6.6 Insights ARE retroactive on a newly converted account
+
+I claimed in session that Instagram insights begin accumulating only when an
+account becomes professional, so converting an account for testing would yield
+no usable history. **That was wrong, asserted from general knowledge rather than
+evidence, and the stored data disproves it.**
+
+Meta documents no such limitation. The account-insights Limitations section
+lists exactly four — the 100-follower floor for `follower_count` and
+`online_followers`, the 30-day window for `online_followers`, empty sets rather
+than zeros for unavailable data, and the top-45 cap on demographics. Conversion
+date is not among them.
+
+`@heath_ens21` was converted to a professional account a few days before
+2026-09-05, and `reconcile.mjs --days 30` returned real values for the full
+month, including movement that a reconstruction could not fabricate:
+
+```
+2026-08-06   92      2026-08-22   96      2026-08-29   98   <- a DECREASE
+2026-08-11   93      2026-08-23   98      2026-09-01  100
+2026-08-12   94      2026-08-26   99      2026-09-03  100
+```
+
+A follower line rebuilt backwards from today's count cannot produce a fall on
+one day and a rise on the next; that requires genuine per-day data. Scattered
+non-zero `reach` on 8, 9, 23, 30 and 31 August says the same.
+
+**Consequence for onboarding:** an account converted specifically for testing is
+a valid oracle, and switching a personal account to Creator does not cost its
+history. That materially changes the advice to give someone lending an account
+for a pilot.
+
+**The general lesson is the one this document keeps relearning.** Documentation
+absence is not API absence — that reopened `online_followers` — and a
+confidently remembered platform behaviour is weaker evidence than either. Check
+the stored rows.
