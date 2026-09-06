@@ -32,6 +32,13 @@ They are kept for the record, not as work.
    per-post view, and no UI change can work around it.
 2. **Deploy to Cloudflare.** §6d. Everything since 443d39a is committed and
    undeployed, including the follows/unfollows correction.
+2b. **CUT NETLIFY OFF — immediately after the DNS cutover, and not later.**
+   The Netlify cron is still running the OLD published commit hourly and
+   rewriting the trailing seven days with the pre-fix follows arithmetic. It is
+   actively corrupting data on a timer right now. Running both hosts at once is
+   worse than either alone: Cloudflare writes the correct values and Netlify
+   overwrites them within the hour. Disable the scheduled functions, then remove
+   the site once DNS has settled.
 3. **Story capture.** §6c. The only PERISHABLE item here: stories and their
    insights are gone after 24 hours and cannot be backfilled at any price.
 4. **Per-post / per-story detail view.** §6c. Needs 1 first.
