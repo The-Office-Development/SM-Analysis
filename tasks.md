@@ -220,6 +220,141 @@ today is "provably read-only by request, not yet verified by audit on a live
 token." That gap is small but real, and the difference between those two
 sentences is the difference between a claim and evidence.
 
+## 6c. MISSING FEATURE — "how is this post doing right now?"
+
+**Raised 2026-09-06. This is a product gap, not a bug, and it may be the most
+valuable thing not yet built.**
+
+The use case: a creator posts something, wants to know within the hour whether it
+is working, and decides whether to keep it, boost it, or delete and repost at a
+better time. That decision has a deadline measured in hours. Nothing in
+PulseBoard serves it today.
+
+### What exists now
+
+- `content` rows are written **only** by the scheduled sync — hourly at best,
+  and only if that account comes up in the batch.
+- The media fetch takes the **25 most recent posts** with no pagination.
+- There is **no way to refresh a single post on demand.** No endpoint, no button.
+- **Stories are not synced at all.** No `media_product_type`, no `/me/stories`
+  call, nothing. They are absent from the schema, the sync and the UI.
+
+### What the API can actually do — verified live, 2026-09-06
+
+- **`/me/stories` works.** Returned an active story on the first call. Stories
+  are available on this API path and we are simply not asking.
+- **One post's complete metrics arrive in ONE call.** `/me/media` with
+  `insights.metric(reach,saved,shares,views)` returned reach 846, views 1610,
+  likes 81, saved 0, shares 4 for a single item. A per-post refresh costs one
+  request, not a sync.
+
+### Why this is not just "run the sync more often"
+
+The daily-metrics sync is heavy — about five calls per day of history — which is
+what forces `IG_DAY_BUDGET` and the multi-run backfill. **A single post refresh
+is one call.** They are different shapes of work and should not share a path:
+making the whole sync real-time is impossible, making one post real-time is
+trivial.
+
+### STORIES ARE PERISHABLE — this is the urgent half
+
+A story is gone after 24 hours, **and so are its insights**. A post's numbers can
+be backfilled two years later; a story's cannot be recovered at all once it
+expires. Every hour without story capture is data permanently lost for any
+connected account.
+
+That also makes stories the strongest argument for a real cron: a missed post
+sync self-heals through the trailing re-fetch, a missed story window does not.
+
+### Design sketch, to be decided
+
+- [ ] **Per-post refresh.** A control on Content and on a post detail view that
+      calls a new endpoint, does the single live fetch and updates that row.
+      Costs one API call. Should be rate-limited per account.
+- [ ] **A "just posted" view.** The newest item, with its numbers and its age,
+      and honest treatment of a post too young to judge.
+- [ ] **Story capture.** `/me/stories` on a schedule frequent enough to catch
+      them before expiry, plus story rows in the schema. Decide the cadence
+      against the 24-hour window, not against the daily sync's cadence.
+- [ ] **Pagination past 25 posts**, or a documented statement that Content shows
+      the most recent 25.
+
+### How real-time can it honestly be?
+
+The API answers immediately, but **Instagram's own insight numbers lag** — a
+post minutes old may report zeros or partial figures through the API and in
+Instagram's own app alike. So "live" means as fresh as Instagram will admit to,
+not as fresh as reality.
+
+That must be shown honestly. A post twenty minutes old reading `reach 0` is not
+a failed sync and must not look like one — and, per the rule this project keeps
+relearning, must not be rendered as a confident zero either.
+
+---
+
+## 6d. PARKED — hosting, sync depth and what it costs
+
+**Parked 2026-09-06 to return to. Nothing here blocks the reconciliation gate.**
+
+Netlify paused production deploys mid-session when build credits ran out, pinning
+the live site to a commit that still contained the follows/unfollows defect. The
+code is now ported to Cloudflare Pages and Workers (`927f228`) and builds
+cleanly, but **nothing is deployed and no Cloudflare account is connected.**
+
+**Where it stands.**
+
+- A `pulseboard` Pages project was created on the personal Cloudflare account and
+  **deleted again** — that account serves other clients' sites and should not
+  host this. No secrets were set, no domain attached, no DNS changed.
+- The domain `theoffice.it.com` already sits on that account's Cloudflare DNS
+  (`handbook.theoffice.it.com` runs there), so a project on a *separate* account
+  would need a CNAME from the existing zone rather than a zone move.
+
+**The limit that actually matters, measured.**
+
+Request volume is a non-issue — the account runs at ~1.3% of the free 100k/day.
+The binding constraint is **50 subrequests per invocation on Workers Free**, and
+a sync run at `IG_DAY_BUDGET=10` makes ~57. Roughly `7 + 5 x days`:
+
+| DAY_BUDGET | Subrequests | Fits free tier |
+|---|---|---|
+| 10 | ~57 | no |
+| 8 | ~47 | barely |
+| 7 | ~42 | yes, with headroom |
+
+**This cannot be optimised away.** Three of the four daily metrics — `views`,
+`total_interactions`, `follows_and_unfollows` — are `total_value` only: Meta
+returns one aggregate for any range, so a per-day series requires a call per day.
+Only `reach` supports `time_series`, and its buckets come back on Meta's own day
+boundary (UTC-7 for a Jordanian account), which is the defect `CLAUDE.md`
+forbids reintroducing. The call volume is the price of correct dates.
+
+**What it buys.** Insights go back **two years** (§6.7), about 3,650 calls:
+
+| Tier | Subrequests | DAY_BUDGET | Runs | At hourly cron |
+|---|---|---|---|---|
+| Free | 50 | 7 | ~104 | ~4 days |
+| Paid, $5/mo | 10,000 | 100+ | ~8 | ~8 hours |
+
+Free does not prevent a deep backfill; it decides how long a new client waits to
+see their own history. Two years is a genuine differentiator — the Instagram app
+shows only a rolling window, so a creator cannot see their own campaign from last
+year, and we could.
+
+**Open decisions:**
+
+- [ ] Which Cloudflare account hosts this — separate one for isolation and
+      billing clarity, or the existing one. **Not a capacity question**; the
+      subrequest cap is per plan, so a second free account changes nothing.
+- [ ] Free at `IG_DAY_BUDGET=7`, or $5/month. Recommendation: ship free now,
+      pay when there is a paying client and a deep backfill is worth an
+      afternoon instead of four days.
+- [ ] Deploy, set secrets, deploy `worker-cron`, then move DNS. The Meta OAuth
+      redirect URI does not change, but the callback breaks until DNS cuts over,
+      so do it before touching a client's account.
+- [ ] Decide whether the sync should fail loudly when a run approaches the
+      subrequest cap, rather than being discovered later as a partial sync.
+
 ## 7. Known gaps, deliberately deferred
 
 - [ ] Share-link expiry and revocation — **not built.** See §0.
