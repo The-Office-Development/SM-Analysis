@@ -227,3 +227,66 @@ export function reachDrivers(
     },
   ].sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
 }
+
+export interface PostContext {
+  /** Median of this metric across other posts of the SAME format, or null. */
+  median: number | null;
+  /** Ratio to that median. 1.4 means 40% above. Null when either side is unknown. */
+  vsMedian: number | null;
+  /** How many comparable posts the median rests on. One post is not a baseline. */
+  sample: number;
+}
+
+/**
+ * Put one post's number in context.
+ *
+ * A figure alone cannot answer "should I keep this?" — 800 reach is excellent
+ * for one account and a failure for another, and it means different things for a
+ * Reel than for a carousel. The comparison is the product; the number is only
+ * the input.
+ *
+ * Compared against the MEDIAN of the same format, never the mean: one viral post
+ * drags a mean so far that every other post looks like a failure. This account
+ * has a reel at 4.8M views against a typical few thousand — a mean would make
+ * its entire normal output look broken.
+ *
+ * `sample` is returned rather than hidden because a median over two posts is not
+ * a baseline, and the UI must be able to say so instead of implying authority it
+ * does not have.
+ */
+export function postContext(
+  post: ContentItem,
+  all: ContentItem[],
+  key: "views" | "reach" | "likes" | "comments" | "shares" | "saves",
+): PostContext {
+  const peers = all
+    .filter((c) => c.id !== post.id && c.platform === post.platform && (c.media_type || "Post") === (post.media_type || "Post"))
+    .map((c) => c[key])
+    .filter((v): v is number => v !== null);
+
+  if (!peers.length) return { median: null, vsMedian: null, sample: 0 };
+  const med = median(peers);
+  const own = post[key];
+  return {
+    median: med,
+    // A median of 0 gives no ratio worth showing rather than an infinity.
+    vsMedian: own !== null && med > 0 ? own / med : null,
+    sample: peers.length,
+  };
+}
+
+/** Hours since publication. Negative values (clock skew) clamp to 0. */
+export function ageHours(publishedAt: string): number {
+  return Math.max(0, (Date.now() - Date.parse(publishedAt)) / 3_600_000);
+}
+
+/**
+ * Is this post too young for its numbers to mean anything?
+ *
+ * Instagram reports nothing for the first minutes and keeps counting for days.
+ * Judging a post at two hours is judging noise, and the product should say so
+ * rather than let someone delete a post that was doing fine.
+ */
+export function tooEarly(publishedAt: string): boolean {
+  return ageHours(publishedAt) < 24;
+}

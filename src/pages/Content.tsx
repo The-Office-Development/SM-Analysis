@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
 import { compact, metric, sumKnown, pctPlain, shortDate } from "../lib/format";
@@ -81,10 +82,18 @@ function ContentInner() {
               {sorted.map((c) => (
                 <tr key={c.id}>
                   <td>
+                    {/* The TITLE opens the post's own page; the arrow opens
+                        Instagram. Nesting the external anchor inside the router
+                        Link would be invalid HTML and would swallow it. */}
                     <div className="stack">
-                      {c.permalink
-                        ? <a href={c.permalink} target="_blank" rel="noreferrer" style={{ fontWeight: 550, textDecoration: "underline", textUnderlineOffset: 2 }}>{c.title}</a>
-                        : <span style={{ fontWeight: 550 }}>{c.title}</span>}
+                      <span style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                        <Link to={`/content/${c.id}`} style={{ fontWeight: 550 }}>{c.title || "Untitled"}</Link>
+                        {c.permalink && (
+                          <a href={c.permalink} target="_blank" rel="noreferrer"
+                             className="muted" style={{ fontSize: 11 }}
+                             aria-label="Open on the platform">↗</a>
+                        )}
+                      </span>
                       <span className="muted" style={{ fontSize: 11 }}>{c.media_type} · {shortDate(c.published_at)}</span>
                     </div>
                   </td>

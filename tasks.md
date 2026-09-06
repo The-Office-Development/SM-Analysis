@@ -328,10 +328,16 @@ reach, likes, comments, shares, saves, watch time and retention. The only click
 target is a column header, for sorting. **There is no per-item view**, no route,
 no drill-down.
 
-- [ ] A route per item — `/content/:id` — showing everything held for that post
-      or story, its age, and a **Refresh** control doing the single live call.
-- [ ] Context, not just figures. A number alone cannot answer "should I keep
-      this?". Against the account's own median for that format it can.
+- [x] A route per item — `/content/:id`. DONE 2026-09-07. Every metric can say
+      "not reported", nothing is judged before 24 hours, and each figure sits
+      beside the median for the SAME format with its sample size shown.
+- [ ] The **Refresh** control on that page, doing the single live call. Not yet
+      built — it needs a new endpoint, and it is what makes the page answer
+      "how is it doing RIGHT NOW" rather than "as of the last sync".
+- [x] Context, not just figures. DONE — postContext() compares against the
+      MEDIAN of the same format, never the mean: this account has a reel at 4.8M
+      views against a typical few thousand, and a mean would make its entire
+      normal output look like failure.
 - [ ] Stories need their own shape. They are not posts: no permalink worth
       showing, a 24-hour life, and different metrics.
 
