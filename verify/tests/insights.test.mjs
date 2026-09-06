@@ -42,6 +42,31 @@ test("an unreported discovery split is null, never 0%", () => {
   assert.equal(d.partial, false);
 });
 
+test("a HALF-reported split is null — the real shape of the live defect", () => {
+  // reach_non_followers was null on 31 of 32 days for a live account while
+  // reach_followers carried values. Deriving the rate from the known half alone
+  // rendered "0% of reach was people who don't follow you - New people 0",
+  // describing a metric Instagram had never returned. Both halves or nothing.
+  const missingNew = discovery([
+    day(1, { reach_followers: 400, reach_non_followers: null }),
+    day(2, { reach_followers: 300, reach_non_followers: null }),
+  ], "all");
+  assert.equal(missingNew.discoveryRate, null, "0% would tell a sponsor nobody new saw the account");
+  assert.equal(missingNew.followers, 700, "the half that WAS reported is still reported");
+
+  // The mirror image lies at the other extreme: 100% discovery.
+  const missingExisting = discovery([
+    day(1, { reach_followers: null, reach_non_followers: 500 }),
+  ], "all");
+  assert.equal(missingExisting.discoveryRate, null, "100% would be just as invented as 0%");
+
+  // A genuine reported zero is a fact and must survive.
+  const realZero = discovery([
+    day(1, { reach_followers: 800, reach_non_followers: 0 }),
+  ], "all");
+  assert.equal(realZero.discoveryRate, 0, "a reported 0 is data, not an absence");
+});
+
 test("provisional days are excluded from the sponsor-facing split", () => {
   const d = discovery([
     day(1, { reach_followers: 100, reach_non_followers: 100 }),

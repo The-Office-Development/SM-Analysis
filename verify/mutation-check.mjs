@@ -14,6 +14,7 @@ const LIB = "verify/build/_lib.js";
 const TOKENS = "verify/build/_tokens.js";
 const DELETION = "verify/build/meta-data-deletion.js";
 const INSTA = "verify/build/_instagram.js";
+const INSIGHTS = "verify/build-lib/insights.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -61,6 +62,9 @@ const mutations = [
   { name: "deploy previews allowed to touch the production database", file: LIB,
     find: "if ((context === \"deploy-preview\" || context === \"branch-deploy\") && !process.env.ALLOW_NONPROD_DB) {",
     replace: "if (false) {" },
+  { name: "discovery rate derived from only one half of the split", file: INSIGHTS,
+    find: "discoveryRate: bothKnown && attributed > 0 ? nonFollowers / attributed : null,",
+    replace: "discoveryRate: attributed > 0 ? (nonFollowers ?? 0) / attributed : null," },
   { name: "Instagram Login requests a write-capable scope", file: INSTA,
     find: 'SCOPES: ["instagram_business_basic", "instagram_business_manage_insights"],',
     replace: 'SCOPES: ["instagram_business_basic", "instagram_business_manage_insights", "instagram_business_content_publish"],' },
@@ -105,7 +109,7 @@ const mutations = [
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

@@ -55,9 +55,25 @@ export function discovery(metrics: MetricPoint[], scope: Scope): Discovery {
   }
   const attributed = (followers ?? 0) + (nonFollowers ?? 0);
   const totalReach = sumKnown(rows, "reach");
+  /*
+   * A SPLIT NEEDS BOTH HALVES. Deriving the rate when only one side is known
+   * turns "not reported" into a number, and the number is always a lie at one
+   * extreme: a missing non-follower half reads as 0% discovery, a missing
+   * follower half as 100%.
+   *
+   * The 0% case is not hypothetical — reach_non_followers has been null on 31
+   * of 32 days for one live account, and the panel showed "0% of reach was
+   * people who don't follow you · New people 0" to describe a metric Instagram
+   * had simply never returned. This is the figure the panel tells a sponsor
+   * they are buying, so a false zero here is the most expensive one in the
+   * product.
+   *
+   * A genuine reported 0 still shows as 0. Only null is withheld.
+   */
+  const bothKnown = followers !== null && nonFollowers !== null;
   return {
     followers, nonFollowers,
-    discoveryRate: attributed > 0 ? (nonFollowers ?? 0) / attributed : null,
+    discoveryRate: bothKnown && attributed > 0 ? nonFollowers / attributed : null,
     partial: totalReach !== null && totalReach > attributed,
   };
 }
