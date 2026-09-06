@@ -236,3 +236,46 @@ zero for absent data, so nothing is being fabricated. But the consequence is
 that **churn and the discovery split — the two panels the product sells on —
 have never once been populated with real data.** Neither can be considered
 working until an account with genuine non-follower reach is connected.
+
+---
+
+## THE GATE PASSED — 2026-09-06/07, @malekismaiil
+
+The first time any number in this product has been checked against reality and
+agreed. An account with 1,079 followers, real posts and real churn, compared
+against Instagram's own 30-day panel:
+
+| Metric | Instagram | PulseBoard | Gap |
+|---|---|---|---|
+| Views | 3,005 | 3,026 | +0.7% |
+| Interactions | 214 | 199 | -7% |
+| **Net followers** | **-9** | **-9** | **exact** |
+
+The two gaps are the size expected from our window being offset by a day against
+theirs. Net followers matches exactly.
+
+**What this validates:** the day-boundary derivation on an account Meta buckets
+at UTC-7 while it sits at UTC+3, the per-day windowing, the storage path, and
+the `views` / `total_interactions` / `follows_and_unfollows` chain end to end.
+
+### Two things that nearly sent this the wrong way
+
+**Instagram's own date picker is offset.** Selecting 17-18 August returns the
+panel for 15-16 August — a two-day skew, reproducible, and visible in the
+screenshots. Per-day comparisons against the app are therefore **not reliable**,
+and an early comparison using it appeared to show catastrophic disagreement
+(ours 2x to 5x higher) when nothing was wrong. **Reconcile against the 30-day
+panel, which needs no date selection.** This cost an hour and would have cost a
+client relationship if it had been discovered during a demo instead.
+
+**A stale deploy was corrupting data hourly.** After the follows/unfollows fix,
+stored `follows` was still inflated by exactly the day's `unfollows` on the most
+recent five days, giving net -3 against Instagram's -9. The parser was correct;
+the **still-deployed Netlify cron was running the OLD code every hour** and
+rewriting the trailing seven days with the old arithmetic. Rebuilding those days
+from the working tree produced -9 immediately.
+
+The general lesson is worth more than the incident: **when a fix is committed but
+not deployed, the old code keeps writing.** A scheduled job on a stale deploy is
+not idle — it is actively undoing the fix, in the same rows, on a timer. Deploy
+blocked plus cron running is a data-corruption state, not a pause.
