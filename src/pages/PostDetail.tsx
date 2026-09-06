@@ -5,6 +5,8 @@ import { metric, sumKnown, full, shortDate } from "../lib/format";
 import { postContext, postRank, engagementSplit, ageHours, tooEarly } from "../lib/insights";
 import { PlatformBadge } from "../components/PlatformTile";
 import RequireData from "../components/RequireData";
+import DistributionStrip from "../components/charts/DistributionStrip";
+import { useState } from "react";
 import type { ContentItem } from "../lib/types";
 
 /**
@@ -39,6 +41,11 @@ function PostDetailInner() {
   const { id } = useParams<{ id: string }>();
   const dash = useDash();
   const post = dash.content.find((c) => c.id === id);
+  // Hoisted above the early return below: a hook called after a conditional
+  // return runs on some renders and not others, and React counts hooks by
+  // position. The post can arrive late while data is still loading, which is
+  // exactly when the count would change.
+  const [stripKey, setStripKey] = useState<typeof METRICS[number]["key"]>("views");
 
   if (!post) {
     return (
@@ -166,6 +173,42 @@ function PostDetailInner() {
           )}
         </div>
       </div>
+
+      {(() => {
+        /*
+         * The rank as a picture. "#1 of 12" cannot distinguish topping a tight
+         * cluster from being an outlier an order of magnitude clear of
+         * everything else, and those mean very different things for what to
+         * post next.
+         */
+        const pool = dash.content.filter((c) => c.platform === post.platform && c[stripKey] !== null);
+        if (pool.length < 2) return null;
+        return (
+          <div className="panel">
+            <div className="panel__head" style={{ gap: 8, flexWrap: "wrap" }}>
+              <h3>Where it sits</h3>
+              <span className="sub">this post against every post we hold</span>
+              <span style={{ marginLeft: "auto", display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {METRICS.map((m) => (
+                  <button key={m.key} type="button"
+                          className={`btn btn--sm${stripKey === m.key ? " btn--on" : ""}`}
+                          onClick={() => setStripKey(m.key)}>{m.label}</button>
+                ))}
+              </span>
+            </div>
+            <div className="panel__body">
+              <DistributionStrip
+                highlightId={post.id}
+                points={pool.map((c) => ({
+                  id: c.id,
+                  label: `${(c.title || "Untitled").slice(0, 40)} · ${c.media_type}`,
+                  value: c[stripKey] as number,
+                }))}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {(() => {
         const split = engagementSplit(post);
