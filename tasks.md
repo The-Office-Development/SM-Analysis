@@ -16,6 +16,38 @@ Last updated: 2026-08-28.
 
 ---
 
+## THE ORDER TO DO THINGS IN — as of 2026-09-06
+
+Sections 1 and 2 below are DONE (2026-09-04): Supabase is live with migrations
+0001-0008, the Meta app is configured, and two Instagram accounts are connected.
+They are kept for the record, not as work.
+
+**Blocking, in this order:**
+
+0. **Reconcile four settled days against the Instagram app.** §3. Not one number
+   in this product has ever been checked against reality. Tonight inverted the
+   follower direction and that fix is unverified. Ten minutes, no deploy needed.
+1. **Migrate `content` to nullable columns.** §6c. `not null default 0` makes a
+   just-posted item read as reach 0 rather than "too early to tell". Blocks the
+   per-post view, and no UI change can work around it.
+2. **Deploy to Cloudflare.** §6d. Everything since 443d39a is committed and
+   undeployed, including the follows/unfollows correction.
+3. **Story capture.** §6c. The only PERISHABLE item here: stories and their
+   insights are gone after 24 hours and cannot be backfilled at any price.
+4. **Per-post / per-story detail view.** §6c. Needs 1 first.
+5. **Token scope audit.** §6b. This is the claim made to a client; it is
+   currently unverified against a live token.
+6. **Pagination past 25 posts**, or say plainly that Content shows 25.
+7. **Sync guard** at the subrequest cap. §6d.
+
+**Parallel, blocking nothing:** Business Verification and App Review (§6), the
+PDPL questions and legal-page placeholders (§0).
+
+**Deferred:** everything in §7, plus TikTok (never worked live), the Facebook
+path, and LinkedIn (not built; its analytics API needs partner approval).
+
+---
+
 ## 0. Before deploying — no accounts needed
 
 - [x] **Reword the legal pages to describe what the system actually does.**
