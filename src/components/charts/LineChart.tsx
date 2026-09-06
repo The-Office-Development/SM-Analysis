@@ -10,13 +10,19 @@ export interface Series {
 }
 
 interface Props {
+  /**
+   * Where the y-axis starts. "zero" (default) for magnitudes like reach and
+   * views. "auto" for a series whose zero is not a real possibility and whose
+   * MOVEMENT is the subject — a follower count above all.
+   */
+  baseline?: "zero" | "auto";
   series: Series[];
   height?: number;
   legend?: boolean;
 }
 
 /** Multi-series area+line chart with a shared crosshair tooltip. */
-export default function LineChart({ series, height = 240, legend = true }: Props) {
+export default function LineChart({ series, height = 240, legend = true, baseline = "zero" }: Props) {
   const { ref, width } = useElementWidth<HTMLDivElement>();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [hover, setHover] = useState<number | null>(null);
@@ -30,16 +36,40 @@ export default function LineChart({ series, height = 240, legend = true }: Props
   const W = Math.max(width, 240);
   const padL = 44, padR = 12, padT = 10, padB = 24;
 
-  const yMax = useMemo(() => {
-    let m = 0;
-    for (const s of visible) for (const p of s.points) m = Math.max(m, p.value);
-    return m * 1.14 || 1;
-  }, [visible, yMax_dep(visible)]);
+  /*
+   * Where the y-axis starts.
+   *
+   * "zero" is right for reach, views and engagement: zero is a meaningful floor
+   * and the height of the line carries the magnitude.
+   *
+   * "auto" is right for a follower count, where zero is not a real possibility
+   * and anchoring there hides the only thing anyone is looking at. A 1,080
+   * follower account that loses 7 people over a month draws a change of 0.6% of
+   * the chart height against a zero baseline — a flat line describing a real
+   * decline. That is a wrong number told in pixels.
+   *
+   * A truncated axis can also mislead in the other direction, by making a small
+   * movement look dramatic, so it is not the default and the axis labels always
+   * print the true values rather than an offset. The reader can see the floor.
+   */
+  const { yMin, yMax } = useMemo(() => {
+    let lo = Infinity, hi = -Infinity;
+    for (const s of visible) for (const p of s.points) { lo = Math.min(lo, p.value); hi = Math.max(hi, p.value); }
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return { yMin: 0, yMax: 1 };
+    if (baseline === "zero") return { yMin: 0, yMax: hi * 1.14 || 1 };
+
+    // Pad by a fraction of the SPREAD, not of the value, so the line is not
+    // pinned to the frame. A flat series gets a small symmetric window instead
+    // of a zero-height one.
+    const spread = hi - lo;
+    const pad = spread > 0 ? spread * 0.25 : Math.max(1, Math.abs(hi) * 0.01);
+    return { yMin: Math.max(0, lo - pad), yMax: hi + pad };
+  }, [visible, baseline, yMax_dep(visible)]);
 
   if (n === 0) return <div ref={ref} style={{ height }} />;
 
   const X = (i: number) => padL + (W - padL - padR) * (n < 2 ? 0.5 : i / (n - 1));
-  const Y = (v: number) => padT + (height - padT - padB) * (1 - v / yMax);
+  const Y = (v: number) => padT + (height - padT - padB) * (1 - (v - yMin) / Math.max(1e-9, yMax - yMin));
 
   const yticks = 4;
   const step = Math.max(1, Math.round(n / 5));
@@ -58,7 +88,7 @@ export default function LineChart({ series, height = 240, legend = true }: Props
       >
         {/* gridlines + y labels */}
         {Array.from({ length: yticks + 1 }, (_, t) => {
-          const v = (yMax * t) / yticks, y = Y(v);
+          const v = yMin + ((yMax - yMin) * t) / yticks, y = Y(v);
           return (
             <g key={t}>
               <line x1={padL} x2={W - padR} y1={y} y2={y} stroke="var(--grid)" strokeWidth={1} />
@@ -78,7 +108,11 @@ export default function LineChart({ series, height = 240, legend = true }: Props
         {visible.map((s) => {
           const end = s.points.length - 1;
           const line = s.points.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.value).toFixed(1)}`).join(" ");
-          const area = `${line} L${X(end).toFixed(1)} ${Y(0)} L${X(0).toFixed(1)} ${Y(0)} Z`;
+          // Close the fill on the axis FLOOR, not on zero. With a truncated
+          // baseline Y(0) sits below the plot area, so the gradient spilled past
+          // the bottom of the chart.
+          const floorY = Y(yMin);
+          const area = `${line} L${X(end).toFixed(1)} ${floorY} L${X(0).toFixed(1)} ${floorY} Z`;
           const gid = `grad-${s.key}`;
           return (
             <g key={s.key}>
@@ -108,7 +142,12 @@ export default function LineChart({ series, height = 240, legend = true }: Props
       {hover !== null && (
         <div className="tooltip" style={{
           left: `${(X(hover) / W) * 100}%`,
-          top: `${(Y(Math.max(0, ...visible.map((s) => s.points[hover]?.value ?? 0))) / height) * 100}%`,
+          // Position on the HIGHEST value at this index. Math.max(0, ...) assumed a
+          // zero floor, which is wrong once the axis can start elsewhere: on a
+          // follower chart every value exceeds 0, so the 0 was harmless there, but
+          // a series that dips below its own baseline would have pinned the
+          // tooltip to the wrong row. Use the series values alone.
+          top: `${(Y(Math.max(...visible.map((s) => s.points[hover]?.value ?? yMin))) / height) * 100}%`,
           opacity: 1,
         }}>
           <div className="d">{shortDate((axisPoints[hover] ?? axisPoints[axisPoints.length - 1]).date)}</div>

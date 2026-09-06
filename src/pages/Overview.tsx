@@ -80,7 +80,11 @@ export default function Overview() {
       <div className="dash">
         <section className="panel col-2">
           <div className="panel__head"><h3>Audience growth</h3><span className="sub">Followers · last {dash.range} days</span></div>
-          <div className="panel__body"><LineChart series={growth} height={264} /></div>
+          <div className="panel__body">
+            {/* Followers: the movement is the subject, and a zero baseline hides
+                it entirely — a real month-long decline drew as a flat line. */}
+            <LineChart series={growth} height={264} baseline="auto" />
+          </div>
         </section>
 
         <section className="panel">
