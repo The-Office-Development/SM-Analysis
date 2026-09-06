@@ -157,10 +157,16 @@ export function formatPerformance(content: ContentItem[]): FormatRow[] {
   }
   const out: FormatRow[] = [];
   for (const [format, items] of groups) {
-    const reaches = items.map((i) => i.reach).filter((r) => r > 0);
-    const reach = items.reduce((a, i) => a + i.reach, 0);
-    const saves = items.reduce((a, i) => a + i.saves, 0);
-    const shares = items.reduce((a, i) => a + i.shares, 0);
+    // Sum only what was actually reported. Treating an unreported metric as 0
+    // does not merely lose information here — it drags a format's median and its
+    // save/share rates toward zero, which reads as "this format performs badly"
+    // rather than "we have no data on it yet".
+    const known = (k: "reach" | "saves" | "shares") =>
+      items.map((i) => i[k]).filter((v): v is number => v !== null);
+    const reaches = known("reach").filter((r) => r > 0);
+    const reach = known("reach").reduce((a, v) => a + v, 0);
+    const saves = known("saves").reduce((a, v) => a + v, 0);
+    const shares = known("shares").reduce((a, v) => a + v, 0);
     out.push({
       format,
       posts: items.length,

@@ -40,3 +40,28 @@ export function initials(name: string): string {
   if (!parts.length) return "?";
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
+
+/**
+ * Render a metric that may not have been reported.
+ *
+ * An em-dash, never "0". `content` columns are nullable (migration 0009) because
+ * Instagram reports nothing for a post's first minutes to hours — exactly when
+ * someone is deciding whether to keep it. "0" answers that question wrongly and
+ * with total confidence.
+ */
+export function metric(v: number | null | undefined): string {
+  return v === null || v === undefined ? "—" : compact(v);
+}
+
+/**
+ * Add up the parts that WERE reported.
+ *
+ * Returns null only when every part is missing, so one absent component does not
+ * erase the ones we have — a post with known likes and unreported saves still
+ * has a meaningful engagement figure. It is a sum of what is known, and callers
+ * should not present it as a complete total when parts were missing.
+ */
+export function sumKnown(...vals: (number | null | undefined)[]): number | null {
+  const known = vals.filter((v): v is number => typeof v === "number");
+  return known.length ? known.reduce((a, v) => a + v, 0) : null;
+}

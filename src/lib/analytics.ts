@@ -141,11 +141,18 @@ export function summarizeForAI(d: AISummaryInput): string {
 
   const top = [...d.content]
     .filter((c) => d.scope === "all" || c.platform === d.scope)
-    .sort((a, b) => b.views - a.views).slice(0, 5);
+    // A post with unreported views is not a zero-view post, so it sorts last
+    // rather than being ranked as the worst performer.
+    .sort((a, b) => (b.views ?? -1) - (a.views ?? -1)).slice(0, 5);
   if (top.length) {
     lines.push("Top posts by views:");
     for (const c of top)
-      lines.push(`- "${(c.title || "Untitled").slice(0, 60)}" (${PLATFORMS[c.platform as Platform].name}, ${c.media_type}) — ${c.views.toLocaleString()} views, ${c.likes.toLocaleString()} likes, ${c.comments.toLocaleString()} comments`);
+      {
+      // This text goes into the AI assistant's context. "not reported" is a fact
+      // it can reason about; a fabricated 0 is one it would confidently repeat.
+      const n = (v: number | null) => (v === null ? "not reported" : v.toLocaleString());
+      lines.push(`- "${(c.title || "Untitled").slice(0, 60)}" (${PLATFORMS[c.platform as Platform].name}, ${c.media_type}) — ${n(c.views)} views, ${n(c.likes)} likes, ${n(c.comments)} comments`);
+    }
   }
 
   const windows = bestTimes(d.audience, d.connectedPlatforms, 3);

@@ -166,10 +166,45 @@ test("a metric the account does not expose is stored as unknown, not as zero", a
 
   const rows = db._rows("metrics_daily");
   assert.ok(rows.length > 0);
-  // No account-level interactions and no posts to fall back on: engagements is
-  // unknown. Zero would claim the account had no engagement at all.
-  assert.ok(rows.every((r) => r.engagements === null || r.engagements === 0));
+
+  // The mock serves two posts, on the first and last day of the window, so the
+  // post-derived fallback legitimately produces a figure for those two days.
+  // Every OTHER day has no account-level interactions and no post to derive
+  // from, and must therefore be null. Zero would claim the account had no
+  // engagement at all on days we simply cannot speak for.
+  const postDays = new Set([from, TODAY]);
+  const quiet = rows.filter((r) => !postDays.has(r.date));
+  assert.ok(quiet.length > 0, "the window must contain days without posts");
+  assert.ok(
+    quiet.every((r) => r.engagements === null),
+    "a day with no interactions metric and no posts must be unknown, never 0",
+  );
   assert.ok(rows.every((r) => r.reach === trueValue("reach", r.date)), "other metrics still stored");
+});
+
+test("a post the platform has not reported on stores null, never zero", async () => {
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] });
+
+  const rows = db._rows("content");
+  const reported = rows.find((r) => r.external_id === "post_reported");
+  const unreported = rows.find((r) => r.external_id === "post_unreported");
+  assert.ok(reported && unreported, "both posts are stored");
+
+  // The reported one keeps its figures.
+  assert.equal(reported.reach, 500);
+  assert.equal(reported.likes, 11);
+  assert.equal(reported.saves, 7);
+
+  // The unreported one — no insights edge, no like_count — must be null on
+  // every metric. This is the shape Instagram returns for a post published
+  // minutes ago, which is exactly when a creator opens the dashboard to decide
+  // whether to keep it. Storing 0 answers "did anyone see this?" with a
+  // confident no, at the moment of maximum consequence.
+  for (const k of ["views", "reach", "likes", "comments", "shares", "saves"]) {
+    assert.equal(unreported[k], null, `${k} must be null, not 0, when unreported`);
+  }
 });
 
 test("recent days are flagged provisional so the UI need not read them as a drop", async () => {

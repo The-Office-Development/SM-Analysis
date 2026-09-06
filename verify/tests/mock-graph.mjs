@@ -151,7 +151,40 @@ export function installGraphMock(opts) {
       }
       return ok(series(metric));
     }
-    if (u.includes("/media")) return ok({ data: [] });
+    if (u.includes("/media")) {
+      /*
+       * Two posts, deliberately unlike each other.
+       *
+       * The first is fully reported. The second has NO insights edge at all —
+       * which is what Instagram returns for a post published minutes ago, and
+       * for any post older than the account's conversion to professional. That
+       * second shape was never modelled here (the mock returned an empty media
+       * array), so nothing in the suite ever exercised the content path, and a
+       * schema that could not express "unknown" went unnoticed until a live
+       * account showed it.
+       *
+       * A post whose metrics are absent must store null, not 0. See migration
+       * 0009 and the test that pins this.
+       */
+      return ok({ data: [
+        {
+          id: "post_reported", caption: "reported", media_type: "IMAGE",
+          permalink: "https://instagram.com/p/aaa", timestamp: `${from}T09:00:00+0000`,
+          like_count: 11, comments_count: 3,
+          insights: { data: [
+            { name: "reach", values: [{ value: 500 }] },
+            { name: "saved", values: [{ value: 7 }] },
+            { name: "shares", values: [{ value: 2 }] },
+            { name: "views", values: [{ value: 900 }] },
+          ] },
+        },
+        {
+          id: "post_unreported", caption: "too new to have numbers", media_type: "IMAGE",
+          permalink: "https://instagram.com/p/bbb", timestamp: `${to}T09:00:00+0000`,
+          // no like_count, no comments_count, no insights edge
+        },
+      ] });
+    }
     return ok({ followers_count: followers, media_count: 10 });
   };
 

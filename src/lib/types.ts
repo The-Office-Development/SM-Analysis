@@ -47,12 +47,14 @@ export interface ContentItem {
   media_type: string; // Reel / Video / Photo / Post ...
   permalink: string | null;
   published_at: string;
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  saves: number;
-  reach: number;
+  // null means the platform did not report the figure — NOT zero. A brand-new
+  // post has nulls because Instagram has not counted it yet. See migration 0009.
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  reach: number | null;
   avg_watch_seconds: number | null;
   retention_pct: number | null;
 }

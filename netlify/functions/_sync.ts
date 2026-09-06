@@ -97,8 +97,11 @@ interface DayRow {
 }
 interface Post {
   external_id: string; title: string; media_type: string; permalink: string | null;
-  published_at: string; views: number; likes: number; comments: number; shares: number;
-  saves: number; reach: number; avg_watch_seconds: number | null; retention_pct: number | null;
+  published_at: string;
+  // Nullable: null means the platform did not report it. See migration 0009.
+  views: number | null; likes: number | null; comments: number | null;
+  shares: number | null; saves: number | null; reach: number | null;
+  avg_watch_seconds: number | null; retention_pct: number | null;
 }
 interface Audience {
   age: Record<string, number>;
@@ -449,12 +452,23 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
       media_type: m.media_type === "VIDEO" ? "Reel" : m.media_type === "CAROUSEL_ALBUM" ? "Carousel" : "Photo",
       permalink: safePermalink(m.permalink),
       published_at: m.timestamp ?? new Date().toISOString(),
-      views: ins.views ?? ins.reach ?? 0,
-      likes: m.like_count ?? 0,
-      comments: m.comments_count ?? 0,
-      shares: ins.shares ?? 0,
-      saves: ins.saved ?? 0,
-      reach: ins.reach ?? 0,
+      /*
+       * null, never 0. A metric Instagram has not reported is unknown, and the
+       * newest post is exactly the case where it reports nothing yet — which is
+       * exactly when a creator opens the dashboard to decide whether to keep it.
+       * "Reached 0 people" and "we don't know yet" must not look the same.
+       *
+       * `views` still falls back to `reach` because Instagram reports views only
+       * for video; for a photo, reach IS the view count. That is a documented
+       * equivalence, not a filled-in blank, and it stops short of inventing a
+       * number: if neither is reported, the answer is null.
+       */
+      views: ins.views ?? ins.reach ?? null,
+      likes: m.like_count ?? null,
+      comments: m.comments_count ?? null,
+      shares: ins.shares ?? null,
+      saves: ins.saved ?? null,
+      reach: ins.reach ?? null,
       avg_watch_seconds: null,
       retention_pct: null,
     };
@@ -472,9 +486,22 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
     const byDate: Record<string, number> = {};
     for (const p of posts) {
       const d = (p.published_at ?? "").slice(0, 10);
-      if (d) byDate[d] = (byDate[d] ?? 0) + p.likes + p.comments + p.shares + p.saves;
+      // Add only the components the platform reported. A post with known likes
+      // and an unreported saves count still contributes its likes; treating the
+      // missing part as 0 would quietly understate a real day's engagement.
+      const parts = [p.likes, p.comments, p.shares, p.saves].filter((v): v is number => v !== null);
+      if (d && parts.length) byDate[d] = (byDate[d] ?? 0) + parts.reduce((a, v) => a + v, 0);
     }
-    for (const d of dates) engagements[d] = d in reach.byDate ? byDate[d] ?? 0 : null;
+    /*
+     * null, not 0, when no post contributed to a day.
+     *
+     * This fallback derives a day's engagement by summing the posts PUBLISHED
+     * that day, which is already an approximation — interactions also land on
+     * older posts. A day with reach but no new post therefore has no derivable
+     * figure, and 0 would assert that nobody engaged with the account at all
+     * that day. That is a claim, not an absence.
+     */
+    for (const d of dates) engagements[d] = d in reach.byDate ? byDate[d] ?? null : null;
   } else {
     for (const d of dates) engagements[d] = null;
   }
@@ -587,12 +614,23 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
       media_type: m.media_type === "VIDEO" ? "Reel" : m.media_type === "CAROUSEL_ALBUM" ? "Carousel" : "Photo",
       permalink: safePermalink(m.permalink),
       published_at: m.timestamp ?? new Date().toISOString(),
-      views: ins.views ?? ins.reach ?? 0,
-      likes: m.like_count ?? 0,
-      comments: m.comments_count ?? 0,
-      shares: ins.shares ?? 0,
-      saves: ins.saved ?? 0,
-      reach: ins.reach ?? 0,
+      /*
+       * null, never 0. A metric Instagram has not reported is unknown, and the
+       * newest post is exactly the case where it reports nothing yet — which is
+       * exactly when a creator opens the dashboard to decide whether to keep it.
+       * "Reached 0 people" and "we don't know yet" must not look the same.
+       *
+       * `views` still falls back to `reach` because Instagram reports views only
+       * for video; for a photo, reach IS the view count. That is a documented
+       * equivalence, not a filled-in blank, and it stops short of inventing a
+       * number: if neither is reported, the answer is null.
+       */
+      views: ins.views ?? ins.reach ?? null,
+      likes: m.like_count ?? null,
+      comments: m.comments_count ?? null,
+      shares: ins.shares ?? null,
+      saves: ins.saved ?? null,
+      reach: ins.reach ?? null,
       avg_watch_seconds: null,
       retention_pct: null,
     };
@@ -607,9 +645,22 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
     const byDate: Record<string, number> = {};
     for (const p of posts) {
       const d = (p.published_at ?? "").slice(0, 10);
-      if (d) byDate[d] = (byDate[d] ?? 0) + p.likes + p.comments + p.shares + p.saves;
+      // Add only the components the platform reported. A post with known likes
+      // and an unreported saves count still contributes its likes; treating the
+      // missing part as 0 would quietly understate a real day's engagement.
+      const parts = [p.likes, p.comments, p.shares, p.saves].filter((v): v is number => v !== null);
+      if (d && parts.length) byDate[d] = (byDate[d] ?? 0) + parts.reduce((a, v) => a + v, 0);
     }
-    for (const d of dates) engagements[d] = d in reach.byDate ? byDate[d] ?? 0 : null;
+    /*
+     * null, not 0, when no post contributed to a day.
+     *
+     * This fallback derives a day's engagement by summing the posts PUBLISHED
+     * that day, which is already an approximation — interactions also land on
+     * older posts. A day with reach but no new post therefore has no derivable
+     * figure, and 0 would assert that nobody engaged with the account at all
+     * that day. That is a claim, not an absence.
+     */
+    for (const d of dates) engagements[d] = d in reach.byDate ? byDate[d] ?? null : null;
   } else {
     for (const d of dates) engagements[d] = null;
   }

@@ -19,7 +19,7 @@ export interface ReportSnapshot {
   headline: { label: string; total: number; deltaPct: number | null }[];
   engagementRate: number;
   platforms: { name: string; followers: number; reach: number; views: number; engagements: number }[];
-  top: { title: string; platform: string; views: number; likes: number; comments: number }[];
+  top: { title: string; platform: string; views: number | null; likes: number | null; comments: number | null }[];
   windows: string[];
   alerts: { label: string; kind: "spike" | "drop"; deltaPct: number; date: string }[];
 }
@@ -46,7 +46,7 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
 
   const top = [...dash.content]
     .filter((c) => dash.scope === "all" || c.platform === dash.scope)
-    .sort((a, b) => b.views - a.views)
+    .sort((a, b) => (b.views ?? -1) - (a.views ?? -1))
     .slice(0, 10)
     .map((c) => ({
       title: c.title || "Untitled",

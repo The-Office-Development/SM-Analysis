@@ -141,7 +141,7 @@ export const demoContent: ContentItem[] = (() => {
       });
     });
   }
-  return items.sort((x, y) => y.views - x.views);
+  return items.sort((x, y) => (y.views ?? 0) - (x.views ?? 0));
 })();
 
 /* ------------------------------ audience --------------------------------- */

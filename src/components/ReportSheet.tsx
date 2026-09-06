@@ -1,4 +1,4 @@
-import { compact, full } from "../lib/format";
+import { compact, metric, full } from "../lib/format";
 import type { ReportSnapshot } from "../lib/snapshot";
 
 const delta = (n: number | null) => {
@@ -65,9 +65,9 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
                 <tr key={i}>
                   <td className="cell-clamp">{c.title}</td>
                   <td>{c.platform}</td>
-                  <td className="num tnum">{compact(c.views)}</td>
-                  <td className="num tnum">{compact(c.likes)}</td>
-                  <td className="num tnum">{compact(c.comments)}</td>
+                  <td className="num tnum">{metric(c.views)}</td>
+                  <td className="num tnum">{metric(c.likes)}</td>
+                  <td className="num tnum">{metric(c.comments)}</td>
                 </tr>
               ))}
             </tbody>

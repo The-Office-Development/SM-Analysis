@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
-import { compact, pctPlain, shortDate } from "../lib/format";
+import { compact, metric, sumKnown, pctPlain, shortDate } from "../lib/format";
 import type { ContentItem, Platform } from "../lib/types";
 import { PlatformBadge } from "../components/PlatformTile";
 import StatCard from "../components/StatCard";
@@ -31,9 +31,15 @@ function ContentInner() {
   const platforms: Platform[] = dash.scope === "all" ? dash.connectedPlatforms : [dash.scope];
   const items = dash.content.filter((c) => platforms.includes(c.platform));
 
-  const totalViews = items.reduce((s, c) => s + c.views, 0);
-  const totalEng = items.reduce((s, c) => s + c.likes + c.comments + c.shares + c.saves, 0);
-  const avgEr = items.length ? (items.reduce((s, c) => s + (c.reach ? (c.likes + c.comments + c.shares + c.saves) / c.reach : 0), 0) / items.length) * 100 : 0;
+  // Totals sum what was reported. An unreported post contributes nothing rather
+  // than a fabricated zero, and a post with no reach is skipped in the rate
+  // rather than counted as a 0% performer.
+  const totalViews = items.reduce((s, c) => s + (c.views ?? 0), 0);
+  const totalEng = items.reduce((s, c) => s + (sumKnown(c.likes, c.comments, c.shares, c.saves) ?? 0), 0);
+  const erRows = items.filter((c) => c.reach !== null && c.reach > 0);
+  const avgEr = erRows.length
+    ? (erRows.reduce((s, c) => s + (sumKnown(c.likes, c.comments, c.shares, c.saves) ?? 0) / (c.reach as number), 0) / erRows.length) * 100
+    : 0;
 
   const sorted = [...items].sort((a, b) => {
     const av = a[sortKey], bv = b[sortKey];
@@ -82,12 +88,12 @@ function ContentInner() {
                       <span className="muted" style={{ fontSize: 11 }}>{c.media_type} · {shortDate(c.published_at)}</span>
                     </div>
                   </td>
-                  <td className="num tnum">{compact(c.views)}</td>
-                  <td className="num tnum">{compact(c.reach)}</td>
-                  <td className="num tnum">{compact(c.likes)}</td>
-                  <td className="num tnum">{compact(c.comments)}</td>
-                  <td className="num tnum">{compact(c.shares)}</td>
-                  <td className="num tnum">{compact(c.saves)}</td>
+                  <td className="num tnum">{metric(c.views)}</td>
+                  <td className="num tnum">{metric(c.reach)}</td>
+                  <td className="num tnum">{metric(c.likes)}</td>
+                  <td className="num tnum">{metric(c.comments)}</td>
+                  <td className="num tnum">{metric(c.shares)}</td>
+                  <td className="num tnum">{metric(c.saves)}</td>
                   <td className="num tnum">{c.avg_watch_seconds != null ? `${c.avg_watch_seconds}s` : "—"}</td>
                   <td className="num tnum">{c.retention_pct != null ? `${c.retention_pct}%` : "—"}</td>
                   <td><PlatformBadge platform={c.platform} /></td>

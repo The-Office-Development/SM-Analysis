@@ -4,7 +4,7 @@ import { PLATFORMS } from "../lib/platforms";
 import {
   seriesByDay, followersByDay, sum, latest, stockDelta, momentum, engagementRate,
 } from "../lib/api";
-import { compact, full, pctPlain, ratioPct, shortDate } from "../lib/format";
+import { compact, metric, sumKnown, full, pctPlain, ratioPct, shortDate } from "../lib/format";
 import type { Platform } from "../lib/types";
 import StatCard from "../components/StatCard";
 import LineChart, { type Series } from "../components/charts/LineChart";
@@ -52,7 +52,7 @@ export default function Overview() {
   const currentReach = midpoint ? reachSeries.slice(reachSeries.length - half).reduce((a, x) => a + x.value, 0) : null;
   const priorContent = midpoint ? scopedContent.filter((c) => c.published_at.slice(0, 10) <= midpoint) : [];
   const recentContent = midpoint ? scopedContent.filter((c) => c.published_at.slice(0, 10) > midpoint) : [];
-  const deep = scopedContent.reduce((s, c) => s + c.shares + c.saves, 0);
+  const deep = scopedContent.reduce((s, c) => s + (sumKnown(c.shares, c.saves) ?? 0), 0);
   const funnel = [
     { k: "Impressions", v: impressions, c: "var(--fb)" },
     { k: "Accounts reached", v: reachTotal, c: "var(--text)" },
@@ -155,10 +155,10 @@ export default function Overview() {
                   <tr key={c.id}>
                     <td><div className="stack"><span style={{ fontWeight: 550 }}>{c.title}</span><span className="muted" style={{ fontSize: 11 }}>{c.media_type} · {shortDate(c.published_at)}</span></div></td>
                     <td><PlatformBadge platform={c.platform} /></td>
-                    <td className="num tnum">{compact(c.views)}</td>
-                    <td className="num tnum">{compact(c.likes + c.comments + c.shares + c.saves)}</td>
-                    <td className="num tnum">{compact(c.shares)}</td>
-                    <td className="num tnum">{compact(c.saves)}</td>
+                    <td className="num tnum">{metric(c.views)}</td>
+                    <td className="num tnum">{metric(sumKnown(c.likes, c.comments, c.shares, c.saves))}</td>
+                    <td className="num tnum">{metric(c.shares)}</td>
+                    <td className="num tnum">{metric(c.saves)}</td>
                   </tr>
                 ))}
                 {scopedContent.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>No posts synced for this scope yet.</td></tr>}
