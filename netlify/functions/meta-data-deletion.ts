@@ -1,4 +1,4 @@
-import type { Handler } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import crypto from "node:crypto";
 import { admin, env, json, log, type Db } from "./_lib";
 

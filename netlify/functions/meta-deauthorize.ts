@@ -1,4 +1,4 @@
-import type { Handler } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import { admin, env, json, log } from "./_lib";
 import { verifySignedRequest } from "./meta-data-deletion";
 

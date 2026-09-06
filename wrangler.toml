@@ -1,0 +1,46 @@
+# Cloudflare Pages configuration for PulseBoard.
+#
+# Replaces netlify.toml. The move was forced by Netlify pausing production
+# deploys when the team ran out of build credits, which pinned the live site to
+# a commit that still contained the follows/unfollows defect — the deploy
+# pipeline became the thing blocking a correctness fix from reaching users.
+#
+# The application code is unchanged. functions/_adapter.ts translates the
+# runtime to the handlers rather than the handlers to the runtime, so every
+# security decision in netlify/functions survives the move untouched.
+
+name = "pulseboard"
+pages_build_output_dir = "dist"
+
+# 2026-08-04 or later enables nodejs_compat and nodejs_compat_v2 by default, so
+# node:crypto works with no flag. It is also past 2025-04-01, which is what
+# populates process.env from vars and secrets — that is the reason _lib.ts,
+# _instagram.ts and _sync.ts need no changes at all.
+compatibility_date = "2026-09-01"
+
+# Redundant at this compatibility date — 2026-08-04 and later enable both
+# nodejs_compat and nodejs_compat_v2 by default — but stated explicitly so the
+# dependency is visible. node:crypto does the token encryption, and the
+# Anthropic SDK reaches for node:path. Neither should rely on a default that a
+# future date change could quietly move.
+compatibility_flags = ["nodejs_compat"]
+
+# ---------------------------------------------------------------------------
+# Environment variables
+#
+# NOT set here. Everything this app reads server-side is a secret:
+# SUPABASE_SERVICE_ROLE_KEY, TOKEN_ENC_KEY, OAUTH_STATE_SECRET,
+# INSTAGRAM_APP_SECRET, META_APP_SECRET, ANTHROPIC_API_KEY. Committing any of
+# them to this file publishes them — the audit already found one secret in this
+# repository once.
+#
+# Set them as encrypted secrets on the Pages project:
+#   npx wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY
+#
+# The three VITE_ vars are build-time and public by construction (Vite inlines
+# them into the browser bundle), so they belong in the build environment:
+#   VITE_SITE_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+#
+# The code fails closed when a secret is missing rather than falling back to a
+# default. Keep it that way.
+# ---------------------------------------------------------------------------

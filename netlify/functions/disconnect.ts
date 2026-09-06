@@ -1,4 +1,4 @@
-import type { Handler } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import {
   admin, userIdFromToken, json, decryptToken, appsecretProof, log, GRAPH, type Db,
 } from "./_lib";

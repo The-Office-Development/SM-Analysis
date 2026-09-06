@@ -1,0 +1,14 @@
+# Security headers, carried over from netlify.toml verbatim.
+# None of these existed before the audit: no CSP, no HSTS, no nosniff and no
+# referrer policy on a site holding platform credentials.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+
+# Public report pages are shared deliberately; they should not be indexed.
+/r/*
+  X-Robots-Tag: noindex, nofollow

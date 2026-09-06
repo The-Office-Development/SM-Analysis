@@ -1,3 +1,35 @@
+/*
+ * The serverless handler contract, defined here rather than imported from a
+ * host's SDK.
+ *
+ * These handlers were written against @netlify/functions. Depending on that
+ * package for a TYPE is harmless, but it also pulls Node's stream and util into
+ * any bundler that follows it, which is what broke the first Cloudflare build.
+ * More to the point, a deploy platform is not something the application should
+ * have a compile-time opinion about — the move off Netlify happened because its
+ * build credits ran out mid-incident, and the next move should cost less than
+ * this one did.
+ *
+ * The shape is exactly the four fields the handlers actually read plus the
+ * response they actually return; functions/_adapter.ts maps a real Request onto
+ * it.
+ */
+export interface HandlerEvent {
+  httpMethod: string;
+  headers: Record<string, string>;
+  body: string | null;
+  queryStringParameters: Record<string, string>;
+  rawUrl?: string;
+}
+
+export interface HandlerResponse {
+  statusCode: number;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+export type Handler = (event: HandlerEvent) => Promise<HandlerResponse> | HandlerResponse;
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 

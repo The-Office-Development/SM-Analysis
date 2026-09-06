@@ -1,4 +1,4 @@
-import type { Handler } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import {
   env, verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
   backToApp, graphGet, encryptToken, log, GRAPH, AccountOwnedByAnotherTenant,

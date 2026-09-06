@@ -1,5 +1,4 @@
-import type { Handler } from "@netlify/functions";
-import { schedule } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import { admin, log } from "./_lib";
 import { refreshIdentity, type Identity } from "./_tokens";
 
@@ -12,7 +11,7 @@ import { refreshIdentity, type Identity } from "./_tokens";
  */
 const TIME_BUDGET_MS = 22_000;
 
-const run: Handler = async () => {
+export const run: Handler = async () => {
   const startedAt = Date.now();
   const db = admin();
   const { data, error } = await db
@@ -41,4 +40,9 @@ const run: Handler = async () => {
   return { statusCode: failed > 0 && refreshed === 0 ? 500 : 200, body: JSON.stringify({ refreshed, failed, skipped, locked }) };
 };
 
-export const handler = schedule("0 */4 * * *", run);
+// Scheduled every four hours. The cron expression now lives with the Cron
+// Trigger in worker-cron/wrangler.toml; this module exports only the work, so
+// the cadence is declared in one place and the body cannot be reached over HTTP.
+//
+// Line comments, not a block: the cron expression contains "*/", which closes a
+// block comment early and produced a genuinely baffling parse error.

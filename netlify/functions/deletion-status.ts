@@ -1,4 +1,4 @@
-import type { Handler } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import { admin, json } from "./_lib";
 
 /** GET /api/deletion-status?code=... — backs the public status page. */

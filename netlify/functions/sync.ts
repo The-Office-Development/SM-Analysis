@@ -1,4 +1,4 @@
-import type { Handler } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import { admin, userIdFromToken, json, isAuthError, isThrottleError, log, type Db } from "./_lib";
 import { syncAccount, MAX_BACKFILL, type AccountRow } from "./_sync";
 

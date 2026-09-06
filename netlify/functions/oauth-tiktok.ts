@@ -1,4 +1,4 @@
-import type { Handler } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import { env, userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin } from "./_lib";
 
 /**

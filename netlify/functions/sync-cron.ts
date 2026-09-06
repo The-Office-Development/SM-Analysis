@@ -1,5 +1,4 @@
-import type { Handler } from "@netlify/functions";
-import { schedule } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import { admin, log } from "./_lib";
 import { runAccount } from "./sync";
 import type { AccountRow } from "./_sync";
@@ -18,7 +17,7 @@ import type { AccountRow } from "./_sync";
 const TIME_BUDGET_MS = 22_000;
 const BATCH = 200;
 
-const run: Handler = async () => {
+export const run: Handler = async () => {
   const startedAt = Date.now();
   const db = admin();
   const { data: accounts, error } = await db
@@ -53,4 +52,14 @@ const run: Handler = async () => {
   return { statusCode: healthy ? 200 : 500, body: JSON.stringify({ attempted, ok, failed, remaining }) };
 };
 
-export const handler = schedule("0 * * * *", run);
+/*
+ * The Netlify entry point. `run` is exported separately so Cloudflare's Cron
+ * Trigger in worker-cron/ can invoke exactly the same body — the hourly pacing,
+ * the time budget and the "0 of 450 is a failure, not a 200" check are decisions
+ * that must not be reimplemented per platform.
+ */
+/*
+ * Scheduled every "0 * * * *". The schedule now lives with the Cron Trigger
+ * in worker-cron/wrangler.toml; this module exports only the work, so the
+ * cadence is declared in one place and the body cannot be invoked over HTTP.
+ */

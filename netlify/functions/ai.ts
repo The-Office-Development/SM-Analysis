@@ -1,4 +1,4 @@
-import type { Handler } from "@netlify/functions";
+import type { Handler } from "./_lib";
 import Anthropic from "@anthropic-ai/sdk";
 import { userIdFromToken, json, admin, log } from "./_lib";
 

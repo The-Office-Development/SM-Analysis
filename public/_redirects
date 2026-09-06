@@ -1,0 +1,7 @@
+# SPA fallback, so the React router owns client-side routes.
+#
+# /api/* is NOT listed. On Cloudflare, Pages Functions are matched before both
+# static assets and this file, so functions/api/[[path]].ts already claims those
+# paths. Netlify needed an explicit rewrite to /.netlify/functions/:splat; adding
+# one here would shadow the function with a rewrite to index.html.
+/*  /index.html  200

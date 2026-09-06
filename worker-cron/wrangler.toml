@@ -1,0 +1,29 @@
+# The scheduled sync. Deployed separately from the Pages project because Pages
+# Functions cannot carry a Cron Trigger.
+#
+#   cd worker-cron && npx wrangler deploy
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   npx wrangler secret put TOKEN_ENC_KEY
+#   npx wrangler secret put INSTAGRAM_APP_SECRET
+#   npx wrangler secret put META_APP_SECRET
+#   npx wrangler secret put VITE_SUPABASE_URL
+#
+# No route and no fetch handler: this Worker is reachable only by its schedule.
+# It holds the service-role key, so that is deliberate — see index.ts.
+
+name = "pulseboard-cron"
+main = "index.ts"
+compatibility_date = "2026-09-01"
+
+# Redundant at this compatibility date — 2026-08-04 and later enable both
+# nodejs_compat and nodejs_compat_v2 by default — but stated explicitly so the
+# dependency is visible. node:crypto does the token encryption, and the
+# Anthropic SDK reaches for node:path. Neither should rely on a default that a
+# future date change could quietly move.
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+# Hourly, matching the Netlify schedule it replaces. The body stops early on a
+# time budget and the trailing re-fetch in _sync.ts heals any missed run, so the
+# cadence is a floor on freshness rather than a guarantee of completeness.
+crons = ["0 * * * *", "0 */4 * * *"]
