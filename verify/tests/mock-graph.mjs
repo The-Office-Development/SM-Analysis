@@ -99,8 +99,14 @@ export function installGraphMock(opts) {
       return { data: [{ name: metric, period: "day", total_value: { breakdowns: [{
         dimension_keys: ["follow_type"],
         results: [
+          // VERIFIED AGAINST THE LIVE API, 2026-09-06. follows_and_unfollows
+          // returns FOLLOWER / NON_FOLLOWER — never the string "UNFOLLOW".
+          // This mock previously invented "UNFOLLOWER", which the parser matched
+          // on the substring "unfollow", so the suite passed while production
+          // read both buckets as follows and stored null unfollows for every day
+          // of its life. A mock built on assumption is not an oracle.
           { dimension_values: ["FOLLOWER"], value: overlapTotal("follows", since, until) },
-          { dimension_values: ["UNFOLLOWER"], value: overlapTotal("unfollows", since, until) },
+          { dimension_values: ["NON_FOLLOWER"], value: overlapTotal("unfollows", since, until) },
         ],
       }] } }] };
     }

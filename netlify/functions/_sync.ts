@@ -989,17 +989,40 @@ export function totalValueOf(json: any, name: string): number | null {
  * losing 392 followers a day while gaining 412 has a retention problem that
  * "+20" actively conceals.
  */
+/**
+ * Split `follows_and_unfollows` into its two directions.
+ *
+ * THE DIMENSION VALUES ARE NOT WHAT THEY LOOK LIKE. This metric's `follow_type`
+ * breakdown returns `FOLLOWER` and `NON_FOLLOWER` — never the words "follow" and
+ * "unfollow" — and on THIS metric they mean the event direction:
+ *
+ *     FOLLOWER      an account followed
+ *     NON_FOLLOWER  an account unfollowed (or left Instagram)
+ *
+ * The same `follow_type` key on the `reach` metric means something completely
+ * different — the audience the reach came from — which is why `reachByFollowType`
+ * reads identical strings with an entirely different meaning. One dimension
+ * name, two semantics, decided by the metric it is attached to.
+ *
+ * The original code matched on the substrings "unfollow" and "follow", which
+ * appear in neither value. Both buckets therefore fell through to `follows`, so
+ * `unfollows` was null on every day ever stored — 42 days across two live
+ * accounts — and the reconstructed follower line could only ever climb. A real
+ * account that Instagram reported as -9 net over 30 days was shown as +11.
+ * Verified against the live API on 2026-09-06: eleven follows and eleven
+ * unfollows over twelve days, daily nets matching the Instagram app exactly.
+ */
 export function followDirections(json: any): { follows: number | null; unfollows: number | null } {
   const breakdowns = json?.data?.[0]?.total_value?.breakdowns ?? [];
   let follows: number | null = null, unfollows: number | null = null;
   for (const b of breakdowns) {
     for (const r of b.results ?? []) {
-      const key = String((r.dimension_values ?? []).join(" ")).toLowerCase();
+      const key = String((r.dimension_values ?? []).join(" ")).toUpperCase();
       const value = typeof r.value === "number" ? r.value : null;
       if (value === null) continue;
-      // Order matters: "unfollow" contains "follow".
-      if (key.includes("unfollow")) unfollows = (unfollows ?? 0) + value;
-      else if (key.includes("follow")) follows = (follows ?? 0) + value;
+      // NON_FOLLOWER first: it contains FOLLOWER as a substring.
+      if (key.includes("NON_FOLLOWER") || key.includes("NON-FOLLOWER")) unfollows = (unfollows ?? 0) + value;
+      else if (key.includes("FOLLOWER")) follows = (follows ?? 0) + value;
     }
   }
   return { follows, unfollows };
