@@ -398,3 +398,10 @@
   .sheet{box-shadow:none !important;border:none !important;padding:0 !important;background:#fff !important}
   @page{margin:14mm}
 }
+
+/* Small segmented control — used on Content to choose between every stored post
+   and only those published inside the selected range. The global range governs
+   daily metrics; posts have their own time dimension, so the choice is explicit
+   rather than implied. */
+.btn--sm{padding:4px 9px;font-size:11.5px;border-radius:7px}
+.btn--on{background:var(--text);color:var(--panel);border-color:var(--text)}

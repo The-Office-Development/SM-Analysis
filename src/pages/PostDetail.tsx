@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
 import { metric, sumKnown, full, shortDate } from "../lib/format";
-import { postContext, ageHours, tooEarly } from "../lib/insights";
+import { postContext, postRank, engagementSplit, ageHours, tooEarly } from "../lib/insights";
 import { PlatformBadge } from "../components/PlatformTile";
 import RequireData from "../components/RequireData";
 import type { ContentItem } from "../lib/types";
@@ -105,25 +105,54 @@ function PostDetailInner() {
             {METRICS.map((m) => {
               const value = post[m.key];
               const ctx = postContext(post, dash.content, m.key);
+              const rk = postRank(post, dash.content, m.key);
+              /*
+               * The bar is drawn against the account's BEST post, so the length
+               * means "how close to your ceiling", and a tick marks the median
+               * so the typical case is visible in the same picture. A number on
+               * its own cannot say whether it is good; these two references can.
+               */
+              const scale = rk.best && rk.best > 0 ? rk.best : null;
+              const pctOfBest = value !== null && scale ? Math.max(1.5, (value / scale) * 100) : 0;
+              const medianMark = ctx.median !== null && scale ? (ctx.median / scale) * 100 : null;
               return (
-                <div key={m.key} style={{ display: "grid", gridTemplateColumns: "104px 1fr auto",
-                       gap: 12, alignItems: "baseline", padding: "7px 0" }}>
-                  <span className="muted" style={{ fontSize: 12.5 }}>{m.label}</span>
-                  <span style={{ fontSize: 12, color: "var(--text-2)" }}>
-                    {value === null
-                      ? "not reported"
-                      : ctx.vsMedian === null
-                        ? (ctx.sample === 0 ? "no other post of this format to compare" : "")
-                        : <>
+                <div key={m.key} style={{ padding: "9px 0", borderBottom: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 550 }}>{m.label}</span>
+                    <span className="tnum" style={{ fontSize: 17, fontWeight: 600 }}>{metric(value)}</span>
+                  </div>
+
+                  {value === null ? (
+                    <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>
+                      Instagram did not report this figure for this post.
+                    </p>
+                  ) : (
+                    <>
+                      <div style={{ position: "relative", height: 8, borderRadius: 20,
+                             background: "var(--panel-sunk)", overflow: "hidden", margin: "7px 0 5px" }}>
+                        <div style={{ display: "block", height: "100%", width: `${pctOfBest}%`,
+                               borderRadius: 20, background: "var(--brand, #4f7cff)" }} />
+                      </div>
+                      {medianMark !== null && (
+                        <div style={{ position: "relative", height: 0 }}>
+                          <span style={{ position: "absolute", left: `${Math.min(99, medianMark)}%`, top: -12,
+                                   width: 2, height: 12, background: "var(--text-2)", opacity: .55 }} />
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11.5 }} className="muted">
+                        {rk.rank !== null && <span><strong>#{rk.rank}</strong> of {rk.of} posts</span>}
+                        {ctx.vsMedian !== null && (
+                          <span>
                             {ctx.vsMedian >= 1
                               ? `${((ctx.vsMedian - 1) * 100).toFixed(0)}% above`
-                              : `${((1 - ctx.vsMedian) * 100).toFixed(0)}% below`}{" "}
-                            median of {full(ctx.median ?? 0)}
-                            <span className="muted"> · {ctx.sample} post{ctx.sample === 1 ? "" : "s"}</span>
-                            {ctx.sample < 3 && <span className="muted"> (too few to lean on)</span>}
-                          </>}
-                  </span>
-                  <span className="tnum" style={{ fontSize: 17, fontWeight: 600 }}>{metric(value)}</span>
+                              : `${((1 - ctx.vsMedian) * 100).toFixed(0)}% below`} median {m.label.toLowerCase()} for a {post.media_type.toLowerCase()}
+                            {ctx.sample < 3 && ` · only ${ctx.sample} to compare`}
+                          </span>
+                        )}
+                        {m.hint && <span>· {m.hint}</span>}
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -137,6 +166,44 @@ function PostDetailInner() {
           )}
         </div>
       </div>
+
+      {(() => {
+        const split = engagementSplit(post);
+        if (!split.total || split.total <= 0) return null;
+        const COLORS = ["var(--brand, #4f7cff)", "var(--ok, #2f9e6e)", "#c084fc", "#f59e0b"];
+        return (
+          <div className="panel">
+            <div className="panel__head">
+              <h3>What kind of engagement</h3>
+              <span className="sub">composition, not just the total</span>
+            </div>
+            <div className="panel__body stack" style={{ gap: 10 }}>
+              <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden",
+                     background: "var(--panel-sunk)" }}>
+                {split.parts.map((p, i) => (
+                  <div key={p.key} title={`${p.label}: ${full(p.value)}`}
+                       style={{ width: `${(p.value / split.total!) * 100}%`, background: COLORS[i % COLORS.length] }} />
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12 }}>
+                {split.parts.map((p, i) => (
+                  <span key={p.key} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ width: 9, height: 9, borderRadius: 3, background: COLORS[i % COLORS.length] }} />
+                    {p.label} <strong className="tnum">{full(p.value)}</strong>
+                    <span className="muted">{((p.value / split.total!) * 100).toFixed(0)}%</span>
+                  </span>
+                ))}
+              </div>
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                Saves and shares are intent — someone kept it or passed it on. A like is the
+                cheapest signal there is. Two posts with the same total can mean very
+                different things, and a sponsor is buying the difference.
+                {split.parts.length < 4 && " Components Instagram did not report are omitted rather than drawn as empty."}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="panel">
         <div className="panel__head"><h3>Derived</h3><span className="sub">only where the inputs exist</span></div>

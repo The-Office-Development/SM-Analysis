@@ -290,3 +290,65 @@ export function ageHours(publishedAt: string): number {
 export function tooEarly(publishedAt: string): boolean {
   return ageHours(publishedAt) < 24;
 }
+
+export interface PostRank {
+  /** 1 = best. Null when this post's value is unreported. */
+  rank: number | null;
+  /** How many posts had a reported value for this metric. */
+  of: number;
+  /** Highest reported value among them — the scale a bar should be drawn against. */
+  best: number | null;
+}
+
+/**
+ * Where this post sits among the account's own posts.
+ *
+ * Ranked against every post on the same platform, NOT just the same format.
+ * Format is the right comparison for "is this good for a carousel"; rank is the
+ * right one for "is this one of my best", and a creator asks both.
+ *
+ * Posts with an unreported value are excluded from the ranking rather than
+ * treated as zero — otherwise every pre-conversion post would crowd the bottom
+ * and make a mediocre recent post look like a triumph.
+ */
+export function postRank(
+  post: ContentItem,
+  all: ContentItem[],
+  key: "views" | "reach" | "likes" | "comments" | "shares" | "saves",
+): PostRank {
+  const pool = all.filter((c) => c.platform === post.platform && c[key] !== null);
+  const values = pool.map((c) => c[key] as number).sort((a, b) => b - a);
+  const own = post[key];
+  return {
+    rank: own === null ? null : values.indexOf(own) + 1,
+    of: values.length,
+    best: values.length ? values[0] : null,
+  };
+}
+
+export interface EngagementSplit {
+  parts: { key: string; label: string; value: number }[];
+  total: number | null;
+}
+
+/**
+ * What KIND of engagement a post earned.
+ *
+ * The composition says more than the total. Saves and shares are intent —
+ * someone kept it or passed it on — while likes are the cheapest possible
+ * signal. Two posts with identical engagement counts can mean entirely
+ * different things, and a sponsor cares about the difference.
+ *
+ * Only reported components appear. An unreported one is omitted rather than
+ * drawn as an empty slice, which would read as "nobody saved this".
+ */
+export function engagementSplit(post: ContentItem): EngagementSplit {
+  const parts: { key: string; label: string; value: number }[] = [];
+  for (const [key, label] of [
+    ["likes", "Likes"], ["comments", "Comments"], ["shares", "Shares"], ["saves", "Saves"],
+  ] as const) {
+    const v = post[key];
+    if (v !== null) parts.push({ key, label, value: v });
+  }
+  return { parts, total: parts.length ? parts.reduce((a, p) => a + p.value, 0) : null };
+}

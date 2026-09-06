@@ -26,11 +26,19 @@ export default function Content() {
 
 function ContentInner() {
   const dash = useDash();
+  // The global range governs daily metrics. Posts have their own time
+  // dimension, and hiding a year-old post that is still the account's best does
+  // not serve anyone — so the list defaults to everything and this toggle makes
+  // the range control MEAN something here rather than sit inert.
+  const [inRange, setInRange] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("views");
   const [dir, setDir] = useState<-1 | 1>(-1);
 
   const platforms: Platform[] = dash.scope === "all" ? dash.connectedPlatforms : [dash.scope];
-  const items = dash.content.filter((c) => platforms.includes(c.platform));
+  const cutoff = new Date(Date.now() - dash.range * 86400000).toISOString();
+  const items = dash.content.filter(
+    (c) => platforms.includes(c.platform) && (!inRange || c.published_at >= cutoff),
+  );
 
   // Totals sum what was reported. An unreported post contributes nothing rather
   // than a fabricated zero, and a post with no reach is skipped in the rate
@@ -63,13 +71,16 @@ function ContentInner() {
       </div>
 
       <section className="panel" style={{ marginTop: 16 }}>
-        <div className="panel__head">
-          <h3>All content</h3>
-          {/* The date selector governs daily metrics, not this list: a post from
-              last year is still this account's best post. Said out loud, because
-              a range control that visibly does nothing reads as broken. */}
+        <div className="panel__head" style={{ gap: 10, flexWrap: "wrap" }}>
+          <h3>{inRange ? "Published in range" : "All content"}</h3>
           <span className="sub">
-            {items.length} post{items.length === 1 ? "" : "s"} · every post we hold, any date · click a column to sort
+            {items.length} post{items.length === 1 ? "" : "s"} · click a column to sort
+          </span>
+          <span style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+            <button type="button" className={`btn btn--sm${inRange ? "" : " btn--on"}`}
+                    onClick={() => setInRange(false)}>All time</button>
+            <button type="button" className={`btn btn--sm${inRange ? " btn--on" : ""}`}
+                    onClick={() => setInRange(true)}>Last {dash.range}d</button>
           </span>
         </div>
         <div className="table-wrap table-wrap--sticky">
