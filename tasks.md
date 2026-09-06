@@ -39,6 +39,9 @@ They are kept for the record, not as work.
    currently unverified against a live token.
 6. **Pagination past 25 posts**, or say plainly that Content shows 25.
 7. **Sync guard** at the subrequest cap. §6d.
+8. **Settle what a "day" means.** §6e. The gate passed on 30-day aggregates;
+   per-day alignment is still unverified, and whether we label days in Amman time
+   or Meta's buckets is an open product decision a client will notice.
 
 **Parallel, blocking nothing:** Business Verification and App Review (§6), the
 PDPL questions and legal-page placeholders (§0).
@@ -361,6 +364,66 @@ not as fresh as reality.
 That must be shown honestly. A post twenty minutes old reading `reach 0` is not
 a failed sync and must not look like one — and, per the rule this project keeps
 relearning, must not be rendered as a confident zero either.
+
+---
+
+## 6e. UNFINISHED — which day a number belongs to
+
+**Partly answered, not settled. Do not treat the day boundary as closed.**
+
+### What is now known
+
+Meta buckets this account's insights on a **UTC-7** boundary while the account
+sits at **UTC+3** (Amman). The sync detects the mismatch and re-fetches per day
+against the account's own offset:
+
+```
+sync.day_boundary_mismatch  account_offset_hours: 3  meta_offset_hours: -7
+```
+
+Two accounts have reported -7, both operated from Jordan, which points at the
+boundary being fixed platform-side rather than following the account. That is
+not proven — a third account could still say otherwise.
+
+### What was verified on 2026-09-06/07, and what was NOT
+
+The gate passed **on 30-day aggregates**: views within 0.7%, interactions within
+7%, net followers exact. That validates the pipeline end to end.
+
+**It does not validate per-day alignment.** Instagram's mobile date picker is
+offset by two days (selecting 17-18 August returns 15-16), so a per-day
+comparison through the app is not trustworthy, and the one attempted looked
+catastrophically wrong when nothing was. **Per-day correctness remains
+unverified**, and totals agreeing is compatible with individual days being
+shifted and cancelling out.
+
+### The open question, which is a product decision not a bug
+
+Our days are **Amman days**. Instagram's app appears to show **Meta's buckets**.
+Both cannot be labelled "Monday" for the same client.
+
+- Amman days are what a Jordanian creator means by a day, and what a sponsor
+  report should say.
+- Meta's buckets are what the client sees in their own app, and **the client
+  will trust their app over us.**
+
+Totals agree either way. Individual days will not. A creator who posts on a
+schedule and checks "how did Tuesday do?" will notice.
+
+- [ ] **Verify per-day alignment by a route that avoids the broken picker.**
+      Per-post insights carry their own timestamps, or compare a day with a very
+      distinctive value against the app's own chart rather than its range picker.
+- [ ] **Decide what a "day" means in the product**, and say so in the UI. Options:
+      label days in the account's timezone and explain the difference when a
+      client asks; follow Meta's buckets so the app always agrees; or show both.
+      Silence is the one option that guarantees an argument with a client.
+- [ ] **Confirm whether the -7 boundary follows the account or is fixed
+      platform-side**, with a third account. This changes whether the offset is
+      per-account configuration or a global assumption.
+- [ ] **Pre-empt the picker bug with clients.** Instagram's own app returns the
+      wrong range when a custom range is selected. A client comparing our figures
+      to their app that way will conclude WE are wrong. Decide how support
+      answers this before a client hits it.
 
 ---
 
