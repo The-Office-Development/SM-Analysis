@@ -75,14 +75,36 @@ export function ChurnPanel({ metrics, scope }: { metrics: MetricPoint[]; scope: 
       <div className="panel__body stack" style={{ gap: 12 }}>
         {c.gained === null && c.lost === null ? <Unavailable what="Follows and unfollows" /> : (
           <>
+            {/*
+              * `?? 0` is forbidden on these three. null means the platform did
+              * not report the figure, and rendering that as 0 states something
+              * we do not know: "nobody left" is a claim, not an absence.
+              *
+              * This is not hypothetical. unfollows has been null on every day
+              * ever stored, across two accounts, while follows is populated —
+              * so the both-null guard above never fires and this row would have
+              * shown a sponsor "Lost -0" next to real growth, with a Net that
+              * quietly treats unknown churn as none.
+              */}
             <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
               <div><div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em" }}>Gained</div>
-                <div style={{ fontSize: 22, fontWeight: 620 }}>+{compact(c.gained ?? 0)}</div></div>
+                <div style={{ fontSize: 22, fontWeight: 620 }}>
+                  {c.gained === null ? <span className="muted">not reported</span> : `+${compact(c.gained)}`}</div></div>
               <div><div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em" }}>Lost</div>
-                <div style={{ fontSize: 22, fontWeight: 620 }}>−{compact(c.lost ?? 0)}</div></div>
+                <div style={{ fontSize: 22, fontWeight: 620 }}>
+                  {c.lost === null ? <span className="muted">not reported</span> : `−${compact(c.lost)}`}</div></div>
               <div><div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em" }}>Net</div>
-                <div style={{ fontSize: 22, fontWeight: 620 }}>{(c.net ?? 0) >= 0 ? "+" : ""}{compact(c.net ?? 0)}</div></div>
+                <div style={{ fontSize: 22, fontWeight: 620 }}>
+                  {c.gained === null || c.lost === null
+                    ? <span className="muted">not reported</span>
+                    : `${(c.net ?? 0) >= 0 ? "+" : ""}${compact(c.net ?? 0)}`}</div></div>
             </div>
+            {c.lost === null && c.gained !== null && (
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                Instagram is not returning unfollows for this account, so losses
+                and the net cannot be shown. Growth above counts arrivals only.
+              </p>
+            )}
             {c.churnRate !== null && (
               <p className="muted" style={{ fontSize: 12, margin: 0 }}>
                 {Math.round(c.churnRate * 100)} people left for every 100 who arrived.
