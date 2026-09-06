@@ -13,6 +13,12 @@
 
 name = "pulseboard-cron"
 main = "index.ts"
+
+# No workers.dev URL. This Worker holds the service-role key and TOKEN_ENC_KEY
+# and has no fetch handler, so a public hostname serves no purpose and only
+# widens what can be probed. The schedule is the only intended way in, and the
+# comment in index.ts claims exactly that — this is what makes the claim true.
+workers_dev = false
 compatibility_date = "2026-09-01"
 
 # Redundant at this compatibility date — 2026-08-04 and later enable both
