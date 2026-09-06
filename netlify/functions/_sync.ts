@@ -441,10 +441,7 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
     if (perDay.available) reach = perDay;
   }
 
-  const media = await optional(() => get(`/${acc.external_id}/media`, {
-    fields: "id,caption,media_type,permalink,timestamp,like_count,comments_count,insights.metric(reach,saved,shares,views)",
-    limit: "25",
-  }), { data: [] as any[] }, { call: "media", account: acc.id });
+  const media = await fetchMedia(get, `/${acc.external_id}/media`, "25", { account: acc.id });
 
   const posts: Post[] = (media.data ?? []).map((m: any) => {
     const ins = normInsights(m.insights?.data ?? []);
@@ -619,9 +616,7 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
     if (perDay.available) reach = perDay;
   }
 
-  const media = await optional(
-    () => get("/me/media", { fields: `${IG.MEDIA_FIELDS},insights.metric(${IG.MEDIA_INSIGHT_METRICS})`, limit: "25" }),
-    { data: [] as any[] }, { call: "media", account: acc.id });
+  const media = await fetchMedia(get, "/me/media", "25", { account: acc.id });
 
   const posts: Post[] = (media.data ?? []).map((m: any) => {
     const ins = normInsights(m.insights?.data ?? []);
@@ -1195,6 +1190,74 @@ async function captureStories(
       expires_at: new Date(Date.parse(published) + IG.STORY_LIFETIME_MS).toISOString(),
     };
   });
+}
+
+/**
+ * Fetch media without letting one unmeasurable post cost every post.
+ *
+ * Meta fails the ENTIRE /media response when any item in the page cannot carry
+ * insights — a post published before the account last became professional, most
+ * commonly. Measured live on 2026-09-06: limit=5 returned five posts, limit=10
+ * returned an error, because posts six to ten predated the conversion. The
+ * account had a reel with 183,686 likes and Content was showing nothing at all,
+ * indistinguishable from an account that had never posted.
+ *
+ * The failure is a property of the PAGE, not of the account, and Instagram
+ * returns media newest-first — so the newest posts are the ones most likely to
+ * be measurable. That gives a cheap strategy:
+ *
+ *   1. Ask for everything with insights. Usually works; one call.
+ *   2. If it fails, take the full list WITHOUT insights, so no post is lost.
+ *   3. Then re-ask for insights over progressively smaller pages until one
+ *      succeeds, and merge those figures onto the newest posts.
+ *
+ * Two or three extra calls in the bad case, and only in the bad case. Posts that
+ * can be measured are; posts Meta refuses to measure keep null metrics, which is
+ * the truth — it will never report them, and 0 would say they reached nobody.
+ */
+async function fetchMedia(
+  get: (path: string, params: Record<string, string>) => Promise<any>,
+  path: string,
+  limit: string,
+  ctx: Record<string, unknown>,
+): Promise<{ data: any[]; withInsights: boolean }> {
+  const fields = IG.MEDIA_FIELDS;
+  const withMetrics = `${fields},insights.metric(${IG.MEDIA_INSIGHT_METRICS})`;
+
+  const full = await optional(
+    () => get(path, { fields: withMetrics, limit }),
+    null as any, { ...ctx, call: "media" },
+  );
+  if (full) return { data: full.data ?? [], withInsights: true };
+
+  // The whole page was refused. Keep the posts.
+  const plain = await optional(
+    () => get(path, { fields, limit }),
+    { data: [] as any[] }, { ...ctx, call: "media_plain" },
+  );
+  const posts: any[] = plain.data ?? [];
+  if (!posts.length) return { data: [], withInsights: false };
+
+  // Recover insights for as many of the NEWEST posts as Meta will allow.
+  let recovered = 0;
+  for (const n of [10, 5, 3, 1]) {
+    if (n >= posts.length) continue;
+    const page = await optional(
+      () => get(path, { fields: withMetrics, limit: String(n) }),
+      null as any, { ...ctx, call: "media_insights_page", page: String(n) },
+    );
+    if (!page) continue;
+    const byId = new Map((page.data ?? []).map((m: any) => [m.id, m.insights]));
+    for (const m of posts) if (byId.has(m.id)) { m.insights = byId.get(m.id); recovered++; }
+    break;
+  }
+
+  log("sync.media_partial_insights", {
+    ...ctx, posts: posts.length, with_insights: recovered,
+    detail: "insights refused for the full page — usually media published before the account "
+      + "became professional. Posts are kept; the ones Meta will measure carry figures, the rest null.",
+  });
+  return { data: posts, withInsights: recovered > 0 };
 }
 
 /** insight json -> { 'YYYY-MM-DD': value }, keyed by the account's own day. */
