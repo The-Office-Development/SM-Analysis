@@ -32,7 +32,10 @@ export function buildCsv(dash: Dash): string {
     const reach = sum(seriesByDay(dash.metrics, p, "reach"));
     const views = sum(seriesByDay(dash.metrics, p, "views"));
     const eng = sum(seriesByDay(dash.metrics, p, "engagements"));
-    rows.push(`${PLATFORMS[p].name},${foll[foll.length - 1]?.value ?? 0},${reach},${views},${eng}`);
+    // An unknown follower total exports as empty, not as 0. A spreadsheet cell
+    // reading 0 is indistinguishable from a measured zero once it leaves here.
+    const latest = foll[foll.length - 1]?.value;
+    rows.push(`${PLATFORMS[p].name},${latest ?? ""},${reach},${views},${eng}`);
   }
   rows.push("");
   rows.push("Content,Platform,Type,Published,Views,Likes,Comments,Shares,Saves");

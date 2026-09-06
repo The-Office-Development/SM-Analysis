@@ -67,6 +67,25 @@ test("a HALF-reported split is null — the real shape of the live defect", () =
   assert.equal(realZero.discoveryRate, 0, "a reported 0 is data, not an absence");
 });
 
+test("half-reported churn yields no net and no rate", () => {
+  // The live shape: follows populated, unfollows null on every day, across two
+  // accounts. net would overstate growth by exactly the churn it cannot see,
+  // and churnRate would print "0 people left for every 100 who arrived".
+  const c = churn([
+    day(1, { follows: 40, unfollows: null }),
+    day(2, { follows: 60, unfollows: null }),
+  ], "all");
+  assert.equal(c.gained, 100, "the reported direction survives");
+  assert.equal(c.lost, null);
+  assert.equal(c.net, null, "net growth cannot be known without the losses");
+  assert.equal(c.churnRate, null, "a 0 rate would be a sentence claiming nobody left");
+
+  // Both known: everything is derivable, including a genuine zero.
+  const full = churn([day(1, { follows: 50, unfollows: 0 })], "all");
+  assert.equal(full.net, 50);
+  assert.equal(full.churnRate, 0, "a reported zero churn is a fact worth showing");
+});
+
 test("provisional days are excluded from the sponsor-facing split", () => {
   const d = discovery([
     day(1, { reach_followers: 100, reach_non_followers: 100 }),

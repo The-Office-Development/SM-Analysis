@@ -104,7 +104,15 @@ export default function Overview() {
                   <span className="text-2">{f.k}</span><span className="tnum">{full(f.v)}</span>
                 </div>
                 <div style={{ height: 22, borderRadius: 6, background: "var(--panel-sunk)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${ratioPct(f.v, fMax)}%`, background: f.c, borderRadius: 6, transition: "width .5s" }} />
+                  {/*
+                    * Clamp the GEOMETRY, never the number. Meta returns negative
+                    * total_interactions when likes or comments are removed —
+                    * 2026-09-03 came back as -1 on a live account — and a
+                    * negative width is invalid CSS, so the bar silently vanishes
+                    * and the row reads as missing rather than negative. The
+                    * figure printed beside it stays exactly as reported.
+                    */}
+                  <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, ratioPct(f.v, fMax)))}%`, background: f.c, borderRadius: 6, transition: "width .5s" }} />
                 </div>
                 <span className="muted" style={{ fontSize: 11 }}>{i ? `${ratioPct(f.v, funnel[i - 1].v).toFixed(1)}% of previous` : "top of funnel"}</span>
               </div>

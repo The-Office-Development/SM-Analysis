@@ -101,10 +101,22 @@ export function churn(metrics: MetricPoint[], scope: Scope): Churn {
   const gained = sumKnown(rows, "follows");
   const lost = sumKnown(rows, "unfollows");
   if (gained === null && lost === null) return { gained: null, lost: null, net: null, churnRate: null };
+  /*
+   * Both derived figures need BOTH directions. Treating an unreported side as 0
+   * is what the whole panel exists to argue against: `net` would overstate
+   * growth by exactly the churn it could not see, and `churnRate` would render
+   * the sentence "0 people left for every 100 who arrived" — a claim, stated in
+   * words, about a number the platform never sent.
+   *
+   * unfollows has been null on every day ever stored across two live accounts
+   * while follows is populated, so this is the normal case rather than an edge
+   * one. A reported 0 is still 0; only null is withheld.
+   */
+  const bothKnown = gained !== null && lost !== null;
   return {
     gained, lost,
-    net: (gained ?? 0) - (lost ?? 0),
-    churnRate: gained && gained > 0 ? (lost ?? 0) / gained : null,
+    net: bothKnown ? gained - lost : null,
+    churnRate: bothKnown && gained > 0 ? lost / gained : null,
   };
 }
 
