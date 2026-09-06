@@ -395,3 +395,47 @@ for a pilot.
 absence is not API absence — that reopened `online_followers` — and a
 confidently remembered platform behaviour is weaker evidence than either. Check
 the stored rows.
+
+### 6.7 How far back the API actually goes — TWO YEARS, measured
+
+`MAX_BACKFILL` was 30 because that was a guess, not a limit. Measured against
+the live API on 2026-09-06, Meta's own error names the real ceiling:
+
+> `since param is not valid. Metrics data is available for the last 2 years`
+
+And the data inside that window is genuine, not a clamped aggregate. Consecutive
+days around the 365-day mark returned 7043, 4263, 3264, 2395, 4478 — a series
+that varies the way a real one does. Around 400 days: 11832, 26422, 27799. The
+account was simply far more active a year ago than it is now.
+
+**What this changes.** A new client can be onboarded with up to two years of
+history rather than a month. For a sponsor-facing media kit that is the
+difference between "here is my last month" and "here is my last two years,
+including the campaign I ran for you", which is a materially better product and
+something most consumer tools cannot show, because the Instagram app itself
+only offers a rolling window.
+
+**What it does NOT cover.** Three separate limits still apply and they are not
+the same limit:
+
+- **Media insights** are only available for media published *after* the account
+  last became professional. The API says so directly: "the media was published
+  before the last time the user's account was converted to a business account".
+  So a two-year metric backfill can sit alongside far shallower post-level data.
+- **`online_followers`** is documented as the last 30 days only.
+- **Demographics** ignore `since`/`until` entirely and use `timeframe`, whose
+  options are fixed buckets.
+
+**What it costs.** Roughly five calls per day of history, so two years is about
+3,650 subrequests — necessarily spread over many runs. The pacing is set by
+`IG_DAY_BUDGET`, and the ceiling on that is the host's subrequest cap per
+invocation, not anything about Meta:
+
+| Host tier | Subrequests/invocation | Sensible DAY_BUDGET | Runs for 2 years |
+|---|---|---|---|
+| Cloudflare Workers Free | 50 | 7 | ~104 |
+| Cloudflare Workers Paid | 10,000 | 100+ | ~8 |
+
+At an hourly cron that is four days versus eight hours. The free tier does not
+prevent a deep backfill; it decides how long a new client waits to see their own
+history, which is a product decision rather than a technical one.
