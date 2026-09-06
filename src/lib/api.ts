@@ -51,8 +51,24 @@ export async function fetchContent(range: Range): Promise<ContentItem[]> {
   const { data, error } = await supabase
     .from("content")
     .select("*")
-    .gte("published_at", isoDaysAgo(range))
-    .order("views", { ascending: false })
+    /*
+     * NOT filtered by the selected range.
+     *
+     * The range is a window on DAILY METRICS — what happened in the last 30
+     * days. Posts are not daily metrics: a post published last year is still
+     * this account's best post, and its numbers are still true. Filtering the
+     * list by publication date hid eleven of twelve stored posts behind a 90-day
+     * selector, including a reel with 4.8M views and 183,686 likes, and left the
+     * Content page reading "1 post" for an account with a year of output.
+     *
+     * It also broke the comparison the per-post page is built on: a median over
+     * one post is not a baseline.
+     *
+     * The sync stores at most 25 posts per account, so "everything stored" is
+     * small and bounded — there is nothing to page through and nothing to
+     * protect against here.
+     */
+    .order("views", { ascending: false, nullsFirst: false })
     .limit(500);
   if (error) throw error;
   return (data ?? []) as ContentItem[];

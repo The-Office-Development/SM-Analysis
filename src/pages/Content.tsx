@@ -56,14 +56,22 @@ function ContentInner() {
   return (
     <>
       <div className="kpis">
-        <StatCard label="Posts synced" value={compact(items.length)} />
+        <StatCard label="Posts stored" value={compact(items.length)} />
         <StatCard label="Total views" value={compact(totalViews)} />
         <StatCard label="Total engagements" value={compact(totalEng)} />
         <StatCard label="Avg engagement rate" value={pctPlain(avgEr)} />
       </div>
 
       <section className="panel" style={{ marginTop: 16 }}>
-        <div className="panel__head"><h3>All content</h3><span className="sub">{items.length} posts · click a column to sort</span></div>
+        <div className="panel__head">
+          <h3>All content</h3>
+          {/* The date selector governs daily metrics, not this list: a post from
+              last year is still this account's best post. Said out loud, because
+              a range control that visibly does nothing reads as broken. */}
+          <span className="sub">
+            {items.length} post{items.length === 1 ? "" : "s"} · every post we hold, any date · click a column to sort
+          </span>
+        </div>
         <div className="table-wrap table-wrap--sticky">
           <table className="data">
             <thead>
