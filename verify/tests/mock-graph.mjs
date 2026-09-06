@@ -151,6 +151,31 @@ export function installGraphMock(opts) {
       }
       return ok(series(metric));
     }
+    if (u.includes("/stories")) {
+      /*
+       * One live story, with the story-shaped metrics (replies, navigation) and
+       * deliberately WITHOUT `saved` — stories do not have it.
+       *
+       * A story is unreachable 24 hours after publishing, so this endpoint is
+       * the only chance to record it. The test that reads this asserts the
+       * capture stores what was reported and nulls the rest, rather than filling
+       * likes and saves with zeros that would rank a story last in any sort.
+       */
+      return ok({ data: [
+        {
+          id: "story_live", caption: "a story", media_type: "IMAGE",
+          media_product_type: "STORY",
+          permalink: "https://instagram.com/stories/x/1",
+          timestamp: `${to}T08:00:00+0000`,
+          insights: { data: [
+            { name: "reach", values: [{ value: 320 }] },
+            { name: "views", values: [{ value: 410 }] },
+            { name: "replies", values: [{ value: 4 }] },
+            { name: "navigation", values: [{ value: 88 }] },
+          ] },
+        },
+      ] });
+    }
     if (u.includes("/media")) {
       /*
        * Two posts, deliberately unlike each other.

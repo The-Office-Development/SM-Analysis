@@ -207,6 +207,31 @@ test("a post the platform has not reported on stores null, never zero", async ()
   }
 });
 
+test("an active story is captured, with the metrics it has and nulls for the rest", async () => {
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] });
+
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+  assert.ok(story, "the story was captured at all — it cannot be fetched again after 24h");
+  assert.equal(story.media_type, "Story");
+  assert.equal(story.reach, 320);
+  assert.equal(story.views, 410);
+  assert.equal(story.replies, 4);
+  assert.equal(story.navigation, 88);
+
+  // A story has no likes, comments or saves. Zero would be a claim about
+  // engagement that cannot exist, and would sink the story to the bottom of any
+  // ranking sorted on those columns.
+  assert.equal(story.likes, null);
+  assert.equal(story.comments, null);
+  assert.equal(story.saves, null);
+
+  // expires_at is what later tells "final numbers" from "still climbing".
+  assert.ok(story.expires_at, "expiry is recorded");
+  assert.ok(Date.parse(story.expires_at) > Date.parse(story.published_at));
+});
+
 test("recent days are flagged provisional so the UI need not read them as a drop", async () => {
   const from = addDays(TODAY, -29);
   const db = seedDb();

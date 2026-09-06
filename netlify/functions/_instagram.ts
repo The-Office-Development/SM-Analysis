@@ -62,6 +62,30 @@ export const IG = {
   DEMOGRAPHIC_BREAKDOWNS: ["age", "gender", "country"],
   MEDIA_FIELDS: "id,caption,media_type,permalink,timestamp,like_count,comments_count",
   MEDIA_INSIGHT_METRICS: "reach,saved,shares,views",
+  /**
+   * Stories. A DIFFERENT edge from /media — stories do not appear there.
+   *
+   * Verified live 2026-09-06: /me/stories answered and returned an active story.
+   * The metric names below come from the API's own enumeration, obtained by
+   * requesting an invalid metric and reading which ones it listed as valid:
+   *
+   *   impressions, shares, comments, likes, saved, replies, total_interactions,
+   *   navigation, follows, profile_visits, profile_activity, reach, views, ...
+   *
+   * `replies` and `navigation` are the story-shaped ones — navigation counts
+   * taps forward, back and exits, which is how people MOVED through a story
+   * rather than whether they saw it.
+   *
+   * NOT yet verified against a live story, because none was active when this was
+   * written. Each metric is requested optionally, so one Meta refuses stores null
+   * instead of failing the capture — which matters more here than anywhere else
+   * in the codebase: a story missed is a story lost forever.
+   */
+  STORIES_EDGE: "stories",
+  STORY_FIELDS: "id,caption,media_type,media_product_type,permalink,timestamp",
+  STORY_INSIGHT_METRICS: "reach,views,replies,navigation,shares,total_interactions",
+  /** Stories are retrievable for 24 hours after publishing. Nothing after that. */
+  STORY_LIFETIME_MS: 24 * 60 * 60 * 1000,
 } as const;
 
 /**

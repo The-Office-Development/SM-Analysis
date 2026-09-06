@@ -102,6 +102,8 @@ interface Post {
   views: number | null; likes: number | null; comments: number | null;
   shares: number | null; saves: number | null; reach: number | null;
   avg_watch_seconds: number | null; retention_pct: number | null;
+  // Story-only. Null on posts, which have neither. See migration 0010.
+  replies?: number | null; navigation?: number | null; expires_at?: string | null;
 }
 interface Audience {
   age: Record<string, number>;
@@ -519,7 +521,22 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
     reach_non_followers: pickDay(reachNonFollowers, date),
     provisional: isProvisional(date, now),
   }));
-  return { days, posts };
+  /*
+   * Stories, captured on EVERY run rather than only during a backfill.
+   *
+   * They are the one thing here that cannot be fetched again later: 24 hours
+   * after publishing a story is unreachable and its insights are gone. So this
+   * is not part of the day-window logic and is not bounded by DAY_BUDGET — it
+   * runs whenever the sync runs, and the last capture before expiry becomes the
+   * permanent record.
+   */
+  const stories = await captureStories(
+    (path, params) => get(path, params ?? {}),
+    acc.external_id,
+    { account: acc.id },
+  );
+
+  return { days, posts: [...posts, ...stories] };
 }
 
 /**
@@ -678,7 +695,22 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
     reach_non_followers: pickDay(reachNonFollowers, date),
     provisional: isProvisional(date, now),
   }));
-  return { days, posts };
+  /*
+   * Stories, captured on EVERY run rather than only during a backfill.
+   *
+   * They are the one thing here that cannot be fetched again later: 24 hours
+   * after publishing a story is unreachable and its insights are gone. So this
+   * is not part of the day-window logic and is not bounded by DAY_BUDGET — it
+   * runs whenever the sync runs, and the last capture before expiry becomes the
+   * permanent record.
+   */
+  const stories = await captureStories(
+    (path, params) => get(path, params ?? {}),
+    acc.external_id,
+    { account: acc.id },
+  );
+
+  return { days, posts: [...posts, ...stories] };
 }
 
 /** Audience breakdowns on the Instagram Login path (needs ~100 followers). */
@@ -1104,6 +1136,65 @@ export function reachByFollowType(json: any): { followers: number | null; nonFol
     }
   }
   return { followers, nonFollowers };
+}
+
+/**
+ * Capture active stories before they expire.
+ *
+ * THE ONLY PERISHABLE DATA THIS PRODUCT TOUCHES. A post's metrics can be
+ * backfilled two years later; a story is unreachable 24 hours after publishing
+ * and its insights are gone with it. There is no recovery, at any price, so a
+ * missed capture window is permanent data loss rather than a delayed sync.
+ *
+ * That shapes two decisions here:
+ *
+ * Every failure is swallowed into a null rather than thrown. Elsewhere in this
+ * file a throttle or auth error must NOT be swallowed — degrading silently is
+ * what turned rate limiting into data loss. Here the calculation inverts: a
+ * story captured with three of six metrics is worth infinitely more than an
+ * exception that captures none of it before the story expires.
+ *
+ * And stories are re-captured on every run while they remain active, because
+ * their numbers keep climbing for the full 24 hours. The last successful capture
+ * before expiry becomes the permanent record.
+ */
+async function captureStories(
+  get: (path: string, params?: Record<string, string>) => Promise<any>,
+  externalId: string,
+  ctx: Record<string, unknown>,
+): Promise<Post[]> {
+  const res = await optional(
+    () => get(`/${externalId}/${IG.STORIES_EDGE}`, {
+      fields: `${IG.STORY_FIELDS},insights.metric(${IG.STORY_INSIGHT_METRICS})`,
+    }),
+    { data: [] as any[] },
+    { ...ctx, call: "stories" },
+  );
+
+  return (res.data ?? []).map((m: any): Post => {
+    const ins = normInsights(m.insights?.data ?? []);
+    const published = m.timestamp ?? new Date().toISOString();
+    return {
+      external_id: m.id,
+      title: (m.caption ?? "Story").slice(0, 120),
+      media_type: "Story",
+      permalink: safePermalink(m.permalink),
+      published_at: published,
+      // Instagram reports views for stories; reach is the distinct-accounts
+      // figure. Neither is invented when absent.
+      views: ins.views ?? null,
+      reach: ins.reach ?? null,
+      shares: ins.shares ?? null,
+      // A story has no likes, comments or saves. null says "not applicable here"
+      // in the same vocabulary as "not reported", which is honest: writing 0
+      // would put a story at the bottom of any ranking sorted by likes.
+      likes: null, comments: null, saves: null,
+      avg_watch_seconds: null, retention_pct: null,
+      replies: ins.replies ?? null,
+      navigation: ins.navigation ?? null,
+      expires_at: new Date(Date.parse(published) + IG.STORY_LIFETIME_MS).toISOString(),
+    };
+  });
 }
 
 /** insight json -> { 'YYYY-MM-DD': value }, keyed by the account's own day. */
