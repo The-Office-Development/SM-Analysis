@@ -279,6 +279,46 @@ sync self-heals through the trailing re-fetch, a missed story window does not.
 - [ ] **Pagination past 25 posts**, or a documented statement that Content shows
       the most recent 25.
 
+### A view per post or story — the shape the operator asked for
+
+Content today is a flat sortable table: one row per post, columns for views,
+reach, likes, comments, shares, saves, watch time and retention. The only click
+target is a column header, for sorting. **There is no per-item view**, no route,
+no drill-down.
+
+- [ ] A route per item — `/content/:id` — showing everything held for that post
+      or story, its age, and a **Refresh** control doing the single live call.
+- [ ] Context, not just figures. A number alone cannot answer "should I keep
+      this?". Against the account's own median for that format it can.
+- [ ] Stories need their own shape. They are not posts: no permalink worth
+      showing, a 24-hour life, and different metrics.
+
+### BLOCKER for this feature: content columns cannot express "unknown"
+
+```sql
+views  bigint not null default 0,
+reach  bigint not null default 0,
+saves  bigint not null default 0,
+```
+
+Every metric on `content` is `not null default 0`, so a post Instagram has not
+reported on is stored as **0** and is indistinguishable from a post that genuinely
+reached nobody. `metrics_daily` was deliberately made nullable for exactly this
+reason; `content` never was.
+
+This is the same fabricated-zero defect fixed three times on 2026-09-06, except
+it lives in the schema rather than the display, so **no UI change can fix it** —
+it needs a migration making these columns nullable, and a sync that writes null
+rather than `?? 0`.
+
+It bites hardest precisely where this feature goes. A post published twenty
+minutes ago is the case where Instagram reports nothing yet, so a detail view
+built on the current schema would tell a creator their new post reached **0
+people** — the single most damaging wrong number the product could show, at the
+exact moment they are deciding whether to delete it.
+
+**Do the migration first. The feature is not safe to build on these columns.**
+
 ### How real-time can it honestly be?
 
 The API answers immediately, but **Instagram's own insight numbers lag** — a
