@@ -17,7 +17,7 @@ export const today = () => new Date().toISOString().slice(0, 10);
  * nearer days return data. Cost is linear — DAY_BUDGET days per run, so 90 days
  * needs nine syncs rather than three.
  */
-const MAX_BACKFILL = Math.max(1, Number(process.env.IG_MAX_BACKFILL ?? 30));
+export const MAX_BACKFILL = Math.max(1, Number(process.env.IG_MAX_BACKFILL ?? 30));
 /**
  * How many recent days to re-fetch on EVERY sync.
  *

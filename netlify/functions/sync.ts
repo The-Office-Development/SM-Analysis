@@ -1,6 +1,6 @@
 import type { Handler } from "@netlify/functions";
 import { admin, userIdFromToken, json, isAuthError, isThrottleError, log, type Db } from "./_lib";
-import { syncAccount, type AccountRow } from "./_sync";
+import { syncAccount, MAX_BACKFILL, type AccountRow } from "./_sync";
 
 /** Minimum gap between syncs of one account, enforced server-side.
  *  The UI disables its button while a sync runs; a script does not. */
@@ -56,8 +56,34 @@ export const handler: Handler = async (event) => {
   if (!accounts?.length) return json(200, { message: "No connected accounts to sync." });
 
   const now = Date.now();
+
+  /*
+   * An account still filling its backfill window is NOT "up to date".
+   *
+   * DAY_BUDGET means a first sync reaches only part of the way back, so a full
+   * window needs several runs. Throttling those to one per fifteen minutes turns
+   * a 30-day backfill into three quarters of an hour of clicking and a 90-day one
+   * into over two hours — and it does so at precisely the moment a new client is
+   * watching their dashboard for the first time.
+   *
+   * So the interval governs steady-state syncs only. An account whose earliest
+   * stored day has not yet reached the backfill floor may run again immediately,
+   * which lets the operator click through the fill and stops on its own once the
+   * window is complete.
+   */
+  const floor = new Date(now - (MAX_BACKFILL - 1) * 86400000).toISOString().slice(0, 10);
+  const backfilling = new Set<string>();
+  for (const a of accounts as any[]) {
+    const { data: first } = await db
+      .from("metrics_daily").select("date")
+      .eq("account_id", a.id).order("date", { ascending: true }).limit(1);
+    if (!first?.length || first[0].date > floor) backfilling.add(a.id);
+  }
+
   const due = (accounts as any[]).filter(
-    (a) => !a.last_synced_at || now - Date.parse(a.last_synced_at) > MIN_SYNC_INTERVAL_MS
+    (a) => !a.last_synced_at
+      || now - Date.parse(a.last_synced_at) > MIN_SYNC_INTERVAL_MS
+      || backfilling.has(a.id)
   );
   if (!due.length) {
     return json(200, { message: "Already up to date — synced within the last 15 minutes.", ok: 0, total: accounts.length });
