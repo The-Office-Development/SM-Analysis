@@ -43,7 +43,7 @@ export const handler: Handler = async (event) => {
    */
   const { data: row, error: rowErr } = await db
     .from("content")
-    .select("id,external_id,account_id,social_accounts!inner(id,user_id,platform,external_id)")
+    .select("id,external_id,account_id,refreshed_at,social_accounts!inner(id,user_id,platform,external_id)")
     .eq("id", id)
     .eq("social_accounts.user_id", uid)
     .maybeSingle();
@@ -57,6 +57,29 @@ export const handler: Handler = async (event) => {
   const account = (row as any).social_accounts;
   if (account.platform !== "instagram") {
     return json(400, { message: "Refreshing one post is only supported for Instagram so far." });
+  }
+
+  /*
+   * A cooldown, per post.
+   *
+   * Instagram throttling would only inconvenience the caller, but every hit here
+   * also spends a Cloudflare Worker invocation, and on the free plan that daily
+   * budget is ACCOUNT-wide — shared with every other project on the same
+   * Cloudflare account. An abusive or looping client could take unrelated sites'
+   * functions down with it, so the limit protects more than this product.
+   *
+   * Thirty seconds is chosen against what Instagram actually does: it updates a
+   * post's figures far more slowly than that, so a shorter gap would spend calls
+   * to return the same numbers.
+   */
+  const COOLDOWN_MS = 30_000;
+  const last = (row as any).refreshed_at ? Date.parse((row as any).refreshed_at) : 0;
+  const waited = Date.now() - last;
+  if (last && waited < COOLDOWN_MS) {
+    return json(429, {
+      message: `Just checked. Try again in ${Math.ceil((COOLDOWN_MS - waited) / 1000)}s — `
+        + `Instagram updates these more slowly than that anyway.`,
+    });
   }
 
   const { data: secret, error: secErr } = await db
@@ -88,11 +111,13 @@ export const handler: Handler = async (event) => {
       saves: ins.saved ?? null,
     };
 
-    const { error: upErr } = await db.from("content").update(fresh).eq("id", row.id);
+    const refreshedAt = new Date().toISOString();
+    const { error: upErr } = await db.from("content")
+      .update({ ...fresh, refreshed_at: refreshedAt }).eq("id", row.id);
     if (upErr) return json(500, { message: `Fetched it, but could not save: ${upErr.message}` });
 
     log("refresh_post.ok", { uid, account: account.id, post: row.external_id });
-    return json(200, { ...fresh, refreshed_at: new Date().toISOString() });
+    return json(200, { ...fresh, refreshed_at: refreshedAt });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     // Classify by the platform's own error rather than by words in the message,
