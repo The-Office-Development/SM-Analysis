@@ -1233,6 +1233,29 @@ async function captureStories(
     { ...ctx, call: "stories" },
   );
 
+  /*
+   * Log what the edge returned, every run, including nothing.
+   *
+   * On 2026-09-07 a story was visibly live on a connected account while this
+   * edge returned an empty array with HTTP 200 and no throttling. The leading
+   * explanation is that it was a RESHARE of another account's feed post — not
+   * the account's own media, and so arguably outside what this edge reports —
+   * but that is a hypothesis, and a silent zero cannot distinguish "no stories
+   * existed" from "stories existed and were not returned".
+   *
+   * Recording the count on every run turns an unanswerable question into
+   * evidence that accumulates: over a week of hourly runs, a count that is
+   * always zero on an account known to post stories says something a single
+   * observation cannot.
+   */
+  const found = (res.data ?? []).length;
+  log("sync.stories_checked", {
+    ...ctx, found,
+    detail: found === 0
+      ? "no stories returned. NOT proof none existed — a reshared post may not appear here"
+      : undefined,
+  });
+
   return (res.data ?? []).map((m: any): Post => {
     const ins = normInsights(m.insights?.data ?? []);
     const published = m.timestamp ?? new Date().toISOString();
