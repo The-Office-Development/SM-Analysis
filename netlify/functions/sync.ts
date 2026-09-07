@@ -10,11 +10,21 @@ export async function runAccount(db: Db, acc: AccountRow, userId: string | null)
   const started = new Date().toISOString();
   try {
     const res = await syncAccount(db, acc);
-    await db.from("sync_log").insert({
+    /*
+     * A failed audit-log write must be visible.
+     *
+     * These inserts discarded their error, so sync_log could stop recording
+     * entirely while every sync reported success — which is exactly what
+     * happened: runs were visible in the platform logs and absent from the
+     * table, and the table is what the operator actually reads. A log that can
+     * fail silently is worse than no log, because it is trusted.
+     */
+    const { error: logErr } = await db.from("sync_log").insert({
       account_id: acc.id, user_id: userId, started_at: started,
       finished_at: new Date().toISOString(), ok: true,
       calls: res.calls, rows_written: res.rowsWritten,
     });
+    if (logErr) log("sync.log_write_failed", { account: acc.id, detail: logErr.message });
     log("sync.ok", { account: acc.id, platform: acc.platform, ...res });
     return { ok: true as const };
   } catch (e) {
@@ -26,11 +36,12 @@ export async function runAccount(db: Db, acc: AccountRow, userId: string | null)
     if (code === "auth") {
       await db.from("social_accounts").update({ status: "expired" }).eq("id", acc.id);
     }
-    await db.from("sync_log").insert({
+    const { error: logErr } = await db.from("sync_log").insert({
       account_id: acc.id, user_id: userId, started_at: started,
       finished_at: new Date().toISOString(), ok: false,
       error_code: code, error_message: message.slice(0, 500),
     });
+    if (logErr) log("sync.log_write_failed", { account: acc.id, detail: logErr.message });
     log("sync.failed", { account: acc.id, platform: acc.platform, code, detail: message });
     return { ok: false as const, code };
   }

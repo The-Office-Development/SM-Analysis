@@ -230,9 +230,20 @@ function offsetFrom(json: any, ctx: Record<string, unknown>): number {
 
 /** Sync one account: fetch from the platform API and upsert into Supabase. */
 export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> {
-  const { data: secretRow } = await db.from("account_secrets").select("access_token,extra").eq("account_id", acc.id).single();
+  /*
+   * The error here is NOT discarded.
+   *
+   * This query previously destructured only `data`, so any failure — a
+   * connection problem, a permissions change, a schema drift — surfaced as the
+   * single phrase "missing token". That sent an investigation after a token
+   * that was sitting in the table, valid and unexpired, because the message
+   * described a symptom that was not the cause.
+   */
+  const { data: secretRow, error: secretErr } = await db
+    .from("account_secrets").select("access_token,extra").eq("account_id", acc.id).maybeSingle();
+  if (secretErr) throw new Error(`cannot read stored token: ${secretErr.message}`);
   const stored = secretRow?.access_token as string | undefined;
-  if (!stored) throw new Error("missing token");
+  if (!stored) throw new Error("no token stored for this account — it needs reconnecting");
   const token = decryptToken(stored);
 
   const { data: latest } = await db
