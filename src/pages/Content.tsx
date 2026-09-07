@@ -103,10 +103,14 @@ function ContentInner() {
                   <td>
                     {/* The TITLE opens the post's own page; the arrow opens
                         Instagram. Nesting the external anchor inside the router
-                        Link would be invalid HTML and would swallow it. */}
-                    <div className="stack">
-                      <span style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-                        <Link to={`/content/${c.id}`} style={{ fontWeight: 550 }}>{c.title || "Untitled"}</Link>
+                        Link would be invalid HTML and would swallow it.
+                        cell-clamp is load-bearing: an Instagram caption is a wall
+                        of hashtags, and without a cap the first column widens
+                        until every numeric column is pushed off the screen. */}
+                    <div className="stack cell-clamp">
+                      <span style={{ display: "flex", gap: 6, alignItems: "baseline", minWidth: 0 }}>
+                        <Link to={`/content/${c.id}`} style={{ fontWeight: 550, overflow: "hidden",
+                              textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "Untitled"}</Link>
                         {c.permalink && (
                           <a href={c.permalink} target="_blank" rel="noreferrer"
                              className="muted" style={{ fontSize: 11 }}

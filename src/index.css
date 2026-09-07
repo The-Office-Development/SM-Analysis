@@ -195,8 +195,13 @@ table.data th .arrow{opacity:.6;font-size:10px}
 table.data td{padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
 table.data tbody tr:last-child td{border-bottom:none}
 table.data tbody tr:hover{background:var(--panel-sunk)}
-/* Long free-text cells (post titles) truncate instead of widening the table. */
-.cell-clamp{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Long free-text cells (post titles) truncate instead of widening the table.
+   An Instagram caption is routinely a paragraph of hashtags, so without a hard
+   cap the first column grows until the numeric columns are pushed off screen.
+   The flex child inside also needs min-width:0, or it refuses to shrink and the
+   ellipsis never applies. */
+.cell-clamp{max-width:320px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell-clamp>*{min-width:0;max-width:100%}
 
 /* Opt-in: pin the first column so a wide table keeps its row label in view
    while the numeric columns scroll under it. */
