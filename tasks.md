@@ -16,45 +16,59 @@ Last updated: 2026-08-28.
 
 ---
 
-## THE ORDER TO DO THINGS IN — as of 2026-09-06
+## WHERE THINGS STAND — 2026-09-07
 
-Sections 1 and 2 below are DONE (2026-09-04): Supabase is live with migrations
-0001-0008, the Meta app is configured, and two Instagram accounts are connected.
-They are kept for the record, not as work.
+Sections 1 and 2 below were done on 2026-09-04 and are kept for the record, not
+as work. Migrations 0001-0012 are all applied.
 
-**Blocking, in this order:**
+### Settled
 
-0. **Reconcile four settled days against the Instagram app.** §3. Not one number
-   in this product has ever been checked against reality. Tonight inverted the
-   follower direction and that fix is unverified. Ten minutes, no deploy needed.
-1. **Migrate `content` to nullable columns.** §6c. `not null default 0` makes a
-   just-posted item read as reach 0 rather than "too early to tell". Blocks the
-   per-post view, and no UI change can work around it.
-2. **Deploy to Cloudflare.** §6d. Everything since 443d39a is committed and
-   undeployed, including the follows/unfollows correction.
-2b. **CUT NETLIFY OFF — immediately after the DNS cutover, and not later.**
-   The Netlify cron is still running the OLD published commit hourly and
-   rewriting the trailing seven days with the pre-fix follows arithmetic. It is
-   actively corrupting data on a timer right now. Running both hosts at once is
-   worse than either alone: Cloudflare writes the correct values and Netlify
-   overwrites them within the hour. Disable the scheduled functions, then remove
-   the site once DNS has settled.
-3. **Story capture.** §6c. The only PERISHABLE item here: stories and their
-   insights are gone after 24 hours and cannot be backfilled at any price.
-4. **Per-post / per-story detail view.** §6c. Needs 1 first.
-5. **Token scope audit.** §6b. This is the claim made to a client; it is
-   currently unverified against a live token.
-6. **Pagination past 25 posts**, or say plainly that Content shows 25.
-7. **Sync guard** at the subrequest cap. §6d.
-8. **Settle what a "day" means.** §6e. The gate passed on 30-day aggregates;
-   per-day alignment is still unverified, and whether we label days in Amman time
-   or Meta's buckets is an open product decision a client will notice.
+0. **Reconcile against the Instagram app.** DONE. Views within 0.7%,
+   interactions within 7%, net followers exact against @malekismaiil's own
+   30-day panel. First number in this project ever checked against reality.
+   It also found the follows_and_unfollows dimension misread, which had the
+   follower line pointing the wrong way. `DATA-INTEGRITY.md`.
+1. **`content` nullable.** DONE, migration 0009. A post Instagram has not
+   reported on stores null, not 0, so a just-published item reads "n/a" rather
+   than "reached 0 people". Widening the type surfaced 39 call sites and each
+   got a decision rather than a blanket `?? 0`.
+2. **Cloudflare.** DONE. Pages serves the app and `/api/*`; `worker-cron` carries
+   both schedules with no HTTP route. The handlers were not rewritten — an
+   adapter translates the runtime to them, so every security decision the audit
+   produced survived the move.
+2b. **Netlify cut off.** DONE. It was rewriting the trailing seven days hourly
+   with the pre-fix arithmetic.
+3. **Story capture.** DONE, migration 0010. Still UNVERIFIED against a live
+   story: none was active while it was built, so the metric names come from the
+   API's own enumeration rather than an observed response.
+4. **Per-post page.** DONE. `/content/:id` with rank, comparison against the
+   typical post of that format, engagement composition, a distribution chart,
+   and "Check now" for a live single-post fetch (migration 0012 rate-limits it).
+5. **Token scope audit.** DONE, and the answer was bad. An OAuth token inherits
+   whatever the ACCOUNT previously granted the app, so the request is a floor,
+   not a ceiling. The callback now audits every new token (0011).
+   `API-VERIFICATION.md` §7.5.
+7. **Sync call budget.** DONE. Not theoretical: production runs were exceeding
+   Cloudflare's 50-subrequest cap, which refuses the WRITES too, so a run
+   reported success while losing demographics, online_followers and its own
+   sync_log entry.
++  **Security review.** DONE, unplanned. `SECURITY-REVIEW-2026-09-07.md`.
+   Cleared a React Router advisory and rate-limited /api/refresh-post.
+
+### Still open
+
+6. **Pagination past 25 posts**, or say plainly that Content shows 25. Not
+   pressing at 12 posts; it matters for an account with years of output.
+8. **Settle what a "day" means.** §6e. The gate passed on 30-day AGGREGATES;
+   per-day alignment is still unverified because Instagram's own date picker is
+   offset by two days. Underneath sits a product decision: our days are Amman
+   days, the client's app shows Meta's buckets, and both cannot be Monday.
 
 **Parallel, blocking nothing:** Business Verification and App Review (§6), the
 PDPL questions and legal-page placeholders (§0).
 
-**Deferred:** everything in §7, plus TikTok (never worked live), the Facebook
-path, and LinkedIn (not built; its analytics API needs partner approval).
+**Deferred:** everything in §7 — share-link expiry is the largest security gap —
+plus TikTok (never worked live), the Facebook path, and LinkedIn.
 
 ---
 
