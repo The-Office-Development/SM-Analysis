@@ -27,6 +27,52 @@ export const MAX_BACKFILL = Math.max(1, Number(process.env.IG_MAX_BACKFILL ?? 30
  * afterwards, so those numbers stayed permanently short. Upserts overwrite, so
  * re-fetching a trailing window is cheap and self-healing.
  */
+/**
+ * How many platform calls one sync run may make before it stops asking.
+ *
+ * A serverless host caps OUTGOING requests per invocation, and Cloudflare's free
+ * plan allows 50. Past that the runtime refuses every further request — including
+ * the SUPABASE WRITES — so a run that overshoots does not merely fetch less, it
+ * silently fails to save what it already fetched.
+ *
+ * That happened in production on 2026-09-07: a run reported calls:46 and
+ * sync.ok, while demographics, online_followers and the sync_log insert were all
+ * being refused. Our counter said 46 because it counts only Graph calls; every
+ * Supabase query is a subrequest too, and the total went past the cap. The
+ * account's last_synced_at appeared frozen for seven hours because the write that
+ * updates it was itself refused.
+ *
+ * So the budget is deliberately below the platform limit, leaving room for the
+ * writes at the end of the run. Exceeding it now stops the FETCHING cleanly and
+ * loudly, which costs a metric, instead of overrunning and losing the save,
+ * which costs the whole run.
+ */
+// Read per call rather than captured at module load: ESM hoists imports above
+// any env assignment in the importing file, so a module-scope constant is fixed
+// before a caller can influence it.
+const callBudget = () => Math.max(5, Number(process.env.IG_CALL_BUDGET ?? 38));
+
+/** Thrown when the run has spent its call budget. Caught by optional() -> null. */
+class CallBudgetExhausted extends Error {
+  constructor(spent: number) {
+    super(`call budget exhausted after ${spent} platform calls — remaining metrics left unknown`);
+    this.name = "CallBudgetExhausted";
+  }
+}
+
+/**
+ * Count one platform call, refusing once the budget is gone.
+ *
+ * Throwing here rather than returning a fallback is deliberate: optional() turns
+ * it into a null for that metric and the run continues to its writes, while a
+ * required call surfaces it as a real failure. Either way the run ends able to
+ * SAVE what it has.
+ */
+function spend(c: { calls: number }): void {
+  if (c.calls >= callBudget()) throw new CallBudgetExhausted(c.calls);
+  c.calls++;
+}
+
 const TRAILING_REFETCH = 7;
 /** Days younger than this are still settling and are flagged provisional. */
 const SETTLING_DAYS = 2;
@@ -127,6 +173,16 @@ async function optional<T>(fn: () => Promise<T>, fallback: T, ctx: Record<string
   try { return await fn(); }
   catch (e) {
     if (isThrottleError(e) || isAuthError(e)) throw e;
+    // A budget stop is not the platform declining to report something. Logging
+    // them the same way would hide a self-inflicted gap among genuine ones.
+    if (e instanceof CallBudgetExhausted) {
+      log("sync.call_budget_exhausted", {
+        ...ctx, budget: callBudget(),
+        detail: "stopped fetching to leave room for the writes; lower IG_DAY_BUDGET "
+          + "or raise IG_CALL_BUDGET if the host allows more subrequests",
+      });
+      return fallback;
+    }
     log("sync.metric_unavailable", { ...ctx, detail: e instanceof Error ? e.message : String(e) });
     return fallback;
   }
@@ -392,7 +448,7 @@ async function mergeWithStored(db: Db, acc: AccountRow, days: DayRow[]) {
 
 /* ------------------------------ Instagram -------------------------------- */
 async function syncInstagram(acc: AccountRow, token: string, start: string, c: { calls: number }, end: string, anchor: FollowerAnchor | null): Promise<{ days: DayRow[]; posts: Post[] }> {
-  const get = (path: string, params: Record<string, string>) => { c.calls++; return graphGet(path, params, token); };
+  const get = (path: string, params: Record<string, string>) => { spend(c); return graphGet(path, params, token); };
   const prof = await get(`/${acc.external_id}`, { fields: "followers_count,media_count" });
   const now = today();
 
@@ -556,7 +612,7 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
  * _instagram.ts; correct it there, not here.
  */
 async function syncInstagramLogin(acc: AccountRow, token: string, start: string, c: { calls: number }, end: string, anchor: FollowerAnchor | null): Promise<{ days: DayRow[]; posts: Post[] }> {
-  const get = (path: string, params: Record<string, string>) => { c.calls++; return igGet(path, params, token); };
+  const get = (path: string, params: Record<string, string>) => { spend(c); return igGet(path, params, token); };
   const prof = await get("/me", { fields: IG.ME_FIELDS });
   const now = today();
 
@@ -721,7 +777,7 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
 
 /** Audience breakdowns on the Instagram Login path (needs ~100 followers). */
 async function audienceInstagramLogin(acc: AccountRow, token: string, c: { calls: number }): Promise<Audience> {
-  const get = (params: Record<string, string>) => { c.calls++; return igGet("/me/insights", params, token); };
+  const get = (params: Record<string, string>) => { spend(c); return igGet("/me/insights", params, token); };
   const demo = (breakdown: string) => optional(
     () => get({ metric: "follower_demographics", period: "lifetime", timeframe: "this_month", breakdown, metric_type: "total_value" }).then(parseDemographics),
     {} as Record<string, number>, { metric: "follower_demographics", breakdown, mode: "instagram_login" });
@@ -746,7 +802,7 @@ async function audienceInstagramLogin(acc: AccountRow, token: string, c: { calls
 }
 
 async function audienceInstagram(acc: AccountRow, token: string, c: { calls: number }): Promise<Audience> {
-  const get = (params: Record<string, string>) => { c.calls++; return graphGet(`/${acc.external_id}/insights`, params, token); };
+  const get = (params: Record<string, string>) => { spend(c); return graphGet(`/${acc.external_id}/insights`, params, token); };
   const demo = (breakdown: string) =>
     optional(() => get({
       metric: "follower_demographics", period: "lifetime", timeframe: "this_month",
@@ -769,7 +825,7 @@ async function audienceInstagram(acc: AccountRow, token: string, c: { calls: num
 
 /* ------------------------------ Facebook --------------------------------- */
 async function syncFacebook(acc: AccountRow, token: string, start: string, c: { calls: number }): Promise<{ days: DayRow[]; posts: Post[] }> {
-  const get = (path: string, params: Record<string, string>) => { c.calls++; return graphGet(path, params, token); };
+  const get = (path: string, params: Record<string, string>) => { spend(c); return graphGet(path, params, token); };
   const prof = await get(`/${acc.external_id}`, { fields: "followers_count" });
   const now = today();
   const since = String(unixSec(start)), until = String(unixSec(addDays(now, 1)));
@@ -824,7 +880,7 @@ async function audienceFacebook(acc: AccountRow, token: string, c: { calls: numb
   // page_fans_online was removed in Sep 2024, and page_fans_gender_age /
   // page_fans_country are unavailable for Pages connected after 14 Mar 2024,
   // so this returns empty for any newly connected Page. That is Meta's limit.
-  c.calls++;
+  spend(c);
   const j = await optional(
     () => graphGet(`/${acc.external_id}/insights`, { metric: "page_fans_gender_age,page_fans_country", period: "lifetime" }, token),
     { data: [] as any[] }, { metric: "page_fans_*" });
@@ -849,10 +905,10 @@ async function audienceFacebook(acc: AccountRow, token: string, c: { calls: numb
 
 /* ------------------------------- TikTok ---------------------------------- */
 async function syncTiktok(acc: AccountRow, token: string, c: { calls: number }): Promise<{ days: DayRow[]; posts: Post[] }> {
-  c.calls++;
+  spend(c);
   const info = await tiktokJson("https://open.tiktokapis.com/v2/user/info/?fields=follower_count,likes_count,video_count", token);
   const user = info.data?.user ?? {};
-  c.calls++;
+  spend(c);
   const listRes = await tiktokPost(
     "https://open.tiktokapis.com/v2/video/list/?fields=id,title,view_count,like_count,comment_count,share_count,create_time,share_url,duration",
     token, { max_count: 20 }

@@ -6,6 +6,11 @@ import { installGraphMock, trueValue, trueNetFollows, addDays } from "./mock-gra
 
 process.env.GRAPH_BACKOFF_BASE_MS = "1";
 process.env.TOKEN_ENC_KEY ??= Buffer.alloc(32, 7).toString("base64");
+// The per-run call budget exists to fit a serverless host's subrequest cap. It
+// is a deployment constraint, not a property of the sync's correctness, and the
+// tests below deliberately sync wide windows. Raised here so it does not mask
+// what they are actually asserting; the budget has its own test instead.
+process.env.IG_CALL_BUDGET = "10000";
 process.env.META_APP_SECRET ??= "test-app-secret";
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -230,6 +235,42 @@ test("an active story is captured, with the metrics it has and nulls for the res
   // expires_at is what later tells "final numbers" from "still climbing".
   assert.ok(story.expires_at, "expiry is recorded");
   assert.ok(Date.parse(story.expires_at) > Date.parse(story.published_at));
+});
+
+test("a run stops at its call budget, and still saves what it fetched", async () => {
+  /*
+   * The failure this guards against is not fetching less. A serverless host caps
+   * outgoing requests per invocation, and past the cap it refuses EVERYTHING,
+   * including the database writes. On 2026-09-07 a production run reported
+   * sync.ok with 46 calls while demographics, online_followers and the sync_log
+   * insert were all being refused, and the account's last_synced_at appeared
+   * frozen for seven hours because the write that updates it never landed.
+   *
+   * So two things must hold: the run stops ASKING at the budget, and it still
+   * reaches its writes.
+   */
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  const BUDGET = 12;                        // far below a 30-day window's needs
+  const previous = process.env.IG_CALL_BUDGET;
+  process.env.IG_CALL_BUDGET = String(BUDGET);
+
+  let res;
+  const mock = installGraphMock({ offset: 3, days: [from, TODAY] });
+  try {
+    res = await syncAccount(db, account);
+  } finally {
+    mock.restore();
+    process.env.IG_CALL_BUDGET = previous;
+  }
+
+  // It stopped asking. Without the guard this window costs far more than 12.
+  assert.ok(res.calls <= BUDGET,
+    `the run must not exceed its budget; made ${res.calls} calls against a budget of ${BUDGET}`);
+
+  // And it still got to its writes, which is the whole point of stopping early.
+  const rows = db._rows("metrics_daily");
+  assert.ok(rows.length > 0, "the run wrote rows despite running out of budget");
 });
 
 test("recent days are flagged provisional so the UI need not read them as a drop", async () => {
