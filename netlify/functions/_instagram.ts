@@ -84,6 +84,23 @@ export const IG = {
   STORIES_EDGE: "stories",
   STORY_FIELDS: "id,caption,media_type,media_product_type,permalink,timestamp",
   STORY_INSIGHT_METRICS: "reach,views,replies,navigation,shares,total_interactions",
+  /**
+   * Endpoints gated behind write-capable permissions, used to AUDIT a token.
+   *
+   * Reading one of these is how you discover what a token can do without doing
+   * it. If Meta answers, the token holds that permission; if it refuses, it does
+   * not. Never prove a write capability by attempting the write.
+   *
+   * This exists because an OAuth token can carry more than the app requested:
+   * Meta grants what the ACCOUNT previously allowed, so an account that once
+   * generated a token through the App Dashboard hands us publishing and
+   * messaging rights we never asked for. Verified live 2026-09-07,
+   * API-VERIFICATION.md §7.5.
+   */
+  WRITE_GATED_PROBES: [
+    { path: "conversations", scope: "instagram_business_manage_messages", label: "read direct messages" },
+    { path: "content_publishing_limit", scope: "instagram_business_content_publish", label: "publish content" },
+  ],
   /** Stories are retrievable for 24 hours after publishing. Nothing after that. */
   STORY_LIFETIME_MS: 24 * 60 * 60 * 1000,
 } as const;
@@ -208,4 +225,39 @@ export async function igGet(
 
 export function logIgConfig() {
   log("ig.config", { version: IG_VERSION, scopes: IG.SCOPES.join(",") });
+}
+
+
+/**
+ * What can this token actually do?
+ *
+ * Every call is a GET against an endpoint a write permission gates. A response
+ * means the token holds that permission; a refusal means it does not. Nothing
+ * here writes, and nothing here should ever be changed to.
+ *
+ * Returns the write-capable scopes observed. An empty array means audited and
+ * clean, which is a different statement from "not audited" — the caller must
+ * keep those apart, because presenting an unaudited token as safe is exactly the
+ * confident claim this function exists to replace with evidence.
+ */
+export async function auditTokenScopes(
+  externalId: string,
+  token: string,
+): Promise<string[]> {
+  const held: string[] = [];
+  for (const probe of IG.WRITE_GATED_PROBES) {
+    try {
+      const u = new URL(`${IG.GRAPH}/${externalId}/${probe.path}`);
+      u.searchParams.set("access_token", token);
+      const res = await fetch(u, { signal: AbortSignal.timeout(8000) });
+      // Only a clean 2xx counts as "held". A refusal, a throttle or a network
+      // failure all mean "not demonstrated", and must not be recorded as absent
+      // either — the caller decides what an incomplete audit means.
+      if (res.ok) held.push(probe.scope);
+    } catch {
+      // Ignore: a probe that could not complete proves nothing in either
+      // direction, and an audit must not fail a connection.
+    }
+  }
+  return held;
 }

@@ -4,7 +4,7 @@ import {
   verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
   backToApp, encryptToken, log, AccountOwnedByAnotherTenant,
 } from "./_lib";
-import { exchangeCode, igGet, IG } from "./_instagram";
+import { exchangeCode, igGet, IG, auditTokenScopes } from "./_instagram";
 
 /** Instagram Login redirect target. */
 export const handler: Handler = async (event) => {
@@ -91,11 +91,49 @@ export const handler: Handler = async (event) => {
       },
       { access_token: tokens.accessToken, expires_at: tokens.expiresAt, extra: { kind: "ig_login" } });
 
+    /*
+     * Audit what Meta actually issued, once, at connect time.
+     *
+     * We request two read scopes and that is provable — but Meta grants what the
+     * ACCOUNT has previously allowed this app, so a token can arrive holding
+     * publishing or messaging rights we never asked for. Verified live on
+     * 2026-09-07 against two accounts, one clean and one not
+     * (API-VERIFICATION.md §7.5). We cannot narrow what Meta issues; we can know,
+     * record it, and tell the account holder how to revoke it themselves.
+     *
+     * Done here rather than in the sync because the sync runs against a
+     * subrequest budget and this is a one-off fact about a token, not a metric.
+     * Two GETs, and a failure must never block a connection that otherwise
+     * succeeded.
+     */
+    let writeScopes: string[] | null = null;
+    try {
+      writeScopes = await auditTokenScopes(externalId, tokens.accessToken);
+      if (writeScopes && writeScopes.length) {
+        log("oauth.token_exceeds_request", {
+          provider: "instagram", uid: state.uid, account: accountId, scopes: writeScopes,
+          detail: "token holds write-capable permissions this app never requested — "
+            + "inherited from an earlier grant by this account. Read-only claims must be "
+            + "qualified for it until the account holder revokes them.",
+        });
+      }
+    } catch { /* an audit that could not run proves nothing and blocks nothing */ }
+
     await db.from("social_accounts")
-      .update({ identity_id: identity.id, auth_mode: "instagram_login" })
+      .update({
+        identity_id: identity.id,
+        auth_mode: "instagram_login",
+        // null stays null when the audit could not run: "not audited" is not
+        // "clean", and the UI must be able to tell them apart.
+        write_scopes: writeScopes,
+        scopes_checked_at: writeScopes ? new Date().toISOString() : null,
+      })
       .eq("id", accountId);
 
-    log("oauth.connected", { provider: "instagram", uid: state.uid, mode: "instagram_login" });
+    log("oauth.connected", {
+      provider: "instagram", uid: state.uid, mode: "instagram_login",
+      write_scopes: writeScopes?.length ?? "unaudited",
+    });
     return backToApp("connected", "instagram", clear);
   } catch (e) {
     if (e instanceof AccountOwnedByAnotherTenant) return backToApp("error", "already_connected_elsewhere", clear);

@@ -6,7 +6,7 @@ process.env.OAUTH_STATE_SECRET = "test-state-secret-value";
 process.env.TOKEN_ENC_KEY = Buffer.alloc(32, 7).toString("base64");
 process.env.META_APP_SECRET = "test-app-secret";
 
-const { authorizeUrl, IG, exchangeCode, refreshLongLivedToken, igGet } = await import("../build/_instagram.js");
+const { authorizeUrl, IG, exchangeCode, refreshLongLivedToken, igGet, auditTokenScopes } = await import("../build/_instagram.js");
 
 test("the authorize URL asks only for read-only Instagram scopes", () => {
   const u = new URL(authorizeUrl("app-1", "https://site/cb", "STATE"));
@@ -79,4 +79,30 @@ test("igGet retries throttling and surfaces a permanent error", async () => {
   try {
     await assert.rejects(() => igGet("/me/insights", { metric: "nope" }, "T"), /no such metric/);
   } finally { globalThis.fetch = original; }
+});
+
+test("the token scope audit only ever READS, and reports what it observed", async () => {
+  const original = globalThis.fetch;
+  const methods = [];
+  globalThis.fetch = async (url, init) => {
+    methods.push(init?.method ?? "GET");
+    const ok = String(url).includes("conversations");
+    return new Response(JSON.stringify(ok ? { data: [] } : { error: { message: "no" } }),
+      { status: ok ? 200 : 400 });
+  };
+
+  try {
+    const held = await auditTokenScopes("123", "tok");
+
+    // An audit that writes is not an audit. Proving a write capability by
+    // exercising it would post to a client's account to find out whether it can.
+    assert.ok(methods.length > 0, "the audit made calls");
+    assert.ok(methods.every((m) => m.toUpperCase() === "GET"),
+      `every probe must be a GET, saw: ${methods.join(", ")}`);
+
+    // And it reports what it saw: allowed becomes a held scope, refused does not.
+    assert.deepEqual(held, ["instagram_business_manage_messages"]);
+  } finally {
+    globalThis.fetch = original;
+  }
 });
