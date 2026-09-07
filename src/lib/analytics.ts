@@ -151,7 +151,7 @@ export function summarizeForAI(d: AISummaryInput): string {
       // This text goes into the AI assistant's context. "not reported" is a fact
       // it can reason about; a fabricated 0 is one it would confidently repeat.
       const n = (v: number | null) => (v === null ? "not reported" : v.toLocaleString());
-      lines.push(`- "${(c.title || "Untitled").slice(0, 60)}" (${PLATFORMS[c.platform as Platform].name}, ${c.media_type}) — ${n(c.views)} views, ${n(c.likes)} likes, ${n(c.comments)} comments`);
+      lines.push(`- "${(c.title || "Untitled").slice(0, 60)}" (${PLATFORMS[c.platform as Platform].name}, ${c.media_type}): ${n(c.views)} views, ${n(c.likes)} likes, ${n(c.comments)} comments`);
     }
   }
 

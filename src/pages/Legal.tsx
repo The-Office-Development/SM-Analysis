@@ -103,13 +103,13 @@ export function Privacy() {
 
       <h3>What we hold</h3>
       <ul>
-        <li><b>Your account</b> — email address and sign-in credentials, handled by our authentication provider.</li>
-        <li><b>Your connected social accounts</b> — the account id, username, display name and profile picture of each Facebook Page, Instagram Business account or TikTok account you connect.</li>
+        <li><b>Your account</b>: email address and sign-in credentials, handled by our authentication provider.</li>
+        <li><b>Your connected social accounts</b>: the account id, username, display name and profile picture of each Facebook Page, Instagram Business account or TikTok account you connect.</li>
         <li><b>Access tokens</b> issued by those platforms. They are encrypted at rest with AES-256-GCM and are never sent to your browser. We request <b>read-only</b> permissions; we never ask for and never hold your social media password.</li>
-        <li><b>Metrics</b> — daily followers, reach, views and engagement figures for the accounts you connect.</li>
-        <li><b>Your posts</b> — captions, publication times, links and per-post performance.</li>
-        <li><b>Aggregated audience information about your followers</b> — age bands, gender split, country distribution and hourly activity, as statistical breakdowns only. We never receive the identity of any individual follower.</li>
-        <li><b>Operational records</b> — sync history, and errors, retained so we can tell you when something failed.</li>
+        <li><b>Metrics</b>: daily followers, reach, views and engagement figures for the accounts you connect.</li>
+        <li><b>Your posts</b>: captions, publication times, links and per-post performance.</li>
+        <li><b>Aggregated audience information about your followers</b>: age bands, gender split, country distribution and hourly activity, as statistical breakdowns only. We never receive the identity of any individual follower.</li>
+        <li><b>Operational records</b>: sync history, and errors, retained so we can tell you when something failed.</li>
       </ul>
 
       <h3>Why we are allowed to hold it</h3>
@@ -117,21 +117,21 @@ export function Privacy() {
 
       <h3>Who else processes it</h3>
       <ul>
-        <li><b>Supabase</b> — database and authentication, including the encrypted tokens.</li>
-        <li><b>Netlify</b> — hosting and server logs.</li>
-        <li><b>Anthropic</b> — powers the optional AI assistant. When you use it, a compact summary of your dashboard figures and the titles of your top posts is sent to produce an answer. Your access tokens and raw records are never sent. If you do not use the assistant, nothing is sent.</li>
+        <li><b>Supabase</b>: database and authentication, including the encrypted tokens.</li>
+        <li><b>Netlify</b>: hosting and server logs.</li>
+        <li><b>Anthropic</b>: powers the optional AI assistant. When you use it, a compact summary of your dashboard figures and the titles of your top posts is sent to produce an answer. Your access tokens and raw records are never sent. If you do not use the assistant, nothing is sent.</li>
       </ul>
-      <p>All three operate outside Jordan, so using this service involves transferring your personal data abroad. [REGIONS CONFIGURED FOR SUPABASE AND NETLIFY, AND THE TRANSFER BASIS RELIED ON UNDER THE PDPL — COUNSEL TO COMPLETE.]</p>
+      <p>All three operate outside Jordan, so using this service involves transferring your personal data abroad. [REGIONS CONFIGURED FOR SUPABASE AND NETLIFY, AND THE TRANSFER BASIS RELIED ON UNDER THE PDPL, COUNSEL TO COMPLETE.]</p>
 
       <h3>How long we keep it</h3>
-      <p>We keep what you connect for as long as you keep it connected, and no longer. <b>Disconnecting an account deletes it immediately</b> — the access token, every daily metric, every post record, the audience breakdowns and that account's sync history are removed at once, not after a delay. There is no retention window afterwards because there is nothing left to retain. Deleting your whole account removes everything above along with your goals, your recorded consents and any report links you created.</p>
+      <p>We keep what you connect for as long as you keep it connected, and no longer. <b>Disconnecting an account deletes it immediately</b>: the access token, every daily metric, every post record, the audience breakdowns and that account's sync history are removed at once, not after a delay. There is no retention window afterwards because there is nothing left to retain. Deleting your whole account removes everything above along with your goals, your recorded consents and any report links you created.</p>
 
       <h3>Shared report links</h3>
       <p>A shared link holds a <b>snapshot</b> of the figures as they stood when you created it; it does not update afterwards. Anyone holding the link can open it without signing in, so treat one as public once you have sent it.</p>
       <p><b>Links do not currently expire, and there is no way to revoke a single link.</b> Deleting your account removes every link you have created. If you need a link withdrawn before then, write to {CONTACT} and we will remove it for you.</p>
 
       <h3>Your rights</h3>
-      <p>You may ask us for a copy of your data, ask us to correct or delete it, or withdraw consent. Use <b>Export my data</b> and <b>Delete my account</b> in your settings, or write to {CONTACT}; we respond within [STATUTORY PERIOD — COUNSEL TO CONFIRM UNDER THE PDPL]. You may also complain to the competent Jordanian authority.</p>
+      <p>You may ask us for a copy of your data, ask us to correct or delete it, or withdraw consent. Use <b>Export my data</b> and <b>Delete my account</b> in your settings, or write to {CONTACT}; we respond within [STATUTORY PERIOD, COUNSEL TO CONFIRM UNDER THE PDPL]. You may also complain to the competent Jordanian authority.</p>
 
       <h3>Deleting your data</h3>
       <p>Disconnecting an account revokes our access at the platform and permanently deletes the metrics, posts and audience information we hold for it. See <a href="/data-deletion">Data deletion</a>.</p>
@@ -154,7 +154,7 @@ export function Terms() {
       <h3>Termination</h3>
       <p>You may stop at any time by deleting your account, which removes your data as described in the privacy policy.</p>
       <h3>Liability and governing law</h3>
-      <p>[LIABILITY POSITION — COUNSEL TO COMPLETE.] These terms are governed by the laws of the Hashemite Kingdom of Jordan.</p>
+      <p>[LIABILITY POSITION, COUNSEL TO COMPLETE.] These terms are governed by the laws of the Hashemite Kingdom of Jordan.</p>
     </Shell>
   );
 }

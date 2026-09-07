@@ -21,7 +21,7 @@ function Unavailable({ what }: { what: string }) {
   return (
     <p className="muted" style={{ fontSize: 13, margin: 0 }}>
       {what} has not been reported for this account yet. It appears once a sync
-      returns the breakdown — it is not zero, it is unknown.
+      returns the breakdown. It is not zero, it is unknown.
     </p>
   );
 }
@@ -137,7 +137,7 @@ export function FormatPanel({ content }: { content: ContentItem[] }) {
                     <td style={{ fontWeight: 550 }}>{r.format}</td>
                     <td className="num tnum">{r.posts}</td>
                     <td className="num tnum">{compact(r.medianReach)}</td>
-                    <td className="num tnum">{r.saveRate === null ? "—" : `${(r.saveRate * 100).toFixed(2)}%`}</td>
+                    <td className="num tnum">{r.saveRate === null ? "n/a" : `${(r.saveRate * 100).toFixed(2)}%`}</td>
                   </tr>
                 ))}
               </tbody>
@@ -145,7 +145,7 @@ export function FormatPanel({ content }: { content: ContentItem[] }) {
           </div>
         )}
         <p className="muted" style={{ fontSize: 12, margin: "10px 0 0" }}>
-          Median, not average — one post that took off should not describe what a
+          The typical post, not the average. One post that took off should not describe what a
           format normally does. Saves are the strongest distribution signal
           Instagram exposes, and a like count hides them.
         </p>

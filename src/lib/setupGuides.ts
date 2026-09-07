@@ -28,7 +28,7 @@ export interface SetupGuide {
 export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
   facebook: {
     summary:
-      "For Facebook Pages. Development Mode is enough to analyse Pages you administer — App Review is only needed to read other people's Pages. Instagram no longer comes through here; it has its own row.",
+      "For Facebook Pages. Development Mode is enough to analyse Pages you administer. App Review is only needed to read other people's Pages. Instagram no longer comes through here; it has its own row.",
     requires: ["A Facebook Page you administer"],
     steps: [
       {
@@ -48,7 +48,7 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
     env: ["META_APP_ID", "META_APP_SECRET"],
     notes: [
       "Permissions requested: pages_show_list, pages_read_engagement, read_insights. Submit these for App Review only if you need Pages you don't administer.",
-      "Brand-new Meta business accounts are sometimes auto-flagged, which blocks asset linking with errors like “not allowed to advertise”. Check business.facebook.com/accountquality — these holds usually clear within 24–48h.",
+      "Brand-new Meta business accounts are sometimes auto-flagged, which blocks asset linking with errors like “not allowed to advertise”. Check business.facebook.com/accountquality. These holds usually clear within 24 to 48 hours.",
     ],
   },
 
@@ -76,15 +76,15 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
       },
       { text: "Business login settings → add the callback URL below as a redirect URI, exactly as shown." },
       { text: "Copy the Instagram app ID and secret into the environment variables below. These are NOT the Facebook app's App ID and secret." },
-      { text: "Set the app's display name — that is the name people see on the Instagram permission screen." },
+      { text: "Set the app's display name. That is the name people see on the Instagram permission screen." },
       { text: "App roles → Roles: add the account as a Tester, and accept the invitation from that account's own Instagram settings. Real data flows with no App Review." },
       { text: "Come back here, press Connect on this row, and approve the permission prompt." },
     ],
     redirectPath: "/api/oauth-instagram-callback",
     env: ["INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET"],
     notes: [
-      "Permissions requested: instagram_business_basic and instagram_business_manage_insights. Both are read-only — this app cannot post, comment or message.",
-      "Follower demographics need roughly 100 followers. Below that Meta returns nothing and the Audience page stays empty — that is Meta's limit, not a failed sync.",
+      "Permissions requested: instagram_business_basic and instagram_business_manage_insights. Both are read-only, so this app cannot post, comment or message.",
+      "Follower demographics need roughly 100 followers. Below that Meta returns nothing and the Audience page stays empty. That is Meta's limit, not a failed sync.",
       "A new account has no history for Meta to backfill, so trends build up from your first sync onward.",
       "History arrives in chunks over several syncs rather than all at once: only reach is available as a daily series, so every other metric costs one API call per day.",
       "Connecting a Facebook Page is a separate row above, and still uses the Facebook app's credentials.",
@@ -103,7 +103,7 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
       { text: "Request the scopes: user.info.basic, user.info.profile, user.info.stats, video.list." },
       { text: "Add the callback URL below to the app's Login Kit redirect URIs." },
       { text: "Copy the Client key and Client secret into the environment variables below." },
-      { text: "Submit the app for review — TikTok returns production data only after approval." },
+      { text: "Submit the app for review. TikTok returns production data only after approval." },
     ],
     redirectPath: "/api/oauth-tiktok-callback",
     env: ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"],

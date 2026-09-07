@@ -122,8 +122,8 @@ function ContentInner() {
                   <td className="num tnum">{metric(c.comments)}</td>
                   <td className="num tnum">{metric(c.shares)}</td>
                   <td className="num tnum">{metric(c.saves)}</td>
-                  <td className="num tnum">{c.avg_watch_seconds != null ? `${c.avg_watch_seconds}s` : "—"}</td>
-                  <td className="num tnum">{c.retention_pct != null ? `${c.retention_pct}%` : "—"}</td>
+                  <td className="num tnum">{c.avg_watch_seconds != null ? `${c.avg_watch_seconds}s` : "n/a"}</td>
+                  <td className="num tnum">{c.retention_pct != null ? `${c.retention_pct}%` : "n/a"}</td>
                   <td><PlatformBadge platform={c.platform} /></td>
                 </tr>
               ))}

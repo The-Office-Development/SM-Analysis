@@ -54,7 +54,7 @@ export default function AuthPage() {
         </span>
         <div className="auth__pitch">
           <h2>Every channel’s numbers, read at a glance.</h2>
-          <p>Connect your accounts once and PulseBoard keeps your growth, content and audience metrics in sync — no spreadsheets, no tab-hopping.</p>
+          <p>Connect your accounts once and PulseBoard keeps your growth, content and audience metrics in sync. No spreadsheets, no tab-hopping.</p>
           <div className="auth__points">
             {POINTS.map((p) => (
               <div className="auth__point" key={p}><IcCheck /> {p}</div>

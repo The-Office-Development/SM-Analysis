@@ -2,7 +2,7 @@ import { compact, metric, full } from "../lib/format";
 import type { ReportSnapshot } from "../lib/snapshot";
 
 const delta = (n: number | null) => {
-  if (n === null) return <span className="delta --flat muted">—</span>;
+  if (n === null) return <span className="delta --flat muted">n/a</span>;
   const r = Math.round(n);
   return <span className={`delta ${r > 0 ? "--pos" : r < 0 ? "--neg" : "--flat"}`}>{r > 0 ? "+" : ""}{r}%</span>;
 };
@@ -32,7 +32,7 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
             {snap.headline.map((h) => (
               <tr key={h.label}><td>{h.label}</td><td className="num tnum">{full(h.total)}</td><td className="num">{delta(h.deltaPct)}</td></tr>
             ))}
-            <tr><td>Engagement rate</td><td className="num tnum">{snap.engagementRate.toFixed(1)}%</td><td className="num muted">—</td></tr>
+            <tr><td>Engagement rate</td><td className="num tnum">{snap.engagementRate.toFixed(1)}%</td><td className="num muted">n/a</td></tr>
           </tbody>
         </table>
       </div>

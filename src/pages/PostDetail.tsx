@@ -33,8 +33,8 @@ const METRICS = [
   { key: "reach", label: "Reach", hint: "Distinct accounts that saw it" },
   { key: "likes", label: "Likes", hint: null },
   { key: "comments", label: "Comments", hint: null },
-  { key: "shares", label: "Shares", hint: "Sent to someone else — the strongest distribution signal" },
-  { key: "saves", label: "Saves", hint: "Kept for later — intent, not just approval" },
+  { key: "shares", label: "Shares", hint: "Sent to someone else. The strongest sign a post is spreading" },
+  { key: "saves", label: "Saves", hint: "Kept for later. Someone meant to come back to it" },
 ] as const;
 
 function PostDetailInner() {
@@ -96,7 +96,7 @@ function PostDetailInner() {
                  border: "1px solid var(--border)", borderRadius: 8 }}>
               <strong>Too early to judge.</strong> Instagram is still counting, and reports
               nothing at all for the first stretch after publishing. Numbers below will keep
-              climbing for a day or more — a low figure now is not a verdict.
+              climbing for a day or more, so a low figure now is not a verdict.
             </p>
           )}
         </div>
@@ -105,7 +105,7 @@ function PostDetailInner() {
       <div className="panel">
         <div className="panel__head">
           <h3>How it performed</h3>
-          <span className="sub">against your median {post.media_type.toLowerCase()}</span>
+          <span className="sub">compared with your typical {post.media_type.toLowerCase()}</span>
         </div>
         <div className="panel__body">
           <div className="bars">
@@ -152,7 +152,7 @@ function PostDetailInner() {
                           <span>
                             {ctx.vsMedian >= 1
                               ? `${((ctx.vsMedian - 1) * 100).toFixed(0)}% above`
-                              : `${((1 - ctx.vsMedian) * 100).toFixed(0)}% below`} median {m.label.toLowerCase()} for a {post.media_type.toLowerCase()}
+                              : `${((1 - ctx.vsMedian) * 100).toFixed(0)}% below`} your typical {post.media_type.toLowerCase()}
                             {ctx.sample < 3 && ` · only ${ctx.sample} to compare`}
                           </span>
                         )}
@@ -166,9 +166,9 @@ function PostDetailInner() {
           </div>
           {METRICS.some((m) => post[m.key] === null) && (
             <p className="muted" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
-              "Not reported" means Instagram did not return that figure — most often because
-              the post predates this account becoming professional, in which case it never
-              will. It does not mean zero.
+              "n/a" means Instagram did not give us that figure. Most often the post was
+              published before this account became a professional account, in which case
+              Instagram never will. It does not mean zero.
             </p>
           )}
         </div>
@@ -238,9 +238,9 @@ function PostDetailInner() {
                 ))}
               </div>
               <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-                Saves and shares are intent — someone kept it or passed it on. A like is the
-                cheapest signal there is. Two posts with the same total can mean very
-                different things, and a sponsor is buying the difference.
+                Saves and shares take real effort. Someone kept the post or passed it on to
+                a friend. A like takes a second. Two posts with the same total can mean very
+                different things, and a sponsor is paying for the difference.
                 {split.parts.length < 4 && " Components Instagram did not report are omitted rather than drawn as empty."}
               </p>
             </div>
@@ -249,17 +249,17 @@ function PostDetailInner() {
       })()}
 
       <div className="panel">
-        <div className="panel__head"><h3>Derived</h3><span className="sub">only where the inputs exist</span></div>
+        <div className="panel__head"><h3>Derived</h3><span className="sub">shown only where we have the numbers to work them out</span></div>
         <div className="panel__body">
           <div className="bars">
             <Derived label="Engagement rate" value={engRate === null ? null : `${engRate.toFixed(1)}%`}
-                     why="Interactions divided by reach. Needs both." />
+                     why="How many of the people who saw it did something about it." />
             <Derived label="Total interactions" value={engagement === null ? null : full(engagement)}
-                     why="Likes, comments, shares and saves that were reported." />
+                     why="Likes, comments, shares and saves added together." />
             <Derived label="Shares per 1k reach"
                      value={post.shares !== null && post.reach !== null && post.reach > 0
                        ? ((post.shares / post.reach) * 1000).toFixed(1) : null}
-                     why="How hard it travelled beyond the people it reached." />
+                     why="How often it got passed on, for every thousand people who saw it." />
           </div>
         </div>
       </div>

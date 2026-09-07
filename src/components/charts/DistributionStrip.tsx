@@ -97,10 +97,12 @@ export default function DistributionStrip({
       </svg>
 
       <p className="muted" style={{ fontSize: 11.5, margin: "2px 0 0" }}>
-        Each dot is a post; the large one is this post.{" "}
-        <strong>The axis is logarithmic</strong> — each label is ten times the one before, which is
-        the only way posts at a thousand and posts at a million fit on one line.
-        {zeros.length > 0 && ` ${zeros.length} post${zeros.length === 1 ? "" : "s"} reported zero and sit${zeros.length === 1 ? "s" : ""} in the slot at the left, off the scale.`}
+        Each dot is one of your posts. The big one is this post.{" "}
+        <strong>Each label along the bottom is ten times the one before it.</strong>{" "}
+        That is what lets a post with a thousand views and a post with a million
+        views both fit on the same line, so the gaps between dots show how far
+        apart posts really are.
+        {zeros.length > 0 && ` ${zeros.length} post${zeros.length === 1 ? "" : "s"} had none of this, shown separately on the far left.`}
         {hover && ` · ${points.find((p) => p.id === hover)?.label}`}
       </p>
     </div>

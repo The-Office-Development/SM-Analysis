@@ -116,7 +116,7 @@ export default function Planner() {
       <section className="panel col-3">
         <div className="panel__head"><IcAlert style={{ width: 16, height: 16, color: "var(--warn)" }} /><h3>Alerts</h3><span className="sub">unusual moves in the last {dash.range} days</span></div>
         <div className="panel__body stack" style={{ gap: 10 }}>
-          {alerts.length === 0 && <p className="muted" style={{ fontSize: 13 }}>Nothing unusual — your metrics are moving within their normal range. ✓</p>}
+          {alerts.length === 0 && <p className="muted" style={{ fontSize: 13 }}>Nothing unusual. Your metrics are moving within their normal range. ✓</p>}
           {alerts.map((a, i) => (
             <div key={i} className="banner" style={{ borderColor: a.kind === "drop" ? "var(--neg-weak)" : "var(--pos-weak)" }}>
               {a.kind === "drop" ? <IcDown style={{ color: "var(--neg)" }} /> : <IcUp style={{ color: "var(--pos)" }} />}

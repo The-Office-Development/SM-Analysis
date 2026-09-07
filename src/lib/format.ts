@@ -50,7 +50,7 @@ export function initials(name: string): string {
  * with total confidence.
  */
 export function metric(v: number | null | undefined): string {
-  return v === null || v === undefined ? "—" : compact(v);
+  return v === null || v === undefined ? "n/a" : compact(v);
 }
 
 /**

@@ -86,7 +86,7 @@ export default function Connections() {
         <input type="checkbox" checked={consented} onChange={(e) => setConsented(e.target.checked)} style={{ marginTop: 3 }} />
         <span style={{ fontSize: 13.5, lineHeight: 1.5 }}>
           I own or am authorised to manage the accounts I connect, and I agree that PulseBoard may read their
-          analytics — including aggregated audience statistics about my followers — as described in the{" "}
+          analytics, including aggregated audience statistics about my followers, as described in the{" "}
           <a href="/privacy" target="_blank" rel="noreferrer">privacy policy</a> and{" "}
           <a href="/terms" target="_blank" rel="noreferrer">terms</a>. Access is read-only and I can withdraw it at any time by disconnecting.
         </span>
