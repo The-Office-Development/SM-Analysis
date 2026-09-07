@@ -38,9 +38,21 @@ as work. Migrations 0001-0012 are all applied.
    produced survived the move.
 2b. **Netlify cut off.** DONE. It was rewriting the trailing seven days hourly
    with the pre-fix arithmetic.
-3. **Story capture.** DONE, migration 0010. Still UNVERIFIED against a live
-   story: none was active while it was built, so the metric names come from the
-   API's own enumeration rather than an observed response.
+3. **Story capture.** Built, migration 0010. **NOT verified, and now with a
+   reason to doubt it.** On 2026-09-07 a story was live on @malekismaiil while
+   `/stories` returned `{"data":[]}` with HTTP 200 and
+   `x-app-usage {"call_volume":0}` — the API succeeding and reporting nothing, not
+   throttled and not erroring. `/me/media` showed no STORY entries either.
+
+   Candidates, in order of likelihood:
+   - **Close Friends stories** are widely reported as absent from this API.
+   - **Reshares of another account's post** are not the account's own media and
+     may not appear.
+   - A delay between publishing and API visibility.
+
+   Until this is understood, story capture cannot be described as working, and
+   the honest statement to a client is that stories are captured **when Instagram
+   exposes them**, which is not always. See §6c.
 4. **Per-post page.** DONE. `/content/:id` with rank, comparison against the
    typical post of that format, engagement composition, a distribution chart,
    and "Check now" for a live single-post fetch (migration 0012 rate-limits it).
