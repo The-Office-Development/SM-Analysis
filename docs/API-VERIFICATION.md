@@ -439,3 +439,44 @@ invocation, not anything about Meta:
 At an hourly cron that is four days versus eight hours. The free tier does not
 prevent a deep backfill; it decides how long a new client waits to see their own
 history, which is a product decision rather than a technical one.
+
+### 7.5 ANSWERED, and badly: OAuth tokens inherit prior grants
+
+`tasks.md` §6b asked whether a token issued by our OAuth flow can carry
+permissions beyond the two read scopes we request. Audited on 2026-09-07 against
+two live tokens, and the answer is **yes**.
+
+```
+@malekismaiil   never had a dashboard token   read-only; both write-gated calls refused
+@heath_ens21    dashboard token generated     ALLOWED: read direct messages
+                                              ALLOWED: content-publishing quota
+```
+
+Both connected through the same OAuth flow, which requests exactly
+`instagram_business_basic` and `instagram_business_manage_insights` — asserted by
+a test and guarded by a mutation. The difference is not our request. It is what
+the **account** had previously granted the app: `@heath_ens21` generated a token
+through the App Dashboard, which asks the operator to choose nothing and grants
+the app's full configured set, and a later OAuth authorisation inherited it.
+
+**The scope list in an authorisation request is a floor, not a ceiling.**
+
+**What this changes.**
+
+- "The token we receive can only read" is **true for an account connecting fresh
+  and false for one that has granted more before.** Do not say the short version.
+- The honest claim is narrower and still strong: *we request only read
+  permissions, we make only read calls, and you can see exactly what this token
+  can do — here is the audit.* Running `verify/audit-token.mjs` in front of a
+  client is the demonstration; the sentence alone is not.
+- A client who has previously used any tool that requested publishing rights may
+  hand us a broader token than we asked for, through no action of ours. That is
+  worth detecting rather than assuming.
+
+**What it does not change.** The product still makes no write calls, and the
+scopes it requests remain read-only and mutation-guarded. The exposure is that a
+token at rest may be more powerful than the request implies, which raises the
+cost of a breach rather than changing what the software does.
+
+**Remediation for `@heath_ens21`:** revoke the excess at Instagram → Settings →
+Apps and websites, then re-authorise, and re-run the audit to confirm.
