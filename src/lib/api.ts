@@ -318,3 +318,23 @@ export function engagementRate(rows: MetricPoint[], scope: Scope): number {
   const reach = s.reduce((a, r) => a + (r.reach ?? 0), 0);
   return reach ? (eng / reach) * 100 : 0;
 }
+
+/**
+ * Refresh one post's numbers from the platform, now.
+ *
+ * Separate from the sync on purpose: the sync costs about five calls per day of
+ * history and can never be live, while a single post is one call. The question
+ * this serves has a deadline measured in hours.
+ */
+export async function refreshPost(id: string): Promise<Partial<ContentItem> & { refreshed_at: string }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not signed in.");
+  const res = await fetch("/api/refresh-post", {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ id }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message ?? "Could not refresh that post.");
+  return body;
+}

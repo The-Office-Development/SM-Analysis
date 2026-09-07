@@ -7,6 +7,7 @@ import { PlatformBadge } from "../components/PlatformTile";
 import RequireData from "../components/RequireData";
 import DistributionStrip from "../components/charts/DistributionStrip";
 import { useState } from "react";
+import { refreshPost } from "../lib/api";
 import type { ContentItem } from "../lib/types";
 
 /**
@@ -46,6 +47,9 @@ function PostDetailInner() {
   // position. The post can arrive late while data is still loading, which is
   // exactly when the count would change.
   const [stripKey, setStripKey] = useState<typeof METRICS[number]["key"]>("views");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
+  const [fresh, setFresh] = useState<Partial<ContentItem> | null>(null);
 
   if (!post) {
     return (
@@ -62,13 +66,16 @@ function PostDetailInner() {
     );
   }
 
+  // Freshly fetched numbers win over the stored ones for this render, so the
+  // page reflects the refresh without waiting for a full reload of the dashboard.
+  const view = fresh ? ({ ...post, ...fresh } as typeof post) : post;
   const hours = ageHours(post.published_at);
   const young = tooEarly(post.published_at);
-  const engagement = sumKnown(post.likes, post.comments, post.shares, post.saves);
+  const engagement = sumKnown(view.likes, view.comments, view.shares, view.saves);
   // A rate needs a denominator that exists. Reach of null gives no rate at all
   // rather than a rate computed against a fabricated zero.
-  const engRate = engagement !== null && post.reach !== null && post.reach > 0
-    ? (engagement / post.reach) * 100 : null;
+  const engRate = engagement !== null && view.reach !== null && view.reach > 0
+    ? (engagement / view.reach) * 100 : null;
 
   return (
     <div className="stack" style={{ gap: 16 }}>
@@ -86,10 +93,32 @@ function PostDetailInner() {
                 Open on {PLATFORMS[post.platform].name} ↗
               </a>
             )}
+            <button type="button" className="btn btn--sm" disabled={refreshing}
+              style={{ marginLeft: "auto" }}
+              onClick={async () => {
+                setRefreshing(true); setRefreshMsg(null);
+                try {
+                  const r = await refreshPost(post.id);
+                  // refreshed_at is metadata about the fetch, not a column on the post.
+                  const { refreshed_at: _t, ...metrics } = r;
+                  setFresh(metrics);
+                  setRefreshMsg(`Updated just now, ${new Date(r.refreshed_at).toLocaleTimeString()}`);
+                } catch (e) {
+                  setRefreshMsg(e instanceof Error ? e.message : "Could not refresh.");
+                } finally { setRefreshing(false); }
+              }}>
+              {refreshing ? "Checking..." : "Check now"}
+            </button>
           </div>
           <h2 style={{ margin: 0, fontSize: 19, lineHeight: 1.35 }}>
             {post.title || "Untitled"}
           </h2>
+          {refreshMsg && (
+            <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+              {refreshMsg}
+              {fresh && " Instagram keeps counting for days, so these will still move."}
+            </p>
+          )}
 
           {young && (
             <p className="muted" style={{ margin: 0, fontSize: 12.5, padding: "8px 10px",
@@ -110,9 +139,9 @@ function PostDetailInner() {
         <div className="panel__body">
           <div className="bars">
             {METRICS.map((m) => {
-              const value = post[m.key];
-              const ctx = postContext(post, dash.content, m.key);
-              const rk = postRank(post, dash.content, m.key);
+              const value = view[m.key];
+              const ctx = postContext(view, dash.content, m.key);
+              const rk = postRank(view, dash.content, m.key);
               /*
                * The bar is drawn against the account's BEST post, so the length
                * means "how close to your ceiling", and a tick marks the median
@@ -211,7 +240,7 @@ function PostDetailInner() {
       })()}
 
       {(() => {
-        const split = engagementSplit(post);
+        const split = engagementSplit(view);
         if (!split.total || split.total <= 0) return null;
         const COLORS = ["var(--brand, #4f7cff)", "var(--ok, #2f9e6e)", "#c084fc", "#f59e0b"];
         return (
@@ -257,8 +286,8 @@ function PostDetailInner() {
             <Derived label="Total interactions" value={engagement === null ? null : full(engagement)}
                      why="Likes, comments, shares and saves added together." />
             <Derived label="Shares per 1k reach"
-                     value={post.shares !== null && post.reach !== null && post.reach > 0
-                       ? ((post.shares / post.reach) * 1000).toFixed(1) : null}
+                     value={view.shares !== null && view.reach !== null && view.reach > 0
+                       ? ((view.shares / view.reach) * 1000).toFixed(1) : null}
                      why="How often it got passed on, for every thousand people who saw it." />
           </div>
         </div>

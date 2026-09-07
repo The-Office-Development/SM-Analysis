@@ -30,6 +30,7 @@ import { handler as oauthMeta } from "../../netlify/functions/oauth-meta";
 import { handler as oauthMetaCallback } from "../../netlify/functions/oauth-meta-callback";
 import { handler as oauthTiktok } from "../../netlify/functions/oauth-tiktok";
 import { handler as oauthTiktokCallback } from "../../netlify/functions/oauth-tiktok-callback";
+import { handler as refreshPost } from "../../netlify/functions/refresh-post";
 import { handler as share } from "../../netlify/functions/share";
 import { handler as sync } from "../../netlify/functions/sync";
 
@@ -46,6 +47,7 @@ const ROUTES: Record<string, NetlifyHandler> = {
   "oauth-meta-callback": oauthMetaCallback as NetlifyHandler,
   "oauth-tiktok": oauthTiktok as NetlifyHandler,
   "oauth-tiktok-callback": oauthTiktokCallback as NetlifyHandler,
+  "refresh-post": refreshPost as NetlifyHandler,
   "share": share as NetlifyHandler,
   "sync": sync as NetlifyHandler,
 };
