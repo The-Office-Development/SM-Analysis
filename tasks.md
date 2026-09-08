@@ -44,11 +44,26 @@ as work. Migrations 0001-0012 are all applied.
    `x-app-usage {"call_volume":0}` — the API succeeding and reporting nothing, not
    throttled and not erroring. `/me/media` showed no STORY entries either.
 
-   Candidates, in order of likelihood:
-   - **Close Friends stories** are widely reported as absent from this API.
-   - **Reshares of another account's post** are not the account's own media and
-     may not appear.
-   - A delay between publishing and API visibility.
+   **2026-09-08, second data point.** Two different accounts — @malekismaiil and
+   @heath_ens21 — each had a live story that was a RESHARE of the same feed post.
+   Both returned `{"data":[]}`. Two independent accounts behaving identically
+   makes the reshare explanation much the strongest:
+
+   > **Working conclusion: `/stories` returns the account's OWN media. A post
+   > reshared to a story is someone else's media and does not appear.**
+
+   Consistent with the one earlier observation where the edge DID return a story,
+   and with `/me` reporting `media_count: 10` and no STORY entries.
+
+   **Still unconfirmed**, because the control has never been run: a plain,
+   original story — a photo or text card the account holder made themselves —
+   has not been tested. Until it is, "reshares are excluded" is the best
+   explanation rather than a demonstrated fact.
+
+   **If it holds, it is a real product limitation and not a small one.** Creators
+   reshare constantly: brand tags, collaborations, sponsor posts. A sponsor
+   asking "how did my campaign story perform?" is asking about exactly the
+   category that would be invisible.
 
    Until this is understood, story capture cannot be described as working, and
    the honest statement to a client is that stories are captured **when Instagram
