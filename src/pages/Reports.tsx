@@ -2,12 +2,12 @@ import { Link } from "react-router-dom";
 import { useMemo } from "react";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
-import { exportCsv, exportXlsx } from "../lib/reports";
+import ExportMenu from "../components/ExportMenu";
 import { buildSnapshot } from "../lib/snapshot";
 import EmptyState from "../components/EmptyState";
 import ReportSheet from "../components/ReportSheet";
 import ShareButton from "../components/ShareButton";
-import { IcPlug, IcDownload, IcFile } from "../lib/icons";
+import { IcPlug } from "../lib/icons";
 import type { Platform } from "../lib/types";
 
 export default function Reports() {
@@ -36,15 +36,7 @@ export default function Reports() {
         </div>
         <div className="row" style={{ gap: 8 }}>
           <ShareButton snap={snap} />
-          {/*
-            * The workbook comes first and is the primary button. CSV stays for
-            * anything that has to be machine-read, but it is not the file to
-            * hand to a sponsor: it can carry no heading, no column width and no
-            * second sheet, so it always arrives looking like a database dump.
-            */}
-          <button className="btn btn--sm btn--primary" onClick={() => exportXlsx(dash)}><IcDownload style={{ width: 15, height: 15 }} /> Excel report</button>
-          <button className="btn btn--sm" onClick={() => exportCsv(dash)}><IcDownload style={{ width: 15, height: 15 }} /> CSV</button>
-          <button className="btn btn--sm btn--primary" onClick={() => window.print()}><IcFile style={{ width: 15, height: 15 }} /> Print / Save PDF</button>
+          <ExportMenu dash={dash} />
         </div>
       </div>
 

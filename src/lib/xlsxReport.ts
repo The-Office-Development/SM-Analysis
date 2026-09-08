@@ -5,6 +5,7 @@ import {
   publishTiming, followerCost, reachMultiples, reachConcentration,
 } from "./insights";
 import type { CsvInput } from "./csvReport";
+import { reportIdentity, footerLine, PROVENANCE_NOTE, ammanStamp, BRAND, accountLabel } from "./reportMeta";
 
 /**
  * The export as a real workbook.
@@ -24,12 +25,7 @@ import type { CsvInput } from "./csvReport";
  * never text; captions are escaped; the file states its own provenance.
  */
 
-const AMMAN_OFFSET_MIN = 180;
-function localStamp(iso: string): string {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return "";
-  return new Date(ms + AMMAN_OFFSET_MIN * 60_000).toISOString().replace("T", " ").slice(0, 16);
-}
+const localStamp = ammanStamp;
 
 /** A number, or an empty cell when the platform never reported it. */
 const n = (v: number | null | undefined): number | null =>
@@ -43,6 +39,75 @@ const title = (text: string): Row => [{ v: text, s: S.TITLE }];
 const section = (text: string): Row => [{ v: text, s: S.SECTION }];
 const header = (...cells: string[]): Row => cells.map((c) => ({ v: c, s: S.HEADER }));
 const note = (text: string): Row => [{ v: text, s: S.NOTE }];
+const footer = (text: string): Row => [{ v: text, s: S.FOOTER }];
+
+/**
+ * Rough height for a paragraph merged across the sheet.
+ *
+ * A merged cell gets no autofit from any reader, so an unstated height clips the
+ * text to a single line — which is how the provenance note ended up as an
+ * unreadable sliver. This over-estimates slightly; whitespace under a paragraph
+ * costs nothing, and a truncated sentence about what a blank cell means costs
+ * the client an argument with their sponsor.
+ */
+const paragraphHeight = (text: string, charsPerLine: number): number =>
+  Math.max(16, Math.ceil(text.length / Math.max(20, charsPerLine)) * 13 + 6);
+
+/**
+ * A sheet, assembled with the parts every sheet must carry.
+ *
+ * Each one opens with the same identifying band and closes with the same
+ * footer, because a reader may be sent one tab, print one tab, or paste one tab
+ * into a deck. A page that cannot say whose account it describes, over what
+ * window, produced by what, is not a document a sponsor can act on.
+ */
+function compose(o: {
+  name: string; cols: number[]; heading: string; id: ReturnType<typeof reportIdentity>;
+  body: Row[]; freeze?: number;
+}): Sheet {
+  const width = o.cols.length;
+  const span = (r: number) => `A${r}:${String.fromCharCode(64 + width)}${r}`;
+  const rows: Row[] = [];
+  const merges: string[] = [];
+  const heights: Record<number, number> = {};
+
+  rows.push(title(o.heading));
+  merges.push(span(rows.length));
+  heights[rows.length - 1] = 26;
+
+  rows.push([{ v: `${o.id.account} · ${o.id.scopeLabel} · ${o.id.rangeLabel} · generated ${o.id.generated}`, s: S.SUBTLE }]);
+  merges.push(span(rows.length));
+  rows.push([]);
+
+  const bodyStart = rows.length;
+  for (const r of o.body) rows.push(r);
+
+  // Merge and size every band and paragraph in the body, so callers describe
+  // content and never geometry.
+  o.body.forEach((r, i) => {
+    const c = r[0];
+    if (c === null || typeof c !== "object" || c.s === undefined) return;
+    const rowNumber = bodyStart + i + 1;
+    if (c.s === S.SECTION || c.s === S.TITLE) {
+      merges.push(span(rowNumber));
+      heights[rowNumber - 1] = 22;
+    } else if ((c.s === S.NOTE || c.s === S.FOOTER) && r.length === 1) {
+      merges.push(span(rowNumber));
+      heights[rowNumber - 1] = paragraphHeight(String(c.v ?? ""), o.cols.reduce((a, b) => a + b, 0));
+    }
+  });
+
+  rows.push([]);
+  rows.push(footer(footerLine(o.id)));
+  merges.push(span(rows.length));
+  heights[rows.length - 1] = 20;
+
+  return {
+    name: o.name, cols: o.cols, rows, merges, heights,
+    // +2 for the identity band above the caller's own header row.
+    freeze: o.freeze ? o.freeze + bodyStart : undefined,
+  };
+}
 
 export function buildWorkbook(input: CsvInput): Uint8Array {
   const scopeLabel = input.scope === "all" ? "All platforms" : input.platformName(input.scope);
@@ -51,8 +116,7 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
   const metrics = input.metrics.filter((m) => inScope(m.platform));
   const content = input.content.filter((c) => inScope(c.platform));
 
-  const account = input.accounts
-    .map((a) => a.username || a.display_name || "").filter(Boolean).join(" / ") || "—";
+  const account = accountLabel(input.accounts);
 
   const sumOf = (k: "reach" | "views" | "engagements" | "follows" | "unfollows"
                     | "reach_followers" | "reach_non_followers") => {
@@ -81,22 +145,21 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
   const conc = reachConcentration(content);
   const multipleById = new Map(multiples.map((m) => [m.id, m]));
 
+  const id = reportIdentity({ account, scopeLabel, range: input.range });
+
   /* ---- 1. Summary ------------------------------------------------------- */
   const summary: Row[] = [
-    title("PulseBoard report"),
-    [],
-    [{ v: "Account", s: S.BOLD }, account],
-    [{ v: "Scope", s: S.BOLD }, scopeLabel],
-    [{ v: "Window", s: S.BOLD }, `Last ${input.range} days`],
-    [{ v: "Generated", s: S.BOLD }, localStamp(new Date().toISOString())],
-    [{ v: "Times", s: S.BOLD }, "Asia/Amman (UTC+3, no daylight saving)"],
-    [{ v: "Source", s: S.BOLD }, "Instagram's official API, read only"],
+    section("About this report"),
+    [{ v: "Account", s: S.BOLD }, id.account],
+    [{ v: "Scope", s: S.BOLD }, id.scopeLabel],
+    [{ v: "Window", s: S.BOLD }, id.rangeLabel],
+    [{ v: "Generated", s: S.BOLD }, id.generated],
+    [{ v: "Times", s: S.BOLD }, id.timezone],
+    [{ v: "Source", s: S.BOLD }, id.source],
     [],
     // Stated in the file itself, because this page is read without the app
     // around it and often by the sponsor, holding a screenshot for comparison.
-    note("Daily figures come from Instagram's data feed. The Instagram app computes its own daily "
-      + "numbers a slightly different way, so a single day can differ. Over a month the totals "
-      + "agree closely. An empty cell means Instagram did not report that figure. It does not mean zero."),
+    note(PROVENANCE_NOTE),
     [],
     section("Headline"),
     header("Metric", "Value", "Notes"),
@@ -124,8 +187,6 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
 
   /* ---- 2. Beyond Instagram --------------------------------------------- */
   const analysis: Row[] = [
-    title("Beyond the platform's own figures"),
-    [],
     note("None of this appears in the Instagram app. Each one needs history kept over time, "
       + "which is what the app does not do. Where too little has been published to say anything, "
       + "the section says so rather than estimating."),
@@ -267,8 +328,6 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
 
   /* ---- 5. Notes --------------------------------------------------------- */
   const notes: Row[] = [
-    title("What these mean"),
-    [],
     header("Term", "Definition"),
     ["Empty cell", "Instagram did not report that figure. It does not mean zero."],
     ["Reach", "Distinct accounts that saw the post, or saw the account that day."],
@@ -286,11 +345,16 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
   ];
 
   const sheets: Sheet[] = [
-    { name: "Summary", cols: [34, 16, 52], rows: summary, freeze: 1, merges: ["A1:C1"] },
-    { name: "Beyond Instagram", cols: [46, 22, 16, 16, 60], rows: analysis, merges: ["A1:E1"] },
-    { name: "Daily", cols: [12, 12, 12, 12, 12, 14, 10, 10, 20, 24, 13], rows: daily, freeze: 1 },
-    { name: "Posts", cols: [42, 11, 11, 17, 12, 12, 11, 11, 10, 10, 13, 15, 18, 34, 17], rows: posts, freeze: 1 },
-    { name: "Notes", cols: [28, 78], rows: notes, merges: ["A1:B1"] },
+    compose({ name: "Summary", heading: `${BRAND.product} report`, id,
+              cols: [34, 18, 54], body: summary }),
+    compose({ name: "Beyond Instagram", heading: "Beyond the platform's own figures", id,
+              cols: [46, 24, 16, 16, 58], body: analysis }),
+    compose({ name: "Daily", heading: "Every day, as recorded", id,
+              cols: [12, 12, 13, 13, 13, 14, 11, 11, 21, 25, 13], body: daily, freeze: 1 }),
+    compose({ name: "Posts", heading: "Every post, with what was worked out from it", id,
+              cols: [44, 12, 12, 18, 13, 13, 11, 12, 10, 10, 14, 16, 19, 36, 18],
+              body: posts, freeze: 1 }),
+    compose({ name: "Notes", heading: "What these mean", id, cols: [30, 76], body: notes }),
   ];
 
   return buildXlsx(sheets);

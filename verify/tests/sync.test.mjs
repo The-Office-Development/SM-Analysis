@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { syncAccount, dayKeyFromEndTime, syncStart, syncWindow, seriesFrom, rotatingWindow } from "../build/_sync.js";
+import { syncAccount, dayKeyFromEndTime, syncStart, syncWindow, backfillTurn, seriesFrom, rotatingWindow } from "../build/_sync.js";
 import { makeDb } from "./fake-supabase.mjs";
 import { installGraphMock, trueValue, trueNetFollows, addDays } from "./mock-graph.mjs";
 
@@ -283,18 +283,72 @@ test("a backfilling account still refreshes its recent days", () => {
    */
   const t = TODAY;
   const latest = t;                        // recent data exists
-  const earliest = addDays(t, -20);        // but history has not reached the floor
-  const TICK = 15 * 60 * 1000;
 
+  /*
+   * Walked by DATA, not by clock.
+   *
+   * The turn used to come from `Math.floor(now / 15min) % 4`, so this test drove
+   * it by passing successive ticks. That made the whole suite a function of the
+   * wall clock: six syncs inside one quarter-hour all computed the identical
+   * window, and the sync tests failed for fifteen minutes in every hour. It also
+   * meant a client pressing Sync repeatedly during onboarding repeated the same
+   * work every time. The turn now advances with how much history is left, so
+   * this walks the backfill the way a real one progresses.
+   */
+  let earliest = addDays(t, -25);          // history has not reached the floor yet
   let backfilled = 0, refreshedPresent = 0;
   for (let i = 0; i < 8; i++) {
-    const w = syncWindow(latest, earliest, i * TICK);
-    if (w.end === t) refreshedPresent++; else backfilled++;
+    const w = syncWindow(latest, earliest);
+    if (w.end === t) refreshedPresent++;
+    else { backfilled++; earliest = w.start; }
   }
 
   assert.ok(backfilled > 0, "it must still make progress on history");
   assert.ok(refreshedPresent > 0,
     "a backfilling account must still refresh today; otherwise the dashboard freezes for the length of the dig");
+});
+
+test("repeated syncs in the same minute each make progress", () => {
+  /*
+   * The defect this guards, which was a client-facing one and not only a test
+   * artifact: the backfill turn was a pure function of the wall clock, and the
+   * Sync button throttles at two minutes against a fifteen-minute tick. So a
+   * client watching a backfill crawl could press Sync seven times and every
+   * press would recompute the identical window and fetch exactly what the last
+   * one fetched. Onboarding is precisely when somebody presses it repeatedly.
+   */
+  const t = TODAY;
+  let earliest = addDays(t, -25);
+  const seen = new Set();
+  for (let i = 0; i < 4; i++) {
+    // The same instant every time. Only the stored data moves.
+    const w = syncWindow(t, earliest, 1_700_000_000_000);
+    seen.add(`${w.start}..${w.end}`);
+    if (w.end !== t) earliest = w.start;
+  }
+  assert.ok(seen.size > 1,
+    "presses at the same instant produced one window every time; the client would be pressing Sync for nothing");
+});
+
+test("a deep backfill still gives one run in four to the present", () => {
+  /*
+   * The reason the branch exists at all. Meta allows two years, and a dig that
+   * long used to return unconditionally, so a client's current numbers stood
+   * still for days while it worked. The rhythm is three runs digging, one on the
+   * present, and it must come from how much history is left rather than from the
+   * clock, or two runs in the same quarter-hour make the same decision.
+   */
+  const budget = 10;
+  const turns = [];
+  // Walk inwards the way a real dig does: one budget closer to the floor a run.
+  for (let daysLeft = 400; daysLeft > 0; daysLeft -= budget) {
+    turns.push(backfillTurn(addDays(TODAY, -(400 - daysLeft) - 1), addDays(TODAY, -401), budget));
+  }
+  const present = turns.filter((x) => x === 3).length;
+  assert.ok(present > 0, "a deep dig must reach the present at some point");
+  const ratio = present / turns.length;
+  assert.ok(ratio > 0.15 && ratio < 0.35,
+    `expected roughly one run in four on the present, got ${present} of ${turns.length}`);
 });
 
 test("the trailing window rotates, so every day is refreshed across runs", () => {

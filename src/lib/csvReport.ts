@@ -2,6 +2,7 @@ import { escapeCsvField as esc } from "./csv";
 import { sumKnown } from "./format";
 import { publishTiming, followerCost, reachConcentration, reachMultiples } from "./insights";
 import type { MetricPoint, ContentItem, Platform, Range, Scope } from "./types";
+import { reportIdentity, footerLine, PROVENANCE_NOTE, ammanStamp, accountLabel } from "./reportMeta";
 
 /**
  * Everything the export needs, and nothing that needs a browser.
@@ -55,12 +56,7 @@ const rate = (v: number | null | undefined, dp = 2): string =>
  * UTC would put evening posts on the wrong date and disagree with the dashboard
  * it came from.
  */
-const AMMAN_OFFSET_MIN = 180;
-function localStamp(iso: string): string {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return "";
-  return new Date(ms + AMMAN_OFFSET_MIN * 60_000).toISOString().replace("T", " ").slice(0, 16);
-}
+const localStamp = ammanStamp;
 
 /** Build a CSV of the current dashboard scope and window from real synced data. */
 export function buildCsv(dash: CsvInput): string {
@@ -75,20 +71,20 @@ export function buildCsv(dash: CsvInput): string {
   const section = (t: string) => { blank(); line(esc(t)); };
 
   /* ---- what this file is ------------------------------------------------ */
-  line(esc("PulseBoard export"));
-  line(esc("Account"), esc(dash.accounts.map((a) => a.username || a.display_name || "").filter(Boolean).join(" / ") || "—"));
-  line(esc("Scope"), esc(scopeLabel));
-  line(esc("Window"), esc(`Last ${dash.range} days`));
-  line(esc("Generated"), esc(localStamp(new Date().toISOString())));
-  line(esc("Times"), esc("Asia/Amman (UTC+3, no daylight saving)"));
-  line(esc("Source"), esc("Instagram's official API, read only"));
+  const id = reportIdentity({
+    account: accountLabel(dash.accounts),
+    scopeLabel, range: dash.range,
+  });
+  line(esc("PulseBoard report"));
+  line(esc("Account"), esc(id.account));
+  line(esc("Scope"), esc(id.scopeLabel));
+  line(esc("Window"), esc(id.rangeLabel));
+  line(esc("Generated"), esc(id.generated));
+  line(esc("Times"), esc(id.timezone));
+  line(esc("Source"), esc(id.source));
   // Said here as well as in the interface, because this file is read on its own
   // and the person reading it may be the sponsor, comparing against a screenshot.
-  line(esc("Note"), esc(
-    "Daily figures come from Instagram's data feed. The Instagram app computes its "
-    + "own daily numbers a slightly different way, so a single day can differ. Over a "
-    + "month the totals agree closely. Blank means Instagram did not report that "
-    + "figure — it does not mean zero."));
+  line(esc("Note"), esc(PROVENANCE_NOTE));
 
   /* ---- the headline ----------------------------------------------------- */
   const sumOf = (k: "reach" | "views" | "engagements" | "follows" | "unfollows"
@@ -233,6 +229,17 @@ export function buildCsv(dash: CsvInput): string {
   d("Reach from non-followers", "People reached who did not already follow the account. This is the part a sponsor is paying for.");
   d("Still settling", "Instagram was still counting that day when it was read, so the figure will rise.");
   d("Figures read", "When these numbers were last taken from Instagram.");
+
+  /*
+   * The same footer the workbook and the printed page carry.
+   *
+   * A CSV is the format most likely to be opened far from where it came from, so
+   * it is the one that most needs to say what produced it. It is also the only
+   * marketing this product gets: a sponsor reading it has never heard of
+   * PulseBoard and no other way to find it.
+   */
+  blank();
+  line(esc(footerLine(id)));
 
   /*
    * CRLF and a byte-order mark.

@@ -83,9 +83,27 @@ const mutations = [
   { name: "day loop walks oldest-first, so truncation loses the newest days", file: SYNC,
     find: "const date = dates[dates.length - 1 - n];",
     replace: "const date = dates[n];" },
+  /*
+   * Expressed against backfillTurn rather than against the branch, because at the
+   * default 30-day floor a dig finishes in two runs and deleting the guard
+   * changes nothing observable. It is the deep backfill the guard protects —
+   * Meta allows two years — so the defect is only visible where the turn is
+   * computed. Returning a constant that is never 3 is exactly "never yield".
+   */
   { name: "backfill never yields, so recent days freeze for the whole dig", file: SYNC,
-    find: "if (earliest > floor && Math.floor(now / (15 * 60 * 1000)) % 4 !== 3)",
-    replace: "if (earliest > floor)" },
+    find: "    return Math.floor(Math.max(0, days) / Math.max(1, budget)) % 4;",
+    replace: "    return 0;" },
+  /*
+   * The backfill turn taken from the wall clock again.
+   *
+   * This is the defect that was live: every run inside the same quarter-hour
+   * computed the identical window, so a client pressing Sync during onboarding
+   * repeated the previous fetch each time, and the suite itself failed for
+   * fifteen minutes in every hour.
+   */
+  { name: "backfill turn keyed on the clock, so repeated syncs repeat work", file: SYNC,
+    find: "    const days = Math.round((Date.parse(earliest) - Date.parse(floor)) / 86_400_000);\n    return Math.floor(Math.max(0, days) / Math.max(1, budget)) % 4;",
+    replace: "    return Math.floor(Date.now() / (15 * 60 * 1000)) % 4;" },
   { name: "trailing window stops rotating, so the far end is never refreshed", file: SYNC,
     find: "const from = (ticks % slices) * slice;",
     replace: "const from = 0;" },

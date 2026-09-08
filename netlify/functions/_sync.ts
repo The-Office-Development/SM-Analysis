@@ -1163,7 +1163,34 @@ const maxIso = (a: string, b: string) => (a > b ? a : b);
  * Priority: fill a recent gap, then extend history backwards, then keep the
  * trailing window settling.
  */
-export function syncWindow(latest: string | null, earliest: string | null, now = Date.now()): { start: string; end: string } {
+/**
+ * Which run of the backfill cycle this is, counted from the DATA rather than the
+ * clock.
+ *
+ * It used to be `Math.floor(now / 15min) % 4`, which is a pure function of the
+ * wall clock, so every run inside the same quarter-hour computed the identical
+ * window. Two consequences, both real:
+ *
+ *  - The Sync button throttles at two minutes while the tick is fifteen, so a
+ *    client could press it seven times during onboarding and every press would
+ *    repeat the previous one exactly. That is precisely when somebody presses it,
+ *    watching a backfill crawl.
+ *  - The test suite ran six syncs back to back and got one chunk of work, so it
+ *    failed for fifteen minutes in every hour and passed for the other
+ *    forty-five. A correctness gate that depends on what time it is is not a
+ *    gate.
+ *
+ * Each backfill run moves `earliest` back by one budget, so the remaining
+ * distance to the floor advances the counter by exactly one per run. Free (the
+ * two dates are already loaded), deterministic, and it keeps the same rhythm:
+ * three runs digging, then one spent on the present.
+ */
+export function backfillTurn(earliest: string, floor: string, budget: number): number {
+  const days = Math.round((Date.parse(earliest) - Date.parse(floor)) / 86_400_000);
+  return Math.floor(Math.max(0, days) / Math.max(1, budget)) % 4;
+}
+
+export function syncWindow(latest: string | null, earliest: string | null, _now = Date.now()): { start: string; end: string } {
   const t = today();
   const floor = addDays(t, -(MAX_BACKFILL - 1));
   const trailing = addDays(t, -(TRAILING_REFETCH - 1));
@@ -1197,7 +1224,7 @@ export function syncWindow(latest: string | null, earliest: string | null, now =
    * history that is two years old can wait fifteen minutes, and the number
    * someone is looking at right now cannot.
    */
-  if (earliest > floor && Math.floor(now / (15 * 60 * 1000)) % 4 !== 3) {
+  if (earliest > floor && backfillTurn(earliest, floor, budget) !== 3) {
     const end = earliest;
     return { start: maxIso(floor, addDays(end, -(budget - 1))), end };
   }

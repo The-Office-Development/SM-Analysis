@@ -5,6 +5,7 @@ import {
   publishTiming, followerCost, reachMultiples, reachConcentration,
 } from "./insights";
 import { PLATFORMS } from "./platforms";
+import { accountLabel } from "./reportMeta";
 import type { Platform } from "./types";
 
 type Dash = ReturnType<typeof useDash>;
@@ -17,6 +18,8 @@ type Dash = ReturnType<typeof useDash>;
 export interface ReportSnapshot {
   v: 1;
   generatedAt: string;         // ISO
+  /** Whose account this describes. A report that cannot say is not usable evidence. */
+  account?: string;
   scopeLabel: string;
   range: number;
   headline: { label: string; total: number; deltaPct: number | null }[];
@@ -82,6 +85,7 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
   return {
     v: 1,
     generatedAt: new Date().toISOString(),
+    account: accountLabel(dash.accounts),
     scopeLabel,
     range: dash.range,
     headline,

@@ -75,6 +75,27 @@ test("the file states where the numbers came from and what a blank means", () =>
   assert.ok(/Asia\/Amman/.test(csv), "and the calendar the dates are on must be stated");
 });
 
+test("the file says what produced it and when", () => {
+  // The CSV is the format most likely to be opened far from where it came from,
+  // so it is the one that most needs to identify itself. It is also the only
+  // route back to a sponsor who has never heard of this product.
+  const csv = buildCsv(input());
+  assert.ok(/Prepared with PulseBoard/.test(csv));
+  assert.ok(/The Office/.test(csv));
+  assert.ok(/Generated 20\d\d-\d\d-\d\d \d\d:\d\d/.test(csv), "the generation time must be stated");
+});
+
+test("an account named the same on two platforms is not repeated", () => {
+  // Joining unfiltered put "northwind / northwind / northwind" at the top of a
+  // report going to a sponsor. Repetition in the first line somebody reads looks
+  // like a bug, whatever the figures underneath say.
+  const csv = buildCsv(input({
+    accounts: [{ username: "northwind" }, { username: "northwind" }, { display_name: "Northwind Co" }],
+  }));
+  assert.ok(!/northwind \/ northwind/.test(csv), "duplicate account names must collapse");
+  assert.ok(/northwind \/ Northwind Co/.test(csv), "genuinely different names are still both shown");
+});
+
 test("every section a reader needs is present", () => {
   const csv = buildCsv(input());
   for (const heading of ["SUMMARY", "DAILY", "POSTS", "WHAT THESE MEAN"]) {

@@ -107,6 +107,40 @@ test("the analysis Instagram does not do has its own sheet", () => {
   }
 });
 
+test("every sheet says whose account it is and what produced it", () => {
+  // A reader may be sent one tab, print one tab, or paste one tab into a deck.
+  // A page that cannot name the account, the window or its own origin is not
+  // evidence a sponsor can act on, and the footer is the only route this product
+  // has back to a reader who has never heard of it.
+  const dir = unpack(buildWorkbook(input()));
+  for (const i of [1, 2, 3, 4, 5]) {
+    const xml = read(dir, `xl/worksheets/sheet${i}.xml`);
+    assert.ok(xml.includes("creator"), `sheet${i} does not name the account`);
+    assert.ok(xml.includes("Last 30 days"), `sheet${i} does not state the window`);
+    assert.ok(/Prepared with PulseBoard/.test(xml), `sheet${i} has no footer`);
+    assert.ok(/Generated 20/.test(xml), `sheet${i} does not say when it was made`);
+  }
+});
+
+test("a heading spans the sheet rather than colouring one cell", () => {
+  // The defect this replaced: a styled row is only as wide as its cells, so a
+  // section heading rendered as a single coloured box with bare grid beside it.
+  const dir = unpack(buildWorkbook(input()));
+  const xml = read(dir, "xl/worksheets/sheet1.xml");
+  assert.ok(/<mergeCells/.test(xml), "bands must be merged across the sheet");
+  // Summary declares three columns, so its bands run A..C.
+  assert.ok(/ref="A1:C1"/.test(xml), `title band does not span the sheet: ${xml.slice(0, 200)}`);
+});
+
+test("a wrapped paragraph is given a height, or a reader clips it to one line", () => {
+  // Merged cells are excluded from autofit everywhere, so an unstated height
+  // turns the note explaining what a blank cell means into an unreadable sliver.
+  const xml = read(unpack(buildWorkbook(input())), "xl/worksheets/sheet1.xml");
+  assert.ok(/customHeight="1"/.test(xml), "no row height was set");
+  const tall = [...xml.matchAll(/ht="(\d+)"/g)].map((m) => Number(m[1]));
+  assert.ok(tall.some((h) => h > 30), `no row is tall enough for a paragraph: ${tall}`);
+});
+
 test("a thin account gets a stated absence, never a confident ranking", () => {
   // One post cannot support a timing recommendation. The sheet must SAY so
   // rather than omit the section: an omission reads as "no pattern", a stated

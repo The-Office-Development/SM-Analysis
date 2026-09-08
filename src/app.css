@@ -93,6 +93,10 @@
 /* menu / dropdown */
 .pop{position:absolute;z-index:60;min-width:210px;background:var(--panel);border:1px solid var(--border-strong);
   border-radius:10px;padding:5px;box-shadow:var(--shadow-pop)}
+/* A row that carries a label and a line of explanation needs to grow; the fixed
+   height below is for the plain single-line menus. */
+.pop button:has(b){height:auto;min-height:40px;padding:7px 10px;align-items:flex-start}
+.pop button:has(b) svg{margin-top:2px;flex:0 0 auto}
 .pop button,.pop a{display:flex;align-items:center;gap:10px;width:100%;height:34px;padding:0 10px;border-radius:6px;
   font-size:13px;font-weight:500;color:var(--text);text-align:left}
 .pop button:hover,.pop a:hover{background:var(--hover)}
@@ -392,10 +396,49 @@
   .goalform{grid-template-columns:1fr}
 }
 
+/* The printed report is a deliverable, not a screenshot of the app.
+   It is what a client sends a sponsor, so it gets its own typography rather than
+   whatever the screen happened to be showing. */
 @media print{
-  .side,.topbar,.report__bar,.shareview__bar,.searchbtn{display:none !important}
+  .side,.topbar,.report__bar,.shareview__bar,.searchbtn,.demobar{display:none !important}
   .shell,.main,.content,.content__inner,.shareview,.shareview__body,.report{display:block !important;padding:0 !important;margin:0 !important;max-width:none !important;overflow:visible !important;background:#fff !important}
   .sheet{box-shadow:none !important;border:none !important;padding:0 !important;background:#fff !important}
+
+  /* Force the light palette by redefining the TOKENS, not just body colour.
+     Every surface in this app paints from these variables, so overriding
+     background and colour alone would leave a dark theme's pale text on white
+     paper — a client printing at night would send a sponsor a blank page, or
+     burn a cartridge on a black background. Redefined here rather than switching
+     data-theme, because the client's screen must not change while they print. */
+  :root,:root[data-theme="dark"]{
+    color-scheme:light;
+    --canvas:#fff !important; --panel:#fff !important; --panel-sunk:#f7f8fa !important;
+    --border:#dfe2e8 !important; --border-strong:#c9ccd4 !important;
+    --text:#111418 !important; --text-2:#4a505a !important; --muted:#5f6672 !important;
+    --ink:#111418 !important; --ink-contrast:#fff !important;
+    --hover:#f0f1f4 !important; --active:#e6e8ec !important;
+    --grid:rgba(17,20,24,.10) !important;
+    --shadow-sm:none !important; --shadow-md:none !important; --shadow-pop:none !important;
+    /* Series colours keep their meaning but darken enough to survive greyscale,
+       which is how most of these will actually be printed. */
+    --fb:#1f4fa8 !important; --ig:#a8410a !important; --tt:#0a6b60 !important;
+    --pos:#0c6a44 !important; --neg:#a5301f !important; --warn:#8a5200 !important;
+  }
+  html,body{background:#fff !important;color:#111418 !important}
+  .sheet table.data th{background:#f2f3f6 !important}
+
+  /* Nothing that reads as one object may be split across a page break: a table
+     whose heading is on the previous page is where a reader stops trusting a
+     document. */
+  .sheet__h,h3,h4{break-after:avoid;page-break-after:avoid}
+  table,.table-wrap,.banner,.sheet__cols>div{break-inside:avoid;page-break-inside:avoid}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  thead{display:table-header-group}
+  .sheet__foot{break-inside:avoid;page-break-inside:avoid}
+
+  /* Links print as text; a bare URL after every post title is noise on paper. */
+  a{color:inherit !important;text-decoration:none !important}
+
   @page{margin:14mm}
 }
 

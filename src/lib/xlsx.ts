@@ -118,6 +118,8 @@ export interface Sheet {
   freeze?: number;
   /** Ranges such as "A1:E1". */
   merges?: string[];
+  /** Explicit heights, by row index. Wrapped paragraphs need one. */
+  heights?: Record<number, number>;
 }
 
 /**
@@ -139,7 +141,16 @@ export const S = {
   NOTE: 7,
   MULTIPLE: 8,
   SUBTLE: 9,
+  FOOTER: 10,
 } as const;
+
+/**
+ * Styles that paint a background across the whole row.
+ *
+ * Padding a row with plain empty cells would leave a coloured box beside bare
+ * grid. These carry their fill into the padding so the band reads as a heading.
+ */
+const BAND_STYLES: ReadonlySet<number> = new Set([S.TITLE, S.SECTION, S.HEADER]);
 
 /**
  * Illegal in XML 1.0. A reader rejects the WHOLE FILE rather than the offending
@@ -166,7 +177,25 @@ function sheetXml(sheet: Sheet): string {
     ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${sheet.freeze}" topLeftCell="A${sheet.freeze + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
     : `<sheetViews><sheetView workbookViewId="0"/></sheetViews>`;
 
-  const rows = sheet.rows.map((cells, r) => {
+  /*
+   * Every row is padded to the sheet's declared width.
+   *
+   * A styled row is only as wide as its cells, so a section heading written as a
+   * single cell renders as one coloured box with bare grid to the right of it —
+   * which is exactly what it looked like. Padding with empty cells CARRYING THE
+   * SAME STYLE makes the band span the table, which is the difference between a
+   * heading and a stray highlighted cell.
+   */
+  const width = sheet.cols.length;
+  const rows = sheet.rows.map((rawCells, r) => {
+    const first = rawCells[0];
+    const bandStyle = (first !== null && typeof first === "object" && first.s !== undefined
+      && BAND_STYLES.has(first.s)) ? first.s : undefined;
+    const cells: Row = rawCells.length >= width
+      ? rawCells
+      : [...rawCells, ...Array.from({ length: width - rawCells.length },
+          () => (bandStyle === undefined ? null : { v: null, s: bandStyle }))];
+
     const body = cells.map((c, i) => {
       const cell: Cell = (c !== null && typeof c === "object") ? c : { v: c as CellValue };
       const ref = `${colName(i)}${r + 1}`;
@@ -178,7 +207,13 @@ function sheetXml(sheet: Sheet): string {
       if (typeof cell.v === "number" && Number.isFinite(cell.v)) return `<c r="${ref}"${s}><v>${cell.v}</v></c>`;
       return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${esc(String(cell.v))}</t></is></c>`;
     }).join("");
-    return `<row r="${r + 1}">${body}</row>`;
+    const h = sheet.heights?.[r];
+    // A wrapped paragraph in a merged range gets NO automatic height from any
+    // reader: merged cells are excluded from autofit, so the text is clipped to
+    // one line unless the height is stated. That is what turned the provenance
+    // note into an unreadable sliver.
+    const ht = h ? ` ht="${h}" customHeight="1"` : "";
+    return `<row r="${r + 1}"${ht}>${body}</row>`;
   }).join("");
 
   const merges = sheet.merges?.length
@@ -219,12 +254,13 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   <fill><patternFill patternType="solid"><fgColor rgb="FF4F7CFF"/><bgColor indexed="64"/></patternFill></fill>
   <fill><patternFill patternType="solid"><fgColor rgb="FFEFF1F5"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
-<borders count="2">
+<borders count="3">
   <border><left/><right/><top/><bottom/><diagonal/></border>
   <border><left/><right/><top/><bottom style="thin"><color rgb="FFC9CCD4"/></bottom><diagonal/></border>
+  <border><left/><right/><top style="thin"><color rgb="FFC9CCD4"/></top><bottom/><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="10">
+<cellXfs count="11">
   <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
   <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
   <xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf>
@@ -235,6 +271,7 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   <xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
   <xf numFmtId="166" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>
   <xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+  <xf numFmtId="0" fontId="4" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
 </cellXfs>
 </styleSheet>`;
 
