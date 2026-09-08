@@ -65,6 +65,34 @@ as work. Migrations 0001-0012 are all applied.
    asking "how did my campaign story perform?" is asking about exactly the
    category that would be invisible.
 
+   ### UNFINISHED — carried into the drinkat pilot
+
+   As of 2026-09-08, **zero stories have ever been captured**. The code path is
+   built and no longer competes for budget (stories are fetched first in a run,
+   before the day metrics), but Instagram has not yet handed us a single story,
+   so nothing about it has been exercised end to end.
+
+   Deliberately left to the pilot rather than forced now: a month of a real
+   creator's output is a better experiment than anything that can be staged. He
+   will post original stories, reshares, and sponsor content, and every sync
+   already logs `sync.stories_checked` with a count — so the evidence collects
+   itself.
+
+   **What to watch during the pilot, and what each outcome means:**
+
+   - **A count above zero at any point** — capture works. Check what kind of
+     story it was, because that identifies the boundary.
+   - **Always zero, while he is visibly posting stories** — the API does not
+     expose them to us at all, and the feature must be withdrawn from the pitch
+     rather than quietly under-delivering.
+   - **Non-zero for original stories, zero for reshares** — confirms the
+     hypothesis. Document it plainly: sponsor and collaboration stories, which
+     are usually reshares, cannot be measured.
+
+   **Do not describe stories as a working feature to a client until one has been
+   captured.** Unlike every other gap here, this one loses data permanently while
+   it goes unnoticed: a story and its insights are gone in 24 hours.
+
    Until this is understood, story capture cannot be described as working, and
    the honest statement to a client is that stories are captured **when Instagram
    exposes them**, which is not always. See §6c.
