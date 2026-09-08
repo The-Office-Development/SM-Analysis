@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { syncAccount, dayKeyFromEndTime, syncStart, seriesFrom } from "../build/_sync.js";
+import { syncAccount, dayKeyFromEndTime, syncStart, seriesFrom, rotatingWindow } from "../build/_sync.js";
 import { makeDb } from "./fake-supabase.mjs";
 import { installGraphMock, trueValue, trueNetFollows, addDays } from "./mock-graph.mjs";
 
@@ -271,6 +271,33 @@ test("a run stops at its call budget, and still saves what it fetched", async ()
   // And it still got to its writes, which is the whole point of stopping early.
   const rows = db._rows("metrics_daily");
   assert.ok(rows.length > 0, "the run wrote rows despite running out of budget");
+});
+
+test("the trailing window rotates, so every day is refreshed across runs", () => {
+  /*
+   * Every run re-fetching the same window in the same order meant a run that
+   * stopped early always stopped in the same place, and the far end of the
+   * window was never reached at all. Rotation is what lets a run be small
+   * enough to finish while still covering everything over time.
+   */
+  const week = ["2026-09-01","2026-09-02","2026-09-03","2026-09-04","2026-09-05","2026-09-06","2026-09-07"];
+  const TICK = 15 * 60 * 1000;
+  const seen = new Set();
+
+  for (let i = 0; i < 12; i++) {
+    const picked = rotatingWindow(week, 2, 2, i * TICK);
+    assert.ok(picked.length <= 4, `a run must stay small; got ${picked.length}`);
+    // The two newest are non-negotiable: they are what a client looks at and
+    // the only days still changing.
+    assert.ok(picked.includes("2026-09-06") && picked.includes("2026-09-07"),
+      `the newest days must be in every run, got ${picked.join(",")}`);
+    picked.forEach((d) => seen.add(d));
+  }
+
+  // And across a handful of runs, nothing is left behind.
+  for (const d of week) {
+    assert.ok(seen.has(d), `${d} was never refreshed by any run`);
+  }
 });
 
 test("a truncated run keeps the NEWEST days, not the oldest", async () => {

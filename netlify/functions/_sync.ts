@@ -546,7 +546,14 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
     { account: acc.id },
   );
 
-  const dates = enumerateDays(start, end);
+  const allDates = enumerateDays(start, end);
+  /*
+   * Refresh the newest two days every run, and rotate through the rest of the
+   * trailing window a slice at a time. A run no longer has to be big enough to
+   * cover everything — which is what kept pushing it past the host's
+   * per-invocation subrequest cap and costing it the writes at the end.
+   */
+  const dates = rotatingWindow(allDates, 2, Math.max(1, DAY_BUDGET - 2));
   const since = String(unixSec(dates[0])), until = String(unixSec(addDays(dates[dates.length - 1], 1)));
 
   // Each metric is requested SEPARATELY. Bundling them meant one removed metric
@@ -721,7 +728,14 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
     { account: acc.id },
   );
 
-  const dates = enumerateDays(start, end);
+  const allDates = enumerateDays(start, end);
+  /*
+   * Refresh the newest two days every run, and rotate through the rest of the
+   * trailing window a slice at a time. A run no longer has to be big enough to
+   * cover everything — which is what kept pushing it past the host's
+   * per-invocation subrequest cap and costing it the writes at the end.
+   */
+  const dates = rotatingWindow(allDates, 2, Math.max(1, DAY_BUDGET - 2));
   const since = String(unixSec(dates[0])), until = String(unixSec(addDays(dates[dates.length - 1], 1)));
 
   // `reach` is the only account metric with a time_series form: one call, all days.
@@ -1073,6 +1087,38 @@ export function enumerateDays(startIso: string, endIso: string): string[] {
 }
 
 /** First day to fetch: always covers a trailing window, plus any gap, capped. */
+/**
+ * Which slice of the trailing window this run refreshes.
+ *
+ * Every run used to re-fetch the whole trailing window in the same order, so a
+ * run that stopped early always stopped in the same place — days six and seven
+ * were never reached, indefinitely. Making runs smaller does not fix that on its
+ * own; smaller trucks still have to carry different loads.
+ *
+ * So the window rotates. The newest days are ALWAYS refreshed, because they are
+ * the ones still changing and the ones a client looks at. The older days of the
+ * trailing window take turns, a slice per run, chosen from the clock rather than
+ * from stored state — no cursor column, nothing to get out of step, and any run
+ * that fails simply cedes its slice to the next one.
+ *
+ * At a 15-minute cadence with a slice of two, every day of a seven-day window is
+ * refreshed within about half an hour, and no single run has to be big enough to
+ * do all of them.
+ */
+export function rotatingWindow(dates: string[], alwaysNewest: number, slice: number, now = Date.now()): string[] {
+  if (dates.length <= alwaysNewest + slice) return dates;
+
+  const newest = dates.slice(dates.length - alwaysNewest);
+  const older = dates.slice(0, dates.length - alwaysNewest);
+
+  // A tick per 15 minutes, so consecutive runs take consecutive slices.
+  const ticks = Math.floor(now / (15 * 60 * 1000));
+  const slices = Math.ceil(older.length / slice);
+  const from = (ticks % slices) * slice;
+
+  return [...older.slice(from, from + slice), ...newest].sort();
+}
+
 export function syncStart(latest: string | null): string {
   const t = today();
   const earliest = addDays(t, -(MAX_BACKFILL - 1));
