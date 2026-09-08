@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { syncAccount, dayKeyFromEndTime, syncStart, seriesFrom, rotatingWindow } from "../build/_sync.js";
+import { syncAccount, dayKeyFromEndTime, syncStart, syncWindow, seriesFrom, rotatingWindow } from "../build/_sync.js";
 import { makeDb } from "./fake-supabase.mjs";
 import { installGraphMock, trueValue, trueNetFollows, addDays } from "./mock-graph.mjs";
 
@@ -271,6 +271,30 @@ test("a run stops at its call budget, and still saves what it fetched", async ()
   // And it still got to its writes, which is the whole point of stopping early.
   const rows = db._rows("metrics_daily");
   assert.ok(rows.length > 0, "the run wrote rows despite running out of budget");
+});
+
+test("a backfilling account still refreshes its recent days", () => {
+  /*
+   * The backfill branch used to return unconditionally, so an account still
+   * digging through history never reached the trailing refresh at all. Over a
+   * 30-day backfill that is hours of a client's current numbers standing still;
+   * over the two years Meta allows it would be days, which is what made a deep
+   * backfill unusable rather than merely slow.
+   */
+  const t = TODAY;
+  const latest = t;                        // recent data exists
+  const earliest = addDays(t, -20);        // but history has not reached the floor
+  const TICK = 15 * 60 * 1000;
+
+  let backfilled = 0, refreshedPresent = 0;
+  for (let i = 0; i < 8; i++) {
+    const w = syncWindow(latest, earliest, i * TICK);
+    if (w.end === t) refreshedPresent++; else backfilled++;
+  }
+
+  assert.ok(backfilled > 0, "it must still make progress on history");
+  assert.ok(refreshedPresent > 0,
+    "a backfilling account must still refresh today; otherwise the dashboard freezes for the length of the dig");
 });
 
 test("the trailing window rotates, so every day is refreshed across runs", () => {

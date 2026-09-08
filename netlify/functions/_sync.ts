@@ -1150,7 +1150,7 @@ const maxIso = (a: string, b: string) => (a > b ? a : b);
  * Priority: fill a recent gap, then extend history backwards, then keep the
  * trailing window settling.
  */
-export function syncWindow(latest: string | null, earliest: string | null): { start: string; end: string } {
+export function syncWindow(latest: string | null, earliest: string | null, now = Date.now()): { start: string; end: string } {
   const t = today();
   const floor = addDays(t, -(MAX_BACKFILL - 1));
   const trailing = addDays(t, -(TRAILING_REFETCH - 1));
@@ -1168,9 +1168,23 @@ export function syncWindow(latest: string | null, earliest: string | null): { st
     return { start, end: minIso(t, addDays(start, budget - 1)) };
   }
 
-  // History does not reach the backfill floor yet: take the chunk before it,
-  // ending ON the oldest stored day, which anchors a backward walk.
-  if (earliest > floor) {
+  /*
+   * History does not reach the backfill floor yet: take the chunk before it,
+   * ending ON the oldest stored day, which anchors a backward walk.
+   *
+   * But NOT on every run. This branch used to return unconditionally, so an
+   * account still backfilling never refreshed its recent days at all — the
+   * trailing window below was unreachable until the dig finished. Over a 30-day
+   * backfill that is a couple of hours of a client's current numbers standing
+   * still. Over the two years Meta actually allows, it would be two days of a
+   * live dashboard not moving, which is what made deep backfills unusable.
+   *
+   * So one run in four is given to the present instead. The dig takes a third
+   * longer and the client's today never goes stale, which is the right trade:
+   * history that is two years old can wait fifteen minutes, and the number
+   * someone is looking at right now cannot.
+   */
+  if (earliest > floor && Math.floor(now / (15 * 60 * 1000)) % 4 !== 3) {
     const end = earliest;
     return { start: maxIso(floor, addDays(end, -(budget - 1))), end };
   }
