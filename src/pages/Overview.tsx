@@ -220,7 +220,7 @@ function NoData({ onSync, syncing }: { onSync: () => void; syncing: boolean }) {
   return (
     <div className="panel"><EmptyState icon={<IcContent />} title="No metrics synced yet"
       action={<button className="btn btn--primary" onClick={onSync} disabled={syncing}><IcRefresh className={syncing ? "spin" : ""} /> {syncing ? "Syncing…" : "Run first sync"}</button>}>
-      Your accounts are connected. Run a sync to pull the latest followers, reach and content from the platform APIs.
+      Your accounts are connected. Your numbers arrive on their own within about fifteen minutes, or press Sync if you would rather not wait.
     </EmptyState></div>
   );
 }

@@ -37,7 +37,7 @@ export function DiscoveryPanel({ metrics, scope }: { metrics: MetricPoint[]; sco
         <span className="sub">followers vs new people</span>
       </div>
       <div className="panel__body stack" style={{ gap: 12 }}>
-        {d.discoveryRate === null ? <Unavailable what="The follower / non-follower split" /> : (
+        {d.discoveryRate === null ? <Unavailable what="Reach among followers versus new people" /> : (
           <>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <span style={{ fontSize: 30, fontWeight: 650, letterSpacing: "-.02em" }}>{pct(d.discoveryRate)}</span>

@@ -25,7 +25,7 @@ export default function RequireData({ children }: { children: ReactNode }) {
     return (
       <div className="panel"><EmptyState icon={<IcRefresh />} title="No data for this scope yet"
         action={<button className="btn btn--primary" onClick={() => dash.sync()} disabled={dash.syncing}><IcRefresh className={dash.syncing ? "spin" : ""} /> Run a sync</button>}>
-        Once a sync completes, your metrics appear here automatically.
+        Your numbers appear here on their own, usually within fifteen minutes of connecting.
       </EmptyState></div>
     );
   }

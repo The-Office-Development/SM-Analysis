@@ -160,7 +160,7 @@ function PostDetailInner() {
 
                   {value === null ? (
                     <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>
-                      Instagram did not report this figure for this post.
+                      Instagram did not give us this figure for this post. It does not mean zero.
                     </p>
                   ) : (
                     <>
@@ -285,7 +285,7 @@ function PostDetailInner() {
                      why="How many of the people who saw it did something about it." />
             <Derived label="Total interactions" value={engagement === null ? null : full(engagement)}
                      why="Likes, comments, shares and saves added together." />
-            <Derived label="Shares per 1k reach"
+            <Derived label="Shares per 1,000 people reached"
                      value={view.shares !== null && view.reach !== null && view.reach > 0
                        ? ((view.shares / view.reach) * 1000).toFixed(1) : null}
                      why="How often it got passed on, for every thousand people who saw it." />

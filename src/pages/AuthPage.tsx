@@ -61,7 +61,7 @@ export default function AuthPage() {
             ))}
           </div>
         </div>
-        <span className="muted" style={{ fontSize: 12 }}>Metrics come straight from the official platform APIs.</span>
+        <span className="muted" style={{ fontSize: 12 }}>Your numbers come straight from Instagram, Facebook and TikTok themselves.</span>
       </div>
 
       <div className="auth__card">
@@ -99,7 +99,7 @@ export default function AuthPage() {
             <>Already have an account? <button onClick={() => { setMode("in"); setErr(null); }}>Sign in</button></>
           )}
         </div>
-        <p className="auth__note">Your credentials are handled by Supabase Auth. We never see your platform passwords. Connections use official OAuth.</p>
+        <p className="auth__note">We never see your Instagram password. You approve the connection on Instagram's own screen, and you can withdraw it there at any time without asking us.</p>
       </div>
     </div>
   );

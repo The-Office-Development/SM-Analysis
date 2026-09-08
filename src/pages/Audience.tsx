@@ -29,7 +29,7 @@ function AudienceInner() {
   if (parts.length === 0) {
     return (
       <div className="panel"><div className="panel__body muted" style={{ textAlign: "center", padding: 34 }}>
-        No audience snapshot has synced yet for this scope. Audience demographics come from Instagram &amp; Facebook and populate after the next sync (they require the insights permissions).
+        Nothing here yet. Instagram and Facebook report who your followers are, and it appears on its own within about fifteen minutes of connecting. Instagram needs roughly 100 followers before it will report this at all.
       </div></div>
     );
   }
@@ -128,7 +128,7 @@ function AudienceInner() {
               </div>
               <div className="heatscale">Less<i style={{ opacity: 0.2 }} /><i style={{ opacity: 0.5 }} /><i style={{ opacity: 0.75 }} /><i style={{ opacity: 1 }} />More</div>
             </>
-          ) : <Unavailable label="Activity-by-hour needs the online-followers insight, which appears after a full day of data." />}
+          ) : <Unavailable label="Instagram only reports when your followers are online after a full day of data has built up. This fills in on its own." />}
         </div>
       </section>
     </div>

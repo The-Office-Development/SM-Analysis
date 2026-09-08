@@ -89,7 +89,7 @@ export default function Planner() {
               <div className="heatscale"><span>Quieter</span><i style={{ opacity: .15 }} /><i style={{ opacity: .45 }} /><i style={{ opacity: .8 }} /><i /><span>Peak</span></div>
             </>
           ) : (
-            <p className="muted" style={{ fontSize: 13 }}>No audience-activity data yet. Instagram &amp; Facebook expose this after a sync; TikTok's basic API does not.</p>
+            <p className="muted" style={{ fontSize: 13 }}>Nothing here yet. Instagram and Facebook report when your followers are online; TikTok does not report it at all.</p>
           )}
         </div>
       </section>
@@ -97,7 +97,7 @@ export default function Planner() {
       <section className="panel">
         <div className="panel__head"><IcSpark style={{ width: 16, height: 16, color: "var(--text-2)" }} /><h3>Top windows</h3></div>
         <div className="panel__body stack" style={{ gap: 12 }}>
-          {windows.length === 0 && <p className="muted" style={{ fontSize: 13 }}>Sync IG or FB to see your peak posting windows.</p>}
+          {windows.length === 0 && <p className="muted" style={{ fontSize: 13 }}>Connect Instagram or Facebook to see when your followers are online.</p>}
           {windows.map((w, i) => (
             <div key={i} className="stack" style={{ gap: 5 }}>
               <div className="row" style={{ justifyContent: "space-between", fontSize: 13, fontWeight: 550 }}>
