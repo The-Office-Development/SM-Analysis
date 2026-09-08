@@ -6,8 +6,9 @@ import { postContext, postRank, engagementSplit, ageHours, tooEarly } from "../l
 import { PlatformBadge } from "../components/PlatformTile";
 import RequireData from "../components/RequireData";
 import DistributionStrip from "../components/charts/DistributionStrip";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { refreshPost } from "../lib/api";
+import { isDemoMode } from "../lib/demoData";
 import type { ContentItem } from "../lib/types";
 
 /**
@@ -26,7 +27,17 @@ import type { ContentItem } from "../lib/types";
  *    a reel.
  */
 export default function PostDetail() {
-  return <RequireData><PostDetailInner /></RequireData>;
+  /*
+   * Keyed on the post id so moving from one post to the next REMOUNTS the inner
+   * component. Without it React keeps the same instance across a param change
+   * and every piece of state below survives: the freshness stamp, the refreshed
+   * figures, and the ref that says the automatic read has already run. The
+   * second post would then show the first post's read time over its own numbers
+   * and never fetch, which is precisely the mismatch this page exists to
+   * prevent.
+   */
+  const { id } = useParams<{ id: string }>();
+  return <RequireData><PostDetailInner key={id} /></RequireData>;
 }
 
 const METRICS = [
@@ -50,6 +61,59 @@ function PostDetailInner() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
   const [fresh, setFresh] = useState<Partial<ContentItem> | null>(null);
+  /*
+   * When these figures were last read. Seeded from the stored stamp and moved
+   * forward by any successful read, automatic or manual, so the freshness line
+   * never claims an age the numbers on screen no longer have.
+   */
+  const [checkedAt, setCheckedAt] = useState<string | null>(post?.checked_at ?? null);
+  // One automatic read per post per visit. A ref, not state: it must not
+  // schedule a render, and it must be consulted before the fetch is started
+  // rather than after it resolves, or a double-invoked effect fires twice.
+  const autoDone = useRef<string | null>(null);
+
+  /*
+   * FETCH ON OPEN.
+   *
+   * The scheduled sync runs every fifteen minutes, so a post could be a quarter
+   * of an hour behind the Instagram app on the client's own phone. Opening the
+   * page IS the request to see this post, so it is also the moment to read it:
+   * the client never sees a stale post page, and never has to know that a button
+   * exists to make it current.
+   *
+   * Bounded on purpose. It fires once per post per visit, only when the stored
+   * figures are older than the threshold, and never in the demo. Each read costs
+   * one platform call and one Worker invocation out of an ACCOUNT-wide daily
+   * budget shared with everything else on the same Cloudflare account, so an
+   * unguarded fetch-on-render would be a self-inflicted outage.
+   *
+   * Failure is deliberately quiet. Nobody asked for this fetch, so an error
+   * banner would be noise about an action the client did not take. The page then
+   * shows the stored figures with their true, older read time, which is honest:
+   * the fallback is accurate data described accurately, not a blank.
+   */
+  const AUTO_STALE_MS = 2 * 60_000;
+  useEffect(() => {
+    if (!post || isDemoMode()) return;
+    if (autoDone.current === post.id) return;
+    const age = post.checked_at ? Date.now() - Date.parse(post.checked_at) : Infinity;
+    if (Number.isFinite(age) && age < AUTO_STALE_MS) return;
+    autoDone.current = post.id;
+
+    let cancelled = false;
+    setRefreshing(true);
+    refreshPost(post.id)
+      .then((r) => {
+        if (cancelled) return;
+        const { refreshed_at: at, ...metrics } = r;
+        setFresh(metrics);
+        setCheckedAt(at);
+      })
+      .catch(() => { /* see the note above: stale but true beats an alarm */ })
+      .finally(() => { if (!cancelled) setRefreshing(false); });
+
+    return () => { cancelled = true; };
+  }, [post?.id, post?.checked_at]);
 
   if (!post) {
     return (
@@ -71,9 +135,8 @@ function PostDetailInner() {
   const view = fresh ? ({ ...post, ...fresh } as typeof post) : post;
   const hours = ageHours(post.published_at);
   const young = tooEarly(post.published_at);
-  // When these figures were read. A manual check supersedes it in the same
-  // render, which is why refreshMsg takes priority over this below.
-  const checked = timeAgo(post.checked_at);
+  // When these figures were read, including by the automatic read above.
+  const checked = timeAgo(checkedAt);
   const engagement = sumKnown(view.likes, view.comments, view.shares, view.saves);
   // A rate needs a denominator that exists. Reach of null gives no rate at all
   // rather than a rate computed against a fabricated zero.
@@ -105,6 +168,7 @@ function PostDetailInner() {
                   // refreshed_at is metadata about the fetch, not a column on the post.
                   const { refreshed_at: _t, ...metrics } = r;
                   setFresh(metrics);
+                  setCheckedAt(r.refreshed_at);
                   setRefreshMsg(`Updated just now, ${new Date(r.refreshed_at).toLocaleTimeString()}`);
                 } catch (e) {
                   setRefreshMsg(e instanceof Error ? e.message : "Could not refresh.");
@@ -137,12 +201,13 @@ function PostDetailInner() {
              * themselves in one click.
              */
             <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-              {checked
-                ? `Read from Instagram ${checked}.`
-                : "Not yet read from Instagram since this page started recording the time."}
-              {" "}Instagram keeps counting for days, so a figure here can differ
-              from the one in your Instagram app. Press Check now to read it
-              again this second.
+              {refreshing
+                ? "Reading the latest numbers from Instagram..."
+                : checked
+                  ? `Read from Instagram ${checked}.`
+                  : "Not yet read from Instagram since this page started recording the time."}
+              {" "}This page checks Instagram each time you open it. Instagram
+              keeps counting for days, so these will still move.
             </p>
           )}
 
