@@ -136,11 +136,17 @@ as work. Migrations 0001-0012 are all applied.
 
 ### Still open
 
-8. **Settle what a "day" means.** §6e, and the only item left. The gate passed on
-   30-day AGGREGATES; per-day alignment is still unverified because Instagram's
-   own date picker is offset by two days. Underneath sits a product decision our
-   code cannot make: our days are Amman days, the client's app shows Meta's
-   buckets, and both cannot be Monday. **This one needs a decision, not work.**
+8. **What a "day" means.** ANSWERED 2026-09-08, and the answer removes the
+   choice. The app's per-day figures cannot be reproduced from the API by ANY
+   window: Instagram's app shows 441 views for 31 August, and every 24-hour
+   window from UTC-14 to UTC+10 returns 396 or 60, never 441. `views` ignores
+   since/until entirely and snaps to Meta's own day; `reach` honours it. See
+   `API-VERIFICATION.md` §6.8.
+
+   So there is nothing to align to. What remains is a sentence, not a decision:
+   daily figures come from Instagram's API, the app computes its own, and the
+   monthly totals agree to within 1%. **Say it before a client finds it**, since
+   they will compare a single day eventually and conclude we are wrong.
 
 **Carried into the pilot:** story capture (§6c) — built, never once verified,
 zero stories captured to date.

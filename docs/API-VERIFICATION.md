@@ -480,3 +480,46 @@ cost of a breach rather than changing what the software does.
 
 **Remediation for `@heath_ens21`:** revoke the excess at Instagram → Settings →
 Apps and websites, then re-authorise, and re-run the audit to confirm.
+
+### 6.8 The app's daily figures cannot be reproduced from the API
+
+`tasks.md` §6e asked whether our days should follow Amman or Meta's buckets, on
+the assumption that one of them would match what a client sees in the Instagram
+app. Tested on 2026-09-08, and **neither does**.
+
+Instagram's own app, reading a single point off its Overview chart (which avoids
+the two-day date-picker offset in §6.2), reports **441 views for 31 August** on
+`@malekismaiil`. Every 24-hour window the API will accept was then swept, hour by
+hour, from UTC-14 to UTC+10:
+
+```
+start UTC-14h .. UTC+6h  ->  396   (identical at every offset)
+start UTC+8h onward      ->   60   (the next day)
+```
+
+**No window reproduces 441.** The app's figure is not a differently-bucketed
+version of ours; it is a number this API does not expose.
+
+Two further findings from the same sweep:
+
+- **`views` ignores since/until and snaps to Meta's own day.** Twenty-one
+  consecutive hourly offsets returned the identical 396. The window we send has
+  no effect on this metric at all.
+- **`reach` does NOT snap.** Measured the same day: an Amman midnight window
+  returned 110, Meta's own bucket 118, and a noon-to-noon window 93. Windows are
+  honoured here.
+
+So the two metrics behave differently, and any reasoning about "our day boundary"
+holds for one and not the other.
+
+**What this settles.** Aligning per-day figures with the client's app is not a
+choice between conventions, it is not achievable. The honest position:
+
+- Our figures are correct readings of what the API reports.
+- The app reports something different per day, from a pipeline we cannot query.
+- **Monthly totals agree closely** — 0.7% on views over 30 days when the gate was
+  run — so the disagreement is in daily attribution, not in the underlying data.
+
+A client WILL eventually compare one day and find a gap. The answer is not to
+chase it, because it cannot be caught; it is to say plainly that daily figures
+come from Instagram's API and their app computes its own, while the totals agree.
