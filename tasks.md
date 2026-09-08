@@ -16,7 +16,7 @@ Last updated: 2026-08-28.
 
 ---
 
-## WHERE THINGS STAND — 2026-09-07
+## WHERE THINGS STAND — 2026-09-08
 
 Sections 1 and 2 below were done on 2026-09-04 and are kept for the record, not
 as work. Migrations 0001-0012 are all applied.
@@ -110,14 +110,40 @@ as work. Migrations 0001-0012 are all applied.
 +  **Security review.** DONE, unplanned. `SECURITY-REVIEW-2026-09-07.md`.
    Cleared a React Router advisory and rate-limited /api/refresh-post.
 
+6. **Pagination past 25 posts.** DONE 2026-09-08. Media follows Meta's cursor to
+   100 posts, degrading per page when the insights expansion is refused. The mock
+   had never paginated either, which is why nothing caught it.
+
+**Also done 2026-09-08, none of it on the original list:**
+
+- **The sync now fits.** A complete run needed ~55 subrequests against a free-tier
+  cap of 50, so runs were losing their WRITES at the end. Content and stories are
+  fetched first, demographics once a day instead of hourly, the trailing window
+  rotates across runs, and truncation drops the oldest days rather than the
+  newest. A run costs 22 calls now, not 46. **This removed the reason to pay for
+  Workers Paid.**
+- **The cron runs every 15 minutes**, not hourly. A firing is one request against
+  100,000 a day; the 50 limit is per run and resets each time. The two were being
+  conflated.
+- **A backfilling account keeps its today.** The backfill branch returned
+  unconditionally, so recent days froze for the whole dig — hours at 30 days, two
+  days at the two years Meta allows. One run in four now goes to the present.
+- **The Sync button works again.** Making the cron 15-minutely silently disabled
+  it: its throttle was also 15 minutes, so every press answered "already up to
+  date". Now two minutes.
+- **A full sweep of user-facing copy**, after three occasions where the code
+  improved and the interface kept describing the old behaviour.
+
 ### Still open
 
-6. **Pagination past 25 posts**, or say plainly that Content shows 25. Not
-   pressing at 12 posts; it matters for an account with years of output.
-8. **Settle what a "day" means.** §6e. The gate passed on 30-day AGGREGATES;
-   per-day alignment is still unverified because Instagram's own date picker is
-   offset by two days. Underneath sits a product decision: our days are Amman
-   days, the client's app shows Meta's buckets, and both cannot be Monday.
+8. **Settle what a "day" means.** §6e, and the only item left. The gate passed on
+   30-day AGGREGATES; per-day alignment is still unverified because Instagram's
+   own date picker is offset by two days. Underneath sits a product decision our
+   code cannot make: our days are Amman days, the client's app shows Meta's
+   buckets, and both cannot be Monday. **This one needs a decision, not work.**
+
+**Carried into the pilot:** story capture (§6c) — built, never once verified,
+zero stories captured to date.
 
 **Parallel, blocking nothing:** Business Verification and App Review (§6), the
 PDPL questions and legal-page placeholders (§0).
