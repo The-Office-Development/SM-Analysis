@@ -11,12 +11,14 @@ import { exportCsv } from "../lib/reports";
 import {
   IcOverview, IcContent, IcAudience, IcPlatforms, IcLink,
   IcDownload, IcRefresh, IcChevron, IcLogout, IcSearch, IcCalendar, IcMessage, IcFile, IcMenu, IcClose,
+  IcSpark,
 } from "../lib/icons";
 import type { Range, Scope } from "../lib/types";
 
 const NAV = [
   { to: "/", label: "Overview", Icon: IcOverview, end: true },
   { to: "/content", label: "Content", Icon: IcContent, end: false },
+  { to: "/analysis", label: "Analysis", Icon: IcSpark, end: false },
   { to: "/audience", label: "Audience", Icon: IcAudience, end: false },
   { to: "/platforms", label: "Platforms", Icon: IcPlatforms, end: false },
   { to: "/planner", label: "Planner", Icon: IcCalendar, end: false },
@@ -24,7 +26,7 @@ const NAV = [
   { to: "/reports", label: "Reports", Icon: IcFile, end: false },
 ];
 const TITLES: Record<string, string> = {
-  "/": "Overview", "/content": "Content", "/audience": "Audience",
+  "/": "Overview", "/content": "Content", "/analysis": "Analysis", "/audience": "Audience",
   "/platforms": "Platforms", "/planner": "Planner", "/assistant": "Assistant",
   "/reports": "Reports", "/connections": "Connections",
 };

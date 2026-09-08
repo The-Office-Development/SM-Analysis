@@ -9,6 +9,7 @@ import AuthPage from "./pages/AuthPage";
 import Overview from "./pages/Overview";
 import Content from "./pages/Content";
 import PostDetail from "./pages/PostDetail";
+import Analysis from "./pages/Analysis";
 import Audience from "./pages/Audience";
 import Platforms from "./pages/Platforms";
 import Planner from "./pages/Planner";
@@ -44,6 +45,7 @@ function Gate() {
           <Route index element={<Overview />} />
           <Route path="content" element={<Content />} />
           <Route path="content/:id" element={<PostDetail />} />
+          <Route path="analysis" element={<Analysis />} />
           <Route path="audience" element={<Audience />} />
           <Route path="platforms" element={<Platforms />} />
           <Route path="planner" element={<Planner />} />

@@ -26,6 +26,11 @@ for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){
 # That line is the product's answer to "your number disagrees with Instagram", so
 # it is tested rather than trusted.
 ./node_modules/.bin/tsc src/lib/format.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
+# The CSV is the only part of this product that is read without the interface
+# around it to explain anything, and it is what gets forwarded to a sponsor. Its
+# decisions are pure and therefore testable, which is why they live apart from
+# the DOM half in reports.ts.
+./node_modules/.bin/tsc src/lib/csvReport.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
 node -e '
 const fs=require("fs"),d="verify/build-lib";
 for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){

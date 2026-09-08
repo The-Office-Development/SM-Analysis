@@ -15,3 +15,102 @@ test("ordinary captions are untouched apart from quoting", () => {
   assert.equal(escapeCsvField('He said "hi"'), '"He said ""hi"""');
   assert.equal(escapeCsvField("2 - 3 tips"), '"2 - 3 tips"');
 });
+
+/* ---- the exported file --------------------------------------------------- */
+
+import { buildCsv } from "../build-lib/csvReport.js";
+
+/**
+ * This file leaves the building.
+ *
+ * It is what a creator forwards to a sponsor, and the only part of the product
+ * read without the interface around it to explain anything. A wrong cell here is
+ * not a rendering bug; it is a figure in somebody's commercial negotiation.
+ */
+
+const day = (d, extra) => ({
+  account_id: "a", platform: "instagram", date: `2026-08-${String(d).padStart(2, "0")}`,
+  followers: 1000, reach: 500, impressions: null, views: 400, engagements: 40,
+  follows: null, unfollows: null, reach_followers: null, reach_non_followers: null,
+  provisional: false, ...extra,
+});
+
+const post = (i, extra) => ({
+  id: `p${i}`, account_id: "a", platform: "instagram", external_id: `x${i}`,
+  title: `Post ${i}`, media_type: "Reel", permalink: "https://example.test/p",
+  published_at: "2026-08-04T09:00:00Z",
+  views: 100, likes: 10, comments: 1, shares: 1, saves: 1,
+  reach: 90, avg_watch_seconds: null, retention_pct: null, checked_at: null, ...extra,
+});
+
+const input = (over = {}) => ({
+  range: 30, scope: "all", accounts: [{ username: "creator" }],
+  metrics: [day(1), day(2)], content: [post(1)],
+  platformName: () => "Instagram", ...over,
+});
+
+test("an unreported metric is a BLANK cell, never the word null and never 0", () => {
+  // The previous version interpolated the value straight into the row, so every
+  // unreported metric arrived in the client's spreadsheet as the text "null":
+  // it breaks SUM, sorts as text, and reads as a broken product to a sponsor.
+  const csv = buildCsv(input({
+    metrics: [day(1, { reach: null, views: null, engagements: null, followers: null })],
+    content: [post(1, { views: null, likes: null, reach: null })],
+  }));
+  assert.ok(!/null/i.test(csv), "the string 'null' must never appear in an exported cell");
+  assert.ok(!/,0,/.test(csv.split("DAILY")[1] ?? ""), "and an unknown must not become a zero");
+});
+
+test("a caption that is a formula is still neutralised inside the file", () => {
+  const csv = buildCsv(input({ content: [post(1, { title: '=HYPERLINK("http://evil","x")' })] }));
+  assert.ok(csv.includes(`"'=HYPERLINK`), "captions reach the sponsor's spreadsheet; they are hostile input");
+});
+
+test("the file states where the numbers came from and what a blank means", () => {
+  // Read without the app around it, the file has to carry its own context, or a
+  // sponsor comparing against a screenshot concludes somebody is lying.
+  const csv = buildCsv(input());
+  assert.ok(/Instagram's official API/.test(csv));
+  assert.ok(/does not mean zero/.test(csv), "a blank must be explained inside the file itself");
+  assert.ok(/Asia\/Amman/.test(csv), "and the calendar the dates are on must be stated");
+});
+
+test("every section a reader needs is present", () => {
+  const csv = buildCsv(input());
+  for (const heading of ["SUMMARY", "DAILY", "POSTS", "WHAT THESE MEAN"]) {
+    assert.ok(csv.includes(heading), `missing section: ${heading}`);
+  }
+});
+
+test("the daily section carries one row per stored day, oldest first", () => {
+  const csv = buildCsv(input({ metrics: [day(3), day(1), day(2)] }));
+  const block = csv.split("DAILY")[1].split("POSTS")[0];
+  const dates = [...block.matchAll(/"(2026-08-\d\d)"/g)].map((m) => m[1]);
+  assert.deepEqual(dates, ["2026-08-01", "2026-08-02", "2026-08-03"]);
+});
+
+test("it opens correctly on the machine it is sent to", () => {
+  const csv = buildCsv(input());
+  // Without a BOM Excel reads UTF-8 as the local codepage and every Arabic
+  // caption on these accounts becomes mojibake.
+  assert.equal(csv.charCodeAt(0), 0xfeff, "a UTF-8 byte-order mark must lead the file");
+  assert.ok(csv.includes("\r\n"), "Excel expects CRLF between rows");
+});
+
+test("a rate is not invented from a denominator that does not exist", () => {
+  const csv = buildCsv(input({
+    content: [post(1, { reach: null, likes: 5, comments: null, shares: null, saves: null })],
+  }));
+  const posts = csv.split("POSTS")[1];
+  assert.ok(!/Infinity|NaN/.test(posts), `a missing denominator leaked into the file: ${posts}`);
+
+  // And, the failure that actually reaches a sponsor: a rate of 0.00 where none
+  // was measurable. "0.00% engagement" on a post whose reach Instagram simply
+  // never reported is a confident, damaging, invented number — the same defect
+  // as a fabricated zero in the sync, one export further downstream.
+  const header = posts.split("\r\n").find((l) => l.includes("Engagement rate"));
+  const row = posts.split("\r\n").find((l) => l.includes("Post 1"));
+  const col = header.split(",").findIndex((h) => h.includes("Engagement rate"));
+  assert.equal(row.split(",")[col], "",
+    `an unmeasurable rate must be blank, got "${row.split(",")[col]}"`);
+});

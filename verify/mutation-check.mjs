@@ -16,6 +16,7 @@ const DELETION = "verify/build/meta-data-deletion.js";
 const INSTA = "verify/build/_instagram.js";
 const INSIGHTS = "verify/build-lib/insights.js";
 const FORMAT = "verify/build-lib/format.js";
+const CSVREPORT = "verify/build-lib/csvReport.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -155,6 +156,37 @@ const mutations = [
    * makes the product confidently wrong at precisely the moment it is being
    * checked, which is worse than saying nothing at all.
    */
+  /*
+   * The deep layer states conclusions, not measurements, and a client cannot
+   * check a conclusion against their phone. Every mutation below turns a guarded
+   * analysis into a confident one, which is the exact failure this layer risks.
+   */
+  { name: "a timing recommendation made on a single post", file: INSIGHTS,
+    find: "lift: xs && xs.length >= TIMING_MIN_POSTS ? median(xs) : null,",
+    replace: "lift: xs && xs.length >= 1 ? median(xs) : null," },
+  { name: "one viral post allowed to carry a whole time slot", file: INSIGHTS,
+    find: "lift: xs && xs.length >= TIMING_MIN_POSTS ? median(xs) : null,",
+    replace: "lift: xs && xs.length >= TIMING_MIN_POSTS ? xs.reduce((a, v) => a + v, 0) / xs.length : null," },
+  { name: "publish times read as UTC instead of the account's own", file: INSIGHTS,
+    find: "const d = new Date(ms + tzOffsetMinutes * 60_000);",
+    replace: "const d = new Date(ms);" },
+  { name: "typical follower loss taken as the mean, hiding every spike", file: INSIGHTS,
+    find: "const typical = median(losses);",
+    replace: "const typical = losses.reduce((a, v) => a + v, 0) / losses.length;" },
+  { name: "reach divided by a follower count from AFTER the post", file: INSIGHTS,
+    find: "            if (f.date <= day)",
+    replace: "            if (true)" },
+  /*
+   * The export is read without the interface around it, by the person the client
+   * is negotiating with. Both mutations below put a number in front of a sponsor
+   * that nobody measured.
+   */
+  { name: "unreported metrics exported as the literal string from the value", file: CSVREPORT,
+    find: 'typeof v === "number" && Number.isFinite(v) ? String(v) : "";',
+    replace: 'String(v);' },
+  { name: "a rate invented where the denominator is unknown", file: CSVREPORT,
+    find: 'typeof v === "number" && Number.isFinite(v) ? v.toFixed(dp) : "";',
+    replace: 'Number(v).toFixed(dp);' },
   { name: "unknown read time invented as 'just now'", file: FORMAT,
     find: `    if (!iso)
         return null;`,
@@ -164,7 +196,7 @@ const mutations = [
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

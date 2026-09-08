@@ -352,3 +352,309 @@ export function engagementSplit(post: ContentItem): EngagementSplit {
   }
   return { parts, total: parts.length ? parts.reduce((a, p) => a + p.value, 0) : null };
 }
+
+/* ===========================================================================
+ * The deep layer.
+ *
+ * Everything above re-presents figures Instagram also shows, arranged to answer
+ * a question. Everything below computes something Instagram does not compute at
+ * all, from data only a tool that KEEPS history can hold.
+ *
+ * The same rule governs it: a bucket with too few posts behind it reports its
+ * sample and refuses to state a result. An analysis is easier to fabricate than
+ * a metric, because nobody can check it against their phone.
+ * ======================================================================== */
+
+/** Local calendar parts of an ISO timestamp at a fixed UTC offset. */
+function localParts(iso: string, tzOffsetMinutes: number): { day: number; hour: number } | null {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  const d = new Date(ms + tzOffsetMinutes * 60_000);
+  return { day: d.getUTCDay(), hour: d.getUTCHours() };
+}
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const BLOCKS = [
+  { from: 0, to: 6, label: "Late night, midnight to 6am" },
+  { from: 6, to: 10, label: "Morning, 6am to 10am" },
+  { from: 10, to: 14, label: "Midday, 10am to 2pm" },
+  { from: 14, to: 18, label: "Afternoon, 2pm to 6pm" },
+  { from: 18, to: 21, label: "Evening, 6pm to 9pm" },
+  { from: 21, to: 24, label: "Night, 9pm to midnight" },
+];
+
+/** A day or a part of the day, with how this account's posts did in it. */
+export interface TimingBucket {
+  key: string;
+  label: string;
+  /** Posts published in this bucket that had a reach figure to measure. */
+  posts: number;
+  /**
+   * How this bucket compares with this account's own normal. 1 is typical, 1.4
+   * is 40% better than typical. Null when too few posts landed here to say.
+   */
+  lift: number | null;
+}
+
+export interface Timing {
+  byDay: TimingBucket[];
+  byBlock: TimingBucket[];
+  /** Posts that could be measured at all. */
+  measured: number;
+  /** Whether the whole analysis rests on enough posts to be worth reading. */
+  enough: boolean;
+}
+
+/** A bucket needs this many posts before it is allowed to state a result. */
+export const TIMING_MIN_POSTS = 3;
+/** And the account needs this many overall before any of it is shown. */
+export const TIMING_MIN_TOTAL = 12;
+
+/**
+ * When this account's posts ACTUALLY did well.
+ *
+ * Instagram shows when followers are online. That is a different question, and
+ * the gap between them is the entire point: being online is not the same as
+ * watching, and a creator who posts into a busy hour and gets nothing has been
+ * told the truth about their audience and nothing about their results.
+ *
+ * This reads the outcome instead. Every post is scored against the MEDIAN OF ITS
+ * OWN FORMAT, so a bucket does not win merely because reels happened to land in
+ * it, and the buckets are then compared on the median of those ratios so a
+ * single viral post cannot carry an hour on its own.
+ *
+ * Days and parts-of-day are reported SEPARATELY, not as a grid. Seven days by
+ * six blocks is forty-two cells, and a hundred posts spread over forty-two cells
+ * is one or two per cell: a grid would look far more precise than the evidence
+ * behind it, and it would recommend "Tuesday at 7pm" on the strength of a single
+ * post. Two coarse rankings are less impressive and considerably more honest.
+ *
+ * Times are the account's own local time, defaulting to Amman.
+ */
+export function publishTiming(content: ContentItem[], tzOffsetMinutes = 180): Timing {
+  // Score each post against the typical post OF ITS FORMAT. Reach of 0 is
+  // excluded rather than scored: it is unreported far more often than it is a
+  // real zero, and a fabricated 0.0 ratio would drag a whole bucket down.
+  const byFormat = new Map<string, number[]>();
+  for (const c of content) {
+    if (typeof c.reach !== "number" || c.reach <= 0) continue;
+    const k = c.media_type || "Post";
+    if (!byFormat.has(k)) byFormat.set(k, []);
+    byFormat.get(k)!.push(c.reach);
+  }
+  const formatMedian = new Map<string, number>();
+  for (const [k, xs] of byFormat) formatMedian.set(k, median(xs));
+
+  const dayRatios = new Map<number, number[]>();
+  const blockRatios = new Map<number, number[]>();
+  let measured = 0;
+
+  for (const c of content) {
+    if (typeof c.reach !== "number" || c.reach <= 0) continue;
+    const base = formatMedian.get(c.media_type || "Post");
+    if (!base || base <= 0) continue;
+    const at = localParts(c.published_at, tzOffsetMinutes);
+    if (!at) continue;
+
+    const ratio = c.reach / base;
+    measured++;
+
+    if (!dayRatios.has(at.day)) dayRatios.set(at.day, []);
+    dayRatios.get(at.day)!.push(ratio);
+
+    const bi = BLOCKS.findIndex((b) => at.hour >= b.from && at.hour < b.to);
+    if (bi >= 0) {
+      if (!blockRatios.has(bi)) blockRatios.set(bi, []);
+      blockRatios.get(bi)!.push(ratio);
+    }
+  }
+
+  const bucket = (key: string, label: string, xs: number[] | undefined): TimingBucket => ({
+    key, label,
+    posts: xs?.length ?? 0,
+    // Below the threshold the count is still reported and the result is not.
+    // "We have two posts on a Friday" is useful; "Fridays are 60% better" on the
+    // strength of those two posts is a guess wearing a number's clothes.
+    lift: xs && xs.length >= TIMING_MIN_POSTS ? median(xs) : null,
+  });
+
+  const byDay = DAY_NAMES.map((label, i) => bucket(String(i), label, dayRatios.get(i)))
+    .sort((a, b) => (b.lift ?? -1) - (a.lift ?? -1));
+  const byBlock = BLOCKS.map((b, i) => bucket(String(i), b.label, blockRatios.get(i)))
+    .sort((a, b) => (b.lift ?? -1) - (a.lift ?? -1));
+
+  return { byDay, byBlock, measured, enough: measured >= TIMING_MIN_TOTAL };
+}
+
+/* ---- what a post cost ---------------------------------------------------- */
+
+export interface FollowerCostDay {
+  date: string;
+  unfollows: number;
+  /** This account's typical daily loss, for comparison. */
+  typical: number;
+  /** How far above typical this day ran. */
+  excess: number;
+  posts: { id: string; title: string }[];
+}
+
+export interface FollowerCost {
+  /** False when the platform has never reported unfollows; then nothing below means anything. */
+  reported: boolean;
+  typical: number | null;
+  days: FollowerCostDay[];
+}
+
+/**
+ * The days that cost followers, and what went out on them.
+ *
+ * Instagram reports follower losses as a total and never says which day, let
+ * alone which post. A creator therefore learns that something is driving people
+ * away and has no way to find out what. This is the question they ask most and
+ * the one no native tool answers.
+ *
+ * It is a CORRELATION and the interface must say so. A post published on a bad
+ * day did not necessarily cause the losses: an account can shed followers
+ * because of a story, a comment, a collaboration, a purge of inactive accounts,
+ * or nothing at all. What this does is narrow the search from a month to a day
+ * and put the day's output beside the number, which is as far as the data can
+ * honestly go.
+ *
+ * "Typical" is the MEDIAN daily loss, not the mean. Means are dragged by exactly
+ * the spike days being looked for, so a mean would raise the bar in proportion
+ * to the thing it is supposed to detect and hide the worst days.
+ */
+export function followerCost(
+  metrics: MetricPoint[], content: ContentItem[], scope: Scope,
+): FollowerCost {
+  const rows = metrics.filter((m) => inScope(m, scope));
+  const losses = rows.map((r) => r.unfollows).filter((v): v is number => typeof v === "number");
+  if (!losses.length) return { reported: false, typical: null, days: [] };
+
+  const typical = median(losses);
+
+  const postsByDay = new Map<string, { id: string; title: string }[]>();
+  for (const c of content) {
+    const day = c.published_at.slice(0, 10);
+    if (!postsByDay.has(day)) postsByDay.set(day, []);
+    postsByDay.get(day)!.push({ id: c.id, title: c.title || "Untitled" });
+  }
+
+  const days: FollowerCostDay[] = [];
+  for (const r of rows) {
+    if (typeof r.unfollows !== "number") continue;
+    const posts = postsByDay.get(r.date);
+    if (!posts?.length) continue;   // nothing published, nothing to point at
+    const excess = r.unfollows - typical;
+    // Half again above normal AND at least two people. On a small account a
+    // ratio alone fires on the difference between one leaver and two, which is
+    // noise dressed as a finding.
+    if (r.unfollows >= typical * 1.5 && excess >= 2) {
+      days.push({ date: r.date, unfollows: r.unfollows, typical, excess, posts });
+    }
+  }
+
+  days.sort((a, b) => b.excess - a.excess);
+  return { reported: true, typical, days };
+}
+
+/* ---- reach against the size of the account ------------------------------- */
+
+export interface ReachMultiple {
+  id: string;
+  title: string;
+  date: string;
+  reach: number;
+  followers: number;
+  /** Reach divided by the follower count on the day it went out. */
+  times: number;
+}
+
+/**
+ * How far past the account's own following a post travelled.
+ *
+ * 40,000 reach means nothing on its own. Against 4,000 followers it means the
+ * post escaped the audience entirely and found ten times as many strangers,
+ * which is the single most useful sentence a creator can put in front of a
+ * sponsor. Instagram shows the reach and never divides.
+ *
+ * The denominator is the follower count ON THE DAY, not today's. An account that
+ * has since tripled would otherwise have its best old post quietly demoted, and
+ * the number would drift every time the account grew.
+ */
+export function reachMultiples(
+  content: ContentItem[], metrics: MetricPoint[], scope: Scope,
+): ReachMultiple[] {
+  const followerDays = metrics
+    .filter((m) => inScope(m, scope) && typeof m.followers === "number" && m.followers > 0)
+    .map((m) => ({ date: m.date, followers: m.followers as number }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!followerDays.length) return [];
+
+  const out: ReachMultiple[] = [];
+  for (const c of content) {
+    if (typeof c.reach !== "number" || c.reach <= 0) continue;
+    const day = c.published_at.slice(0, 10);
+    // The most recent known count on or before the publish day. Falling forward
+    // to a LATER count would divide by an audience the post never had.
+    let followers: number | null = null;
+    for (const f of followerDays) {
+      if (f.date <= day) followers = f.followers;
+      else break;
+    }
+    if (followers === null || followers <= 0) continue;
+    out.push({
+      id: c.id, title: c.title || "Untitled", date: day,
+      reach: c.reach, followers, times: c.reach / followers,
+    });
+  }
+  return out.sort((a, b) => b.times - a.times);
+}
+
+/* ---- how much of the account rests on how little ------------------------- */
+
+export interface Concentration {
+  posts: number;
+  totalReach: number;
+  /** How many posts it takes to account for half of all reach. */
+  postsForHalf: number | null;
+  /** The best post's share of all reach. */
+  topShare: number | null;
+}
+
+/**
+ * How concentrated the account's reach is.
+ *
+ * Two accounts with the same monthly reach are different businesses if one got
+ * it from twenty posts and the other from one. The second is a lucky month, not
+ * a channel, and it will look like a collapse next month through no fault of
+ * anyone's.
+ *
+ * A sponsor buying on last month's total is buying the first case and being sold
+ * the second, so this is a number that protects the client's credibility as much
+ * as it informs them. Nothing native computes it.
+ */
+export function reachConcentration(content: ContentItem[]): Concentration {
+  const reaches = content
+    .map((c) => c.reach)
+    .filter((v): v is number => typeof v === "number" && v > 0)
+    .sort((a, b) => b - a);
+
+  const totalReach = reaches.reduce((a, v) => a + v, 0);
+  if (!reaches.length || totalReach <= 0) {
+    return { posts: reaches.length, totalReach: 0, postsForHalf: null, topShare: null };
+  }
+
+  let running = 0, postsForHalf = reaches.length;
+  for (let i = 0; i < reaches.length; i++) {
+    running += reaches[i];
+    if (running >= totalReach / 2) { postsForHalf = i + 1; break; }
+  }
+
+  return {
+    posts: reaches.length,
+    totalReach,
+    postsForHalf,
+    topShare: reaches[0] / totalReach,
+  };
+}
