@@ -35,7 +35,7 @@ export default {
      * A token left to lapse cannot be recovered without the user re-authorising,
      * which is why the refresh has its own schedule and its own failure log.
      */
-    const isRefresh = event.cron === "0 */4 * * *";
+    const isRefresh = event.cron === "0 */4 * * *";   // everything else is the sync
     const job = isRefresh ? "token-refresh" : "sync-cron";
     const work = isRefresh ? refreshTokens : syncAll;
 

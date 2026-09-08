@@ -32,4 +32,19 @@ compatibility_flags = ["nodejs_compat"]
 # Hourly, matching the Netlify schedule it replaces. The body stops early on a
 # time budget and the trailing re-fetch in _sync.ts heals any missed run, so the
 # cadence is a floor on freshness rather than a guarantee of completeness.
-crons = ["0 * * * *", "0 */4 * * *"]
+# Every 15 minutes, not hourly.
+#
+# The per-run subrequest cap and the daily request budget are different limits,
+# and only the first has ever constrained us. A cron firing is ONE request
+# against 100,000 a day, and each firing gets its own fresh 50 subrequests — so
+# running four times as often costs 96 requests a day instead of 24, and buys
+# four times the work. Measured after a day of hourly syncing, Instagram's own
+# x-app-usage reported call_volume 0, so there is headroom on that side too.
+#
+# The reason to spend it is stories. A story lives 24 hours and cannot be
+# re-fetched once gone; hourly gave 24 chances to catch one, this gives 96. It
+# also quarters the time a new account takes to backfill.
+#
+# What it does NOT fix: a single run still cannot finish. More trips, same size
+# truck.
+crons = ["*/15 * * * *", "0 */4 * * *"]

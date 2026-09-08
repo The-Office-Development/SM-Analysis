@@ -353,28 +353,20 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
   // Instagram accounts arrive through one of two authentication paths. Instagram
   // Login needs no linked Facebook Page and talks to a different host.
   const igLogin = (secretRow?.extra as any)?.kind === "ig_login";
-  if (acc.platform === "instagram" && igLogin) ({ days, posts } = await syncInstagramLogin(acc, token, start, counter, window.end, anchor));
-  else if (acc.platform === "instagram") ({ days, posts } = await syncInstagram(acc, token, start, counter, window.end, anchor));
-  else if (acc.platform === "facebook") ({ days, posts } = await syncFacebook(acc, token, start, counter));
-  else if (acc.platform === "tiktok") ({ days, posts } = await syncTiktok(acc, token, counter));
 
-  let rowsWritten = 0;
-  if (days.length) {
-    const merged = await mergeWithStored(db, acc, days);
-    if (merged.length) {
-      const { error } = await db.from("metrics_daily").upsert(merged, { onConflict: "account_id,date" });
-      if (error) throw error;
-      rowsWritten = merged.length;
-    }
-  }
-  if (posts.length) {
-    const { error } = await db.from("content").upsert(
-      posts.map((p) => ({ account_id: acc.id, platform: acc.platform, ...p })),
-      { onConflict: "account_id,external_id" }
-    );
-    if (error) throw error;
-  }
-
+  /*
+   * Demographics run BEFORE the day metrics, not after.
+   *
+   * They are a once-a-day snapshot costing four calls, and they were queued
+   * behind thirty per-day calls that spend the entire budget. That produced a
+   * deadlock rather than a delay: the run that would capture them always ran out
+   * of budget first, so no snapshot was ever stored, so the skip-if-already-have
+   * check never fired, so the next run tried and starved in exactly the same
+   * place. Every hour, indefinitely.
+   *
+   * Four cheap calls once a day take priority over the thirtieth per-day metric,
+   * which the trailing window will fetch again within the hour anyway.
+   */
   /*
    * Audience demographics — best effort, and ONCE A DAY, not once an hour.
    *
@@ -419,6 +411,28 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     if (e instanceof SkipAudience) { /* already have today's; nothing to do */ }
     else if (isThrottleError(e) || isAuthError(e)) throw e;
     /* audience insights are otherwise optional and permission-gated */
+  }
+
+  if (acc.platform === "instagram" && igLogin) ({ days, posts } = await syncInstagramLogin(acc, token, start, counter, window.end, anchor));
+  else if (acc.platform === "instagram") ({ days, posts } = await syncInstagram(acc, token, start, counter, window.end, anchor));
+  else if (acc.platform === "facebook") ({ days, posts } = await syncFacebook(acc, token, start, counter));
+  else if (acc.platform === "tiktok") ({ days, posts } = await syncTiktok(acc, token, counter));
+
+  let rowsWritten = 0;
+  if (days.length) {
+    const merged = await mergeWithStored(db, acc, days);
+    if (merged.length) {
+      const { error } = await db.from("metrics_daily").upsert(merged, { onConflict: "account_id,date" });
+      if (error) throw error;
+      rowsWritten = merged.length;
+    }
+  }
+  if (posts.length) {
+    const { error } = await db.from("content").upsert(
+      posts.map((p) => ({ account_id: acc.id, platform: acc.platform, ...p })),
+      { onConflict: "account_id,external_id" }
+    );
+    if (error) throw error;
   }
 
   await db.from("social_accounts").update({ last_synced_at: new Date().toISOString() }).eq("id", acc.id);
