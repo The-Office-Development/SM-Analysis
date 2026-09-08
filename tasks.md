@@ -143,10 +143,22 @@ as work. Migrations 0001-0012 are all applied.
    since/until entirely and snaps to Meta's own day; `reach` honours it. See
    `API-VERIFICATION.md` §6.8.
 
-   So there is nothing to align to. What remains is a sentence, not a decision:
-   daily figures come from Instagram's API, the app computes its own, and the
-   monthly totals agree to within 1%. **Say it before a client finds it**, since
-   they will compare a single day eventually and conclude we are wrong.
+   **Corrected the same day, and the item is reopened in part.** The sweep
+   proves we cannot re-bucket `views` through the API, because Meta will not
+   return anything smaller than its own day for it. It does NOT prove the gap is
+   unexplainable by a boundary shift: for `views` the window is ignored, so the
+   sweep could not vary the thing it was testing. Per-day disagreement with
+   monthly totals agreeing to 0.7% is precisely the shape a boundary shift has.
+
+   The sentence has been added to the Overview regardless, since it is true
+   today and cheaper said first than discovered by a client.
+
+   - [ ] **Observe when the day-to-date `views` figure RESETS.** That hour is
+         Meta's boundary, seen rather than inferred. One day of polling, and it
+         may settle the whole question on its own.
+   - [ ] Only if that is not enough: difference the 15-minute cron's readings
+         into a sub-day series and re-sum it against the observed boundary.
+         Forward only; nothing recovers 31 August.
 
 **Carried into the pilot:** story capture (§6c) — built, never once verified,
 zero stories captured to date.
@@ -481,9 +493,19 @@ relearning, must not be rendered as a confident zero either.
 
 ---
 
-## 6e. UNFINISHED — which day a number belongs to
+## 6e. ANSWERED 2026-09-08 — which day a number belongs to
 
-**Partly answered, not settled. Do not treat the day boundary as closed.**
+**Closed. The question below turned out to have no answer available, which is
+itself the answer.** The app's per-day figure cannot be reproduced from the API
+under any 24-hour window, so aligning to it is not a choice between conventions,
+it is not achievable. See `API-VERIFICATION.md` 6.8 and item 8 of the board
+above. The material below is kept as the record of how the question was framed
+before it was settled; the open checkboxes in it are superseded except the last,
+which is a support matter and still stands.
+
+The product now states the difference in the interface rather than waiting to be
+asked: a line under the Overview says daily figures come from Instagram's data
+feed, the app computes its own, and monthly totals agree to about 1%.
 
 ### What is now known
 

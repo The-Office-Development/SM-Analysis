@@ -497,8 +497,28 @@ start UTC-14h .. UTC+6h  ->  396   (identical at every offset)
 start UTC+8h onward      ->   60   (the next day)
 ```
 
-**No window reproduces 441.** The app's figure is not a differently-bucketed
-version of ours; it is a number this API does not expose.
+**No window reproduces 441.**
+
+**CORRECTION, 2026-09-08 (same day).** The sentence that stood here read "the
+app's figure is not a differently-bucketed version of ours; it is a number this
+API does not expose." That claim does not follow from this sweep, and it is
+withdrawn.
+
+For `views` the sweep cannot test the hypothesis it was built to test. The
+window is IGNORED by that metric, so varying the window varies nothing: the
+constant 396 is evidence that our request had no effect, not evidence that no
+boundary yields 441. A re-bucketing explanation for the gap remains open and
+untested.
+
+What the sweep does establish is narrower and mechanical: **we cannot re-bucket
+`views` through the API**, because the API will not return anything smaller than
+its own day for it. There are no sub-day pieces to re-sum.
+
+It is also worth noting that a boundary shift is exactly the shape the evidence
+has: per-day disagreement with monthly totals agreeing to 0.7%. Summing cannot
+create views, only move them between days, and a month that already agrees is
+what a pure boundary shift looks like. That is a reason to keep the hypothesis
+alive, not to close it.
 
 Two further findings from the same sweep:
 
@@ -512,14 +532,39 @@ Two further findings from the same sweep:
 So the two metrics behave differently, and any reasoning about "our day boundary"
 holds for one and not the other.
 
-**What this settles.** Aligning per-day figures with the client's app is not a
-choice between conventions, it is not achievable. The honest position:
+### The one route to sub-day resolution, untested
+
+If the API will not break a day into pieces, the pieces can be built here. The
+cron already runs every 15 minutes, and `views` returns Meta's DAY-TO-DATE total
+each time it is asked. Differencing consecutive polls therefore yields a
+15-minute increment series that Meta never exposes directly, and a series like
+that can be re-summed against any boundary we choose.
+
+Three things must be checked before any of this is built, and the first is by far
+the cheapest:
+
+1. **Watch when the day-to-date figure RESETS.** That hour IS Meta's boundary,
+   observed rather than inferred. One day of polling answers it, and it may make
+   the rest unnecessary.
+2. **Confirm the figure moves within a day at all.** If it only updates once, on
+   Meta's schedule, there is nothing to difference.
+3. **Handle restatement.** Meta revises settled figures, so a difference can come
+   out negative or jump. Increments derived this way are our reconstruction, not
+   the platform's number, and must be labelled as such.
+
+This only ever works FORWARD. No amount of polling recovers 31 August.
+
+**What this settles.** Not the alignment question, which stays open pending the
+reset-hour observation above. What it settles is the mechanism: per-day figures
+cannot be re-bucketed from the API alone. The honest position today:
 
 - Our figures are correct readings of what the API reports.
 - The app reports something different per day, from a pipeline we cannot query.
 - **Monthly totals agree closely** — 0.7% on views over 30 days when the gate was
   run — so the disagreement is in daily attribution, not in the underlying data.
 
-A client WILL eventually compare one day and find a gap. The answer is not to
-chase it, because it cannot be caught; it is to say plainly that daily figures
-come from Instagram's API and their app computes its own, while the totals agree.
+A client WILL eventually compare one day and find a gap, so the interface now
+says plainly that daily figures come from Instagram's data feed, that the app
+computes its own, and that the monthly totals agree. That holds whether or not
+the reset-hour experiment later closes the gap: it is true today, and saying it
+first is cheaper than being caught by it.

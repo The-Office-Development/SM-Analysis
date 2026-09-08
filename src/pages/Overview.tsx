@@ -171,6 +171,21 @@ export default function Overview() {
           </div>
         </section>
       </div>
+
+      {/*
+        * Said here, unprompted, because a client WILL compare one day against
+        * the Instagram app and find a gap. Verified 2026-09-08: the app's daily
+        * figure cannot be reproduced from the API under ANY 24-hour window (441
+        * in the app, 396 from every offset between UTC-14 and UTC+10), while the
+        * 30-day totals agree to 0.7%. There is nothing to align to, so the only
+        * honest move is to say so first. API-VERIFICATION.md 6.8.
+        */}
+      <p className="muted" style={{ margin: "18px 2px 0", fontSize: 11.5, lineHeight: 1.6, maxWidth: 760 }}>
+        Daily figures here come straight from Instagram's official data feed. The
+        Instagram app works out its own daily numbers a slightly different way, so
+        one particular day can differ between the two. Over a full month the
+        totals line up to within about 1%.
+      </p>
     </>
   );
 }
