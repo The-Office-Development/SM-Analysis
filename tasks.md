@@ -160,6 +160,26 @@ as work. Migrations 0001-0012 are all applied.
          into a sub-day series and re-sum it against the observed boundary.
          Forward only; nothing recovers 31 August.
 
+9. **The Analysis page and the export.** DONE 2026-09-08. Four things the native
+   app does not compute: when posts actually performed (not when followers are
+   online), which days cost followers and what went out on them, how far a post
+   travelled past the following it had at the time, and how few posts carry half
+   the reach. Every bucket refuses a result below three posts and the timing
+   panel stays silent below twelve, because an analysis cannot be checked against
+   a phone the way a metric can.
+
+   The CSV was rewritten. It had been exporting the literal text "null" for every
+   unreported metric, which breaks SUM in the client's spreadsheet and reads as a
+   broken product to whoever they forwarded it to. It now carries its own context
+   (source, window, timezone, what a blank means), a summary with the discovery
+   split and concentration, every stored day, every post with derived columns,
+   and a definitions block — plus a UTF-8 BOM so Arabic captions survive Excel.
+
+   - [ ] **Check the Discovery panel against Malek's account before the drinkat
+         call.** `reach_non_followers` was null on every day ever stored as of the
+         last audit. It is the most sponsor-relevant number in the product, and
+         the summary line in the export quotes it.
+
 **Carried into the pilot:** story capture (§6c) — built, never once verified,
 zero stories captured to date.
 
