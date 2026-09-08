@@ -16,7 +16,10 @@
 
 export const BRAND = {
   product: "PulseBoard",
-  company: "The Office",
+  // The DEVELOPMENT arm, not "The Office" alone. This line appears on documents
+  // that reach sponsors and other companies, so it names the entity that
+  // actually produced the software.
+  company: "The Office Development",
   site: "app.theoffice.it.com",
 } as const;
 

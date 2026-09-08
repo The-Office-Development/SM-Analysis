@@ -81,7 +81,7 @@ test("the file says what produced it and when", () => {
   // route back to a sponsor who has never heard of this product.
   const csv = buildCsv(input());
   assert.ok(/Prepared with PulseBoard/.test(csv));
-  assert.ok(/The Office/.test(csv));
+  assert.ok(/The Office Development/.test(csv), "the footer names the entity that produced the software");
   assert.ok(/Generated 20\d\d-\d\d-\d\d \d\d:\d\d/.test(csv), "the generation time must be stated");
 });
 
