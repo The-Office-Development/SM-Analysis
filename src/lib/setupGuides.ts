@@ -86,7 +86,7 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
       "Permissions requested: instagram_business_basic and instagram_business_manage_insights. Both are read-only, so this app cannot post, comment or message.",
       "Follower demographics need roughly 100 followers. Below that Meta returns nothing and the Audience page stays empty. That is Meta's limit, not a failed sync.",
       "A new account has no history for Meta to backfill, so trends build up from your first sync onward.",
-      "History arrives in chunks over several syncs rather than all at once: only reach is available as a daily series, so every other metric costs one API call per day.",
+      "History arrives in chunks over several syncs rather than all at once. Instagram will only answer about one day at a time for most figures, so a month of history is hundreds of separate questions. Recent days are refreshed on every run; older history fills in behind them.",
       "Connecting a Facebook Page is a separate row above, and still uses the Facebook app's credentials.",
     ],
   },

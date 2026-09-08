@@ -58,7 +58,7 @@ function PostDetailInner() {
           <h3 style={{ margin: 0 }}>That post is not in the current window</h3>
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
             It may fall outside the selected date range, or belong to an account that is
-            no longer connected. Content shows the 25 most recent posts per account.
+            no longer connected.
           </p>
           <Link to="/content" className="btn" style={{ alignSelf: "start" }}>Back to Content</Link>
         </div>

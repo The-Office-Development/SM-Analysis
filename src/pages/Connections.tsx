@@ -131,7 +131,7 @@ export default function Connections() {
       </div>
 
       <div className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-        <span className="muted" style={{ fontSize: 12.5 }}>Data refreshes on sync. Automatic daily sync runs server-side once deployed.</span>
+        <span className="muted" style={{ fontSize: 12.5 }}>Your numbers refresh by themselves every 15 minutes. Use Sync if you have just posted and do not want to wait.</span>
         <button className="btn btn--sm" onClick={() => dash.sync()} disabled={dash.syncing || dash.connectedPlatforms.length === 0}>
           <IcRefresh className={dash.syncing ? "spin" : ""} /> Sync now
         </button>
