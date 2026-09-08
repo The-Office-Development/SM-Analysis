@@ -191,7 +191,27 @@ export function installGraphMock(opts) {
        * A post whose metrics are absent must store null, not 0. See migration
        * 0009 and the test that pins this.
        */
-      return ok({ data: [
+      /*
+       * TWO PAGES, joined by a cursor.
+       *
+       * Instagram returns media newest-first in pages of 25 with a paging
+       * cursor. The mock previously returned one page and no cursor, so nothing
+       * exercised paging at all — and the sync did in fact stop at the first
+       * page, leaving everything older than an account's 25 most recent posts
+       * silently absent.
+       */
+      const after = new URL(u).searchParams.get("after");
+      if (after === "CURSOR_1") {
+        return ok({ data: [
+          {
+            id: "post_older", caption: "second page", media_type: "IMAGE",
+            permalink: "https://instagram.com/p/ccc", timestamp: `${from}T08:00:00+0000`,
+            like_count: 5, comments_count: 1,
+            insights: { data: [{ name: "reach", values: [{ value: 120 }] }] },
+          },
+        ] });   // no paging block: Meta has no more to give
+      }
+      return ok({ paging: { cursors: { after: "CURSOR_1" }, next: "https://example/next" }, data: [
         {
           id: "post_reported", caption: "reported", media_type: "IMAGE",
           permalink: "https://instagram.com/p/aaa", timestamp: `${from}T09:00:00+0000`,

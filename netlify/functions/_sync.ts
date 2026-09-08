@@ -52,6 +52,9 @@ export const MAX_BACKFILL = Math.max(1, Number(process.env.IG_MAX_BACKFILL ?? 30
 // before a caller can influence it.
 const callBudget = () => Math.max(5, Number(process.env.IG_CALL_BUDGET ?? 38));
 
+/** Signals that today's audience snapshot already exists and need not be fetched. */
+class SkipAudience extends Error {}
+
 /** Thrown when the run has spent its call budget. Caught by optional() -> null. */
 class CallBudgetExhausted extends Error {
   constructor(spent: number) {
@@ -212,14 +215,34 @@ async function totalValuePerDay(
 ): Promise<Series> {
   const byDate: Record<string, number> = {};
   let failedFirst = false;
-  for (let i = 0; i < dates.length; i++) {
-    const w = dayWindow(dates[i], offsetHours);
+  /*
+   * NEWEST DAY FIRST.
+   *
+   * `dates` runs oldest to newest, and this loop used to follow it. That is the
+   * wrong order the moment a run can stop early: the call budget, a throttle or
+   * a timeout all truncate the tail, so the days that went missing were the most
+   * RECENT ones — the days a client actually looks at, and the only days still
+   * changing.
+   *
+   * Walking backwards inverts that. What gets dropped is the oldest end of the
+   * trailing window: days already stored by earlier runs, already settled, and
+   * revisited again next hour. The same amount of work is skipped; it is simply
+   * skipped where it costs nothing.
+   *
+   * `failedFirst` still means "the very first day we asked for failed", which is
+   * how a metric the account does not expose at all is told apart from one that
+   * merely ran out of room. That first day is now the newest, which is also the
+   * best day to judge availability on.
+   */
+  for (let n = 0; n < dates.length; n++) {
+    const date = dates[dates.length - 1 - n];
+    const w = dayWindow(date, offsetHours);
     const j = await optional(
       () => get({ metric, period: "day", metric_type: "total_value", ...extra, since: w.since, until: w.until }),
-      null as any, { ...ctx, metric, date: dates[i] });
-    if (j === null) { failedFirst = i === 0; break; }
+      null as any, { ...ctx, metric, date });
+    if (j === null) { failedFirst = n === 0; break; }
     const v = parse(j);
-    if (v !== null) byDate[dates[i]] = v;
+    if (v !== null) byDate[date] = v;
   }
   return { available: !failedFirst, byDate };
 }
@@ -243,13 +266,15 @@ async function totalValuePerDayRaw(
 ): Promise<{ available: boolean; jsonByDate: Record<string, any> }> {
   const jsonByDate: Record<string, any> = {};
   let failedFirst = false;
-  for (let i = 0; i < dates.length; i++) {
-    const w = dayWindow(dates[i], offsetHours);
+  // Newest first, for the reason given in totalValuePerDay above.
+  for (let n = 0; n < dates.length; n++) {
+    const date = dates[dates.length - 1 - n];
+    const w = dayWindow(date, offsetHours);
     const j = await optional(
       () => get({ metric, period: "day", metric_type: "total_value", ...extra, since: w.since, until: w.until }),
-      null as any, { ...ctx, metric, date: dates[i] });
-    if (j === null) { failedFirst = i === 0; break; }
-    jsonByDate[dates[i]] = j;
+      null as any, { ...ctx, metric, date: date });
+    if (j === null) { failedFirst = n === 0; break; }
+    jsonByDate[date] = j;
   }
   return { available: !failedFirst, jsonByDate };
 }
@@ -350,8 +375,37 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     if (error) throw error;
   }
 
-  // Audience demographics — best effort, IG + FB expose them (TikTok basic API does not).
+  /*
+   * Audience demographics — best effort, and ONCE A DAY, not once an hour.
+   *
+   * These are stored as a daily snapshot keyed on (account_id, captured_on), so
+   * every run after the first of a day fetched four calls' worth of data only to
+   * overwrite the same row with the same values. At an hourly cron that is
+   * ninety-odd wasted calls a day per account, out of a per-invocation budget of
+   * fewer than fifty.
+   *
+   * That waste was invisible while it merely cost quota. It stopped being
+   * invisible when the budget guard began refusing calls: demographics were
+   * being skipped for lack of budget on runs where they had already been
+   * captured hours earlier and did not need fetching at all.
+   *
+   * The check is one cheap database read in place of four platform calls.
+   */
+  const { data: todaysSnapshot } = await db
+    .from("audience_snapshots")
+    .select("account_id")
+    .eq("account_id", acc.id)
+    .eq("captured_on", today())
+    .maybeSingle();
+
   try {
+    if (todaysSnapshot) {
+      log("sync.audience_already_captured", {
+        account: acc.id, date: today(),
+        detail: "demographics are a daily snapshot; skipping the fetch leaves budget for the rest of the run",
+      });
+      throw new SkipAudience();
+    }
     const snap = acc.platform === "instagram"
       ? (igLogin ? await audienceInstagramLogin(acc, token, counter) : await audienceInstagram(acc, token, counter))
       : acc.platform === "facebook" ? await audienceFacebook(acc, token, counter) : null;
@@ -362,8 +416,9 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
       );
     }
   } catch (e) {
-    if (isThrottleError(e) || isAuthError(e)) throw e;
-    /* audience insights are optional and permission-gated */
+    if (e instanceof SkipAudience) { /* already have today's; nothing to do */ }
+    else if (isThrottleError(e) || isAuthError(e)) throw e;
+    /* audience insights are otherwise optional and permission-gated */
   }
 
   await db.from("social_accounts").update({ last_synced_at: new Date().toISOString() }).eq("id", acc.id);
@@ -455,6 +510,28 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
   // Same bounded window as the Instagram Login path, and for the same reason:
   // the insights reference governs BOTH login paths with one metrics table, so
   // the per-day call cost applies here too.
+  /*
+   * CONTENT AND STORIES FIRST, before the day-by-day metrics.
+   *
+   * Everything in a run competes for one subrequest budget, and whatever comes
+   * last is what starves. On 2026-09-08 the day loop consumed the entire budget
+   * and media returned posts:0 pages:0 — an account's whole content list gone,
+   * silently, because it was queued behind thirty per-day calls.
+   *
+   * The order follows from what can be recovered later. Stories cannot be
+   * re-fetched at all; media is cheap and describes what the client sees right
+   * now; day metrics are the most expensive AND the most recoverable, since the
+   * trailing re-fetch revisits them every run and history stays available for
+   * two years. So the irreplaceable and the cheap go first, and the
+   * expensive-but-durable absorbs any shortfall.
+   */
+  const media = await fetchMedia(get, `/${acc.external_id}/media`, "25", { account: acc.id });
+  const stories = await captureStories(
+    (path, params) => get(path, params ?? {}),
+    acc.external_id,
+    { account: acc.id },
+  );
+
   const dates = enumerateDays(start, end);
   const since = String(unixSec(dates[0])), until = String(unixSec(addDays(dates[dates.length - 1], 1)));
 
@@ -508,7 +585,6 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
     if (perDay.available) reach = perDay;
   }
 
-  const media = await fetchMedia(get, `/${acc.external_id}/media`, "25", { account: acc.id });
 
   const posts: Post[] = (media.data ?? []).map((m: any) => {
     const ins = normInsights(m.insights?.data ?? []);
@@ -585,21 +661,6 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
     reach_non_followers: pickDay(reachNonFollowers, date),
     provisional: isProvisional(date, now),
   }));
-  /*
-   * Stories, captured on EVERY run rather than only during a backfill.
-   *
-   * They are the one thing here that cannot be fetched again later: 24 hours
-   * after publishing a story is unreachable and its insights are gone. So this
-   * is not part of the day-window logic and is not bounded by DAY_BUDGET — it
-   * runs whenever the sync runs, and the last capture before expiry becomes the
-   * permanent record.
-   */
-  const stories = await captureStories(
-    (path, params) => get(path, params ?? {}),
-    acc.external_id,
-    { account: acc.id },
-  );
-
   return { days, posts: [...posts, ...stories] };
 }
 
@@ -618,6 +679,34 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
 
   // syncWindow already bounded this to DAY_BUDGET days; it is contiguous, and a
   // backfill walks backwards so each chunk is anchored by the one after it.
+  /*
+   * CONTENT AND STORIES FIRST, before the day-by-day metrics.
+   *
+   * Everything in a run competes for one subrequest budget, and whatever comes
+   * last is what starves. On 2026-09-08 the day loop consumed the entire budget
+   * and media returned posts:0 pages:0 — the account's whole content list gone,
+   * silently, because it was queued behind thirty per-day calls.
+   *
+   * The ordering follows from what can be recovered later:
+   *
+   *   stories  cannot be re-fetched at all. Gone in 24 hours, permanently.
+   *   media    is cheap and current; a missed page is a gap in what the client
+   *            sees right now.
+   *   day metrics are the most expensive AND the most recoverable — the trailing
+   *            re-fetch revisits them every run, and history stays available for
+   *            two years.
+   *
+   * So the irreplaceable and the cheap go first, and the expensive-but-durable
+   * absorbs the shortfall. A day left for the next run costs nothing; a story
+   * left for the next run may not exist by then.
+   */
+  const media = await fetchMedia(get, "/me/media", "25", { account: acc.id });
+  const stories = await captureStories(
+    (path, params) => get(path, params ?? {}),
+    acc.external_id,
+    { account: acc.id },
+  );
+
   const dates = enumerateDays(start, end);
   const since = String(unixSec(dates[0])), until = String(unixSec(addDays(dates[dates.length - 1], 1)));
 
@@ -683,7 +772,6 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
     if (perDay.available) reach = perDay;
   }
 
-  const media = await fetchMedia(get, "/me/media", "25", { account: acc.id });
 
   const posts: Post[] = (media.data ?? []).map((m: any) => {
     const ins = normInsights(m.insights?.data ?? []);
@@ -757,21 +845,6 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
     reach_non_followers: pickDay(reachNonFollowers, date),
     provisional: isProvisional(date, now),
   }));
-  /*
-   * Stories, captured on EVERY run rather than only during a backfill.
-   *
-   * They are the one thing here that cannot be fetched again later: 24 hours
-   * after publishing a story is unreachable and its insights are gone. So this
-   * is not part of the day-window logic and is not bounded by DAY_BUDGET — it
-   * runs whenever the sync runs, and the last capture before expiry becomes the
-   * permanent record.
-   */
-  const stories = await captureStories(
-    (path, params) => get(path, params ?? {}),
-    acc.external_id,
-    { account: acc.id },
-  );
-
   return { days, posts: [...posts, ...stories] };
 }
 
@@ -1283,71 +1356,121 @@ async function captureStories(
 }
 
 /**
- * Fetch media without letting one unmeasurable post cost every post.
+ * How many posts to reach for, across pages.
  *
- * Meta fails the ENTIRE /media response when any item in the page cannot carry
+ * 25 was one page, silently: an account with years of output had everything
+ * older than its 25 most recent posts simply absent, with nothing saying so. For
+ * a creator being asked "how did last spring's campaign do?", the answer was a
+ * gap.
+ *
+ * Bounded rather than unlimited because each page is a request against the same
+ * per-invocation subrequest budget as everything else. The budget guard stops it
+ * cleanly if a run runs short, so this is a target rather than a promise.
+ */
+const MEDIA_TARGET = Math.max(25, Number(process.env.IG_MEDIA_TARGET ?? 100));
+const MEDIA_PAGE = 25;
+
+/**
+ * Fetch media across pages, without letting one unmeasurable post cost a page.
+ *
+ * Two separate problems are handled here, and they interact.
+ *
+ * FIRST: Meta fails the ENTIRE response when any item in a page cannot carry
  * insights — a post published before the account last became professional, most
  * commonly. Measured live on 2026-09-06: limit=5 returned five posts, limit=10
- * returned an error, because posts six to ten predated the conversion. The
- * account had a reel with 183,686 likes and Content was showing nothing at all,
- * indistinguishable from an account that had never posted.
+ * returned an error. Requested as part of the media call the expansion is
+ * all-or-nothing, and "nothing" meant Content was empty for an account with a
+ * reel at 4.8M views.
  *
- * The failure is a property of the PAGE, not of the account, and Instagram
- * returns media newest-first — so the newest posts are the ones most likely to
- * be measurable. That gives a cheap strategy:
+ * So each page asks with insights, and on failure re-asks without them and then
+ * recovers insights for as many of the newest items as Meta will allow. Media
+ * comes back newest-first, so the newest are the ones most likely measurable.
  *
- *   1. Ask for everything with insights. Usually works; one call.
- *   2. If it fails, take the full list WITHOUT insights, so no post is lost.
- *   3. Then re-ask for insights over progressively smaller pages until one
- *      succeeds, and merge those figures onto the newest posts.
- *
- * Two or three extra calls in the bad case, and only in the bad case. Posts that
- * can be measured are; posts Meta refuses to measure keep null metrics, which is
- * the truth — it will never report them, and 0 would say they reached nobody.
+ * SECOND: only one page was ever fetched. Paging now continues while Meta offers
+ * a cursor, up to MEDIA_TARGET, and stops early when the call budget runs out —
+ * which is correct rather than unfortunate: an older page is worth less than the
+ * writes at the end of the run.
  */
 async function fetchMedia(
   get: (path: string, params: Record<string, string>) => Promise<any>,
   path: string,
-  limit: string,
+  _limit: string,
   ctx: Record<string, unknown>,
 ): Promise<{ data: any[]; withInsights: boolean }> {
   const fields = IG.MEDIA_FIELDS;
   const withMetrics = `${fields},insights.metric(${IG.MEDIA_INSIGHT_METRICS})`;
 
-  const full = await optional(
-    () => get(path, { fields: withMetrics, limit }),
-    null as any, { ...ctx, call: "media" },
-  );
-  if (full) return { data: full.data ?? [], withInsights: true };
+  const all: any[] = [];
+  let after: string | undefined;
+  let pages = 0, degraded = 0;
 
-  // The whole page was refused. Keep the posts.
-  const plain = await optional(
-    () => get(path, { fields, limit }),
-    { data: [] as any[] }, { ...ctx, call: "media_plain" },
-  );
-  const posts: any[] = plain.data ?? [];
-  if (!posts.length) return { data: [], withInsights: false };
+  try {
+    while (all.length < MEDIA_TARGET) {
+      const page = String(Math.min(MEDIA_PAGE, MEDIA_TARGET - all.length));
+      const params: Record<string, string> = { fields: withMetrics, limit: page };
+      if (after) params.after = after;
 
-  // Recover insights for as many of the NEWEST posts as Meta will allow.
-  let recovered = 0;
-  for (const n of [10, 5, 3, 1]) {
-    if (n >= posts.length) continue;
-    const page = await optional(
-      () => get(path, { fields: withMetrics, limit: String(n) }),
-      null as any, { ...ctx, call: "media_insights_page", page: String(n) },
-    );
-    if (!page) continue;
-    const byId = new Map((page.data ?? []).map((m: any) => [m.id, m.insights]));
-    for (const m of posts) if (byId.has(m.id)) { m.insights = byId.get(m.id); recovered++; }
-    break;
+      let body = await optional(
+        () => get(path, params),
+        null as any, { ...ctx, call: "media", page: String(pages + 1) },
+      );
+
+      if (!body) {
+        // This page was refused for the insights expansion. Keep its posts.
+        const plainParams: Record<string, string> = { fields, limit: page };
+        if (after) plainParams.after = after;
+        const plain = await optional(
+          () => get(path, plainParams),
+          null as any, { ...ctx, call: "media_plain", page: String(pages + 1) },
+        );
+        if (!plain) break;                       // nothing more to be had
+        body = plain;
+        degraded++;
+
+        // Recover insights for as many of this page's newest items as allowed.
+        const posts: any[] = body.data ?? [];
+        for (const n of [10, 5, 3, 1]) {
+          if (n >= posts.length) continue;
+          const sub: Record<string, string> = { fields: withMetrics, limit: String(n) };
+          if (after) sub.after = after;
+          const got = await optional(
+            () => get(path, sub),
+            null as any, { ...ctx, call: "media_insights_page", page: String(n) },
+          );
+          if (!got) continue;
+          const byId = new Map((got.data ?? []).map((m: any) => [m.id, m.insights]));
+          for (const m of posts) if (byId.has(m.id)) m.insights = byId.get(m.id);
+          break;
+        }
+      }
+
+      const batch: any[] = body.data ?? [];
+      if (!batch.length) break;
+      all.push(...batch);
+      pages++;
+
+      after = body.paging?.cursors?.after;
+      if (!after || !body.paging?.next) break;   // Meta has no more to give
+    }
+  } catch (e) {
+    // The call budget ran out mid-paging. Everything already collected stands;
+    // stopping here is what leaves room for the writes.
+    if (!(e instanceof CallBudgetExhausted)) throw e;
+    log("sync.media_paging_stopped", {
+      ...ctx, posts: all.length, pages,
+      detail: "call budget reached while paging; older posts left for a later run",
+    });
   }
 
-  log("sync.media_partial_insights", {
-    ...ctx, posts: posts.length, with_insights: recovered,
-    detail: "insights refused for the full page — usually media published before the account "
-      + "became professional. Posts are kept; the ones Meta will measure carry figures, the rest null.",
+  log("sync.media_fetched", {
+    ...ctx, posts: all.length, pages, degraded_pages: degraded,
+    detail: degraded
+      ? "some pages refused the insights expansion, usually media published before the "
+        + "account became professional; those posts are kept with null metrics"
+      : undefined,
   });
-  return { data: posts, withInsights: recovered > 0 };
+
+  return { data: all, withInsights: degraded < pages };
 }
 
 /** insight json -> { 'YYYY-MM-DD': value }, keyed by the account's own day. */

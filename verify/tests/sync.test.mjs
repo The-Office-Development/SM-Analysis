@@ -273,6 +273,54 @@ test("a run stops at its call budget, and still saves what it fetched", async ()
   assert.ok(rows.length > 0, "the run wrote rows despite running out of budget");
 });
 
+test("a truncated run keeps the NEWEST days, not the oldest", async () => {
+  /*
+   * A run can stop early for several reasons — the call budget, a throttle, a
+   * timeout — and whatever it has not reached yet is what goes missing. The days
+   * ran oldest-first, so the casualties were the most RECENT ones: the days a
+   * client looks at, and the only days still changing.
+   *
+   * Dropping the oldest end of the trailing window instead costs nothing: those
+   * days were stored by earlier runs, have settled, and are revisited next hour.
+   */
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  const previous = process.env.IG_CALL_BUDGET;
+  process.env.IG_CALL_BUDGET = "14";           // enough for a few days, not all
+  try {
+    const mock = installGraphMock({ offset: 3, days: [from, TODAY] });
+    try { await syncAccount(db, account); } finally { mock.restore(); }
+  } finally {
+    process.env.IG_CALL_BUDGET = previous;
+  }
+
+  const dates = db._rows("metrics_daily")
+    .filter((r) => r.views !== null || r.engagements !== null)
+    .map((r) => r.date).sort();
+  assert.ok(dates.length > 0, "a truncated run still stored something");
+
+  // Whatever it managed, the newest day must be among it.
+  assert.equal(dates[dates.length - 1], TODAY,
+    `a truncated run must reach today; newest stored was ${dates[dates.length - 1]}`);
+});
+
+test("media is paged, not truncated at the first page", async () => {
+  /*
+   * The sync fetched one page of 25 and stopped. For an account with years of
+   * output everything older was silently absent — no error, no note, just a gap
+   * where last spring's campaign should be. The mock now returns a cursor and a
+   * second page, which is what Instagram actually does.
+   */
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] });
+
+  const ids = db._rows("content").map((r) => r.external_id);
+  assert.ok(ids.includes("post_reported"), "first page stored");
+  assert.ok(ids.includes("post_older"),
+    "the SECOND page must be stored too — stopping at page one is the defect");
+});
+
 test("recent days are flagged provisional so the UI need not read them as a drop", async () => {
   const from = addDays(TODAY, -29);
   const db = seedDb();
