@@ -2,9 +2,23 @@ import type { Handler } from "./_lib";
 import { admin, userIdFromToken, json, isAuthError, isThrottleError, log, type Db } from "./_lib";
 import { syncAccount, MAX_BACKFILL, type AccountRow } from "./_sync";
 
-/** Minimum gap between syncs of one account, enforced server-side.
- *  The UI disables its button while a sync runs; a script does not. */
-const MIN_SYNC_INTERVAL_MS = 15 * 60 * 1000;
+/**
+ * Minimum gap between manual syncs of one account, enforced server-side. The UI
+ * disables its button while a sync runs; a script does not.
+ *
+ * TWO MINUTES, not fifteen.
+ *
+ * Fifteen was chosen when the scheduled sync ran hourly, and it made sense then:
+ * the button skipped up to an hour of waiting. Once the cron moved to every
+ * fifteen minutes the two numbers collided, and the button silently became
+ * useless — an account is essentially never more than fifteen minutes stale, so
+ * every press answered "Already up to date" and did nothing.
+ *
+ * The throttle only needs to stop a script hammering the endpoint. Two minutes
+ * does that while leaving the button its actual purpose: someone who has just
+ * posted should not be told to wait for a timer.
+ */
+const MIN_SYNC_INTERVAL_MS = Math.max(30_000, Number(process.env.SYNC_MIN_INTERVAL_MS ?? 120_000));
 
 export async function runAccount(db: Db, acc: AccountRow, userId: string | null) {
   const started = new Date().toISOString();
@@ -97,7 +111,10 @@ export const handler: Handler = async (event) => {
       || backfilling.has(a.id)
   );
   if (!due.length) {
-    return json(200, { message: "Already up to date — synced within the last 15 minutes.", ok: 0, total: accounts.length });
+    return json(200, {
+      message: `Just refreshed. Everything here is less than ${Math.round(MIN_SYNC_INTERVAL_MS / 60000)} minutes old, and it updates itself every 15 minutes.`,
+      ok: 0, total: accounts.length,
+    });
   }
 
   let ok = 0;
