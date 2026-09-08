@@ -22,6 +22,10 @@ for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){
 # is quoted, so it is tested like the sync is. Type-only imports are stripped by
 # the compiler, so analytics.ts builds without dragging in the React tree.
 ./node_modules/.bin/tsc src/lib/insights.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
+# format.ts carries timeAgo, which is what tells a client WHEN a figure was read.
+# That line is the product's answer to "your number disagrees with Instagram", so
+# it is tested rather than trusted.
+./node_modules/.bin/tsc src/lib/format.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
 node -e '
 const fs=require("fs"),d="verify/build-lib";
 for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){

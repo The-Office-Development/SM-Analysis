@@ -57,6 +57,11 @@ export interface ContentItem {
   reach: number | null;
   avg_watch_seconds: number | null;
   retention_pct: number | null;
+  // When these figures were last read from the platform, by the sync or by an
+  // on-demand check. null for rows written before migration 0013. Shown to the
+  // client so a gap against Instagram's own app reads as a timing difference
+  // rather than as a wrong number.
+  checked_at: string | null;
 }
 
 export interface AudienceSnapshot {

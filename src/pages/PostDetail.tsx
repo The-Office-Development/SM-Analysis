@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
-import { metric, sumKnown, full, shortDate } from "../lib/format";
+import { metric, sumKnown, full, shortDate, timeAgo } from "../lib/format";
 import { postContext, postRank, engagementSplit, ageHours, tooEarly } from "../lib/insights";
 import { PlatformBadge } from "../components/PlatformTile";
 import RequireData from "../components/RequireData";
@@ -71,6 +71,9 @@ function PostDetailInner() {
   const view = fresh ? ({ ...post, ...fresh } as typeof post) : post;
   const hours = ageHours(post.published_at);
   const young = tooEarly(post.published_at);
+  // When these figures were read. A manual check supersedes it in the same
+  // render, which is why refreshMsg takes priority over this below.
+  const checked = timeAgo(post.checked_at);
   const engagement = sumKnown(view.likes, view.comments, view.shares, view.saves);
   // A rate needs a denominator that exists. Reach of null gives no rate at all
   // rather than a rate computed against a fabricated zero.
@@ -113,10 +116,33 @@ function PostDetailInner() {
           <h2 style={{ margin: 0, fontSize: 19, lineHeight: 1.35 }}>
             {post.title || "Untitled"}
           </h2>
-          {refreshMsg && (
+          {refreshMsg ? (
             <p className="muted" style={{ margin: 0, fontSize: 12 }}>
               {refreshMsg}
               {fresh && " Instagram keeps counting for days, so these will still move."}
+            </p>
+          ) : (
+            /*
+             * ALWAYS shown, not only after someone presses "Check now".
+             *
+             * This is the line that prevents the most likely complaint about this
+             * product. A creator publishes, sees a figure in the Instagram app,
+             * opens this page and sees a different one. Both are right; they were
+             * read minutes apart, and a new post's counters move fast.
+             *
+             * Before this line the page gave them nothing to reason with, so the
+             * only available conclusion was that we are wrong. Naming the moment
+             * the figures were taken turns a contradiction into a timestamp, and
+             * the button beside it turns it into something they can settle
+             * themselves in one click.
+             */
+            <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+              {checked
+                ? `Read from Instagram ${checked}.`
+                : "Not yet read from Instagram since this page started recording the time."}
+              {" "}Instagram keeps counting for days, so a figure here can differ
+              from the one in your Instagram app. Press Check now to read it
+              again this second.
             </p>
           )}
 

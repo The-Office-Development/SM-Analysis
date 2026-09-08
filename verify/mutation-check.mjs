@@ -15,6 +15,7 @@ const TOKENS = "verify/build/_tokens.js";
 const DELETION = "verify/build/meta-data-deletion.js";
 const INSTA = "verify/build/_instagram.js";
 const INSIGHTS = "verify/build-lib/insights.js";
+const FORMAT = "verify/build-lib/format.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -144,11 +145,26 @@ const mutations = [
   { name: "unset account timezone silently inherits the platform's boundary", file: SYNC,
     find: "  return (typeof m === \"number\" && Number.isFinite(m) ? m : DEFAULT_TZ_OFFSET_MINUTES) / 60;",
     replace: "  return (typeof m === \"number\" && Number.isFinite(m) ? m : 0) / 60;" },
+  /*
+   * An unknown read time invented as "just now".
+   *
+   * This is the fabricated-zero defect wearing a different hat, and it damages
+   * the same way. The freshness line exists so a client comparing this dashboard
+   * against the Instagram app can tell a timing gap from an error. A line that
+   * claims a figure was read seconds ago when nobody knows when it was read
+   * makes the product confidently wrong at precisely the moment it is being
+   * checked, which is worse than saying nothing at all.
+   */
+  { name: "unknown read time invented as 'just now'", file: FORMAT,
+    find: `    if (!iso)
+        return null;`,
+    replace: `    if (!iso)
+        return "just now";` },
 ];
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

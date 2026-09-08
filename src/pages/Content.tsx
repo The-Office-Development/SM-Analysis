@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
-import { compact, metric, sumKnown, pctPlain, shortDate } from "../lib/format";
+import { compact, metric, sumKnown, pctPlain, shortDate, timeAgo } from "../lib/format";
 import type { ContentItem, Platform } from "../lib/types";
 import { PlatformBadge } from "../components/PlatformTile";
 import StatCard from "../components/StatCard";
@@ -61,6 +61,12 @@ function ContentInner() {
     else { setSortKey(k); setDir(-1); }
   }
 
+  // The most recent read across the listed posts. See the note beside its use.
+  const lastRead = timeAgo(
+    items.reduce<string | null>(
+      (best, i) => (i.checked_at && (!best || i.checked_at > best) ? i.checked_at : best), null),
+  );
+
   return (
     <>
       <div className="kpis">
@@ -75,6 +81,14 @@ function ContentInner() {
           <h3>{inRange ? "Published in range" : "All content"}</h3>
           <span className="sub">
             {items.length} post{items.length === 1 ? "" : "s"} · click a column to sort
+            {/*
+              * The freshest stamp across the listed posts, not each post's own.
+              * A timestamp on every row would be noise, and the honest summary of
+              * a table is its most recent read: it answers "how current is this
+              * screen?", which is the question someone holding their phone next
+              * to it is actually asking.
+              */}
+            {lastRead && ` · read from Instagram ${lastRead}`}
           </span>
           <span style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
             <button type="button" className={`btn btn--sm${inRange ? "" : " btn--on"}`}

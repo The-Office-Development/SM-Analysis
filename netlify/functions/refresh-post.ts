@@ -113,7 +113,9 @@ export const handler: Handler = async (event) => {
 
     const refreshedAt = new Date().toISOString();
     const { error: upErr } = await db.from("content")
-      .update({ ...fresh, refreshed_at: refreshedAt }).eq("id", row.id);
+      // Both: refreshed_at rate-limits this endpoint, checked_at is the freshness
+      // the client is shown. A manual check updates both; a sync only the latter.
+      .update({ ...fresh, refreshed_at: refreshedAt, checked_at: refreshedAt }).eq("id", row.id);
     if (upErr) return json(500, { message: `Fetched it, but could not save: ${upErr.message}` });
 
     log("refresh_post.ok", { uid, account: account.id, post: row.external_id });

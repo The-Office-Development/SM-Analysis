@@ -138,6 +138,10 @@ export const demoContent: ContentItem[] = (() => {
         reach: Math.round(views * (0.8 + r() * 0.3)),
         avg_watch_seconds: isVideo ? Math.round(6 + r() * 30) : null,
         retention_pct: isVideo ? Math.round(28 + r() * 52) : null,
+        // A few minutes ago, as a real sync would leave it. The demo has to show
+        // the freshness line too, since that line is half of what stops a client
+        // reading a difference against Instagram as an error.
+        checked_at: new Date(Date.now() - Math.round(r() * 12 + 1) * 60_000).toISOString(),
       });
     });
   }

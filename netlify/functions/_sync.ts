@@ -428,8 +428,21 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     }
   }
   if (posts.length) {
+    /*
+     * Stamp checked_at on every post this run read.
+     *
+     * The figures themselves are lifetime counters and carry no timestamp, so
+     * without this the dashboard can show a number but not say when it was true.
+     * That is the whole of the friction: a creator sees 1.5k views in Instagram,
+     * a different figure here, and nothing on screen distinguishing "read four
+     * minutes ago" from "wrong".
+     *
+     * NOT refreshed_at, which rate-limits /api/refresh-post. Writing that here
+     * would make a recent sync refuse the client's own "Check now". See 0013.
+     */
+    const checkedAt = new Date().toISOString();
     const { error } = await db.from("content").upsert(
-      posts.map((p) => ({ account_id: acc.id, platform: acc.platform, ...p })),
+      posts.map((p) => ({ account_id: acc.id, platform: acc.platform, ...p, checked_at: checkedAt })),
       { onConflict: "account_id,external_id" }
     );
     if (error) throw error;

@@ -64,9 +64,9 @@ export async function fetchContent(range: Range): Promise<ContentItem[]> {
      * It also broke the comparison the per-post page is built on: a median over
      * one post is not a baseline.
      *
-     * The sync stores at most 25 posts per account, so "everything stored" is
-     * small and bounded — there is nothing to page through and nothing to
-     * protect against here.
+     * The sync stores up to 100 posts per account (it follows Meta's cursor to
+     * MEDIA_TARGET), so "everything stored" is small and bounded — there is
+     * nothing to page through and nothing to protect against here.
      */
     .order("views", { ascending: false, nullsFirst: false })
     .limit(500);
