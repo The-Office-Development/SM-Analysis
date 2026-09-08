@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
 import { metric, sumKnown, full, shortDate, timeAgo } from "../lib/format";
-import { postContext, postRank, engagementSplit, ageHours, tooEarly } from "../lib/insights";
+import { postContext, postRank, engagementSplit, ageHours, tooEarly, reachMultiples } from "../lib/insights";
 import { PlatformBadge } from "../components/PlatformTile";
 import RequireData from "../components/RequireData";
 import DistributionStrip from "../components/charts/DistributionStrip";
@@ -137,6 +137,18 @@ function PostDetailInner() {
   const young = tooEarly(post.published_at);
   // When these figures were read, including by the automatic read above.
   const checked = timeAgo(checkedAt);
+  // Computed across every post so the divisor is the follower count on THIS
+  // post's publication day; a per-post shortcut would not have the series.
+  const multiple = reachMultiples([view], dash.metrics, dash.scope)[0] ?? null;
+  /*
+   * The platform's own name, not a hardcoded "Instagram".
+   *
+   * This page serves TikTok and Facebook posts too, and telling someone their
+   * TikTok figures were "read from Instagram" undermines the exact sentence that
+   * is meant to make a discrepancy readable.
+   */
+  const platform = PLATFORMS[post.platform].name;
+  const demo = isDemoMode();
   const engagement = sumKnown(view.likes, view.comments, view.shares, view.saves);
   // A rate needs a denominator that exists. Reach of null gives no rate at all
   // rather than a rate computed against a fabricated zero.
@@ -183,7 +195,7 @@ function PostDetailInner() {
           {refreshMsg ? (
             <p className="muted" style={{ margin: 0, fontSize: 12 }}>
               {refreshMsg}
-              {fresh && " Instagram keeps counting for days, so these will still move."}
+              {fresh && ` ${platform} keeps counting for days, so these will still move.`}
             </p>
           ) : (
             /*
@@ -201,20 +213,48 @@ function PostDetailInner() {
              * themselves in one click.
              */
             <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-              {refreshing
-                ? "Reading the latest numbers from Instagram..."
-                : checked
-                  ? `Read from Instagram ${checked}.`
-                  : "Not yet read from Instagram since this page started recording the time."}
-              {" "}This page checks Instagram each time you open it. Instagram
-              keeps counting for days, so these will still move.
+              {demo ? (
+                // The demo neither fetches nor could: saying it checks the
+                // platform each time would be a false claim about the product,
+                // made in the one place a prospect is looking closely.
+                <>These are sample figures, not read from {platform}.</>
+              ) : refreshing ? (
+                `Reading the latest numbers from ${platform}...`
+              ) : checked ? (
+                <>Read from {platform} {checked}. This page checks {platform} each
+                time you open it. {platform} keeps counting for days, so these
+                will still move.</>
+              ) : (
+                <>Not yet read from {platform} since this page started recording
+                the time. Press Check now to read it this second.</>
+              )}
+            </p>
+          )}
+
+          {/*
+            * How far this post travelled past the following it HAD.
+            *
+            * The sentence a creator repeats to a sponsor, and the one Instagram
+            * never produces: it shows the reach and never divides. Placed at the
+            * top rather than among the metrics because it is the headline claim
+            * about the post, not another measurement of it.
+            *
+            * Absent when the follower count on that day is unknown. Dividing by
+            * today's count would flatter or punish an old post according to
+            * growth that happened after it.
+            */}
+          {multiple && (
+            <p style={{ margin: 0, fontSize: 13 }}>
+              Reached <strong>{multiple.times.toFixed(1)} times</strong> your following
+              at the time, {full(multiple.reach)} accounts against{" "}
+              {full(multiple.followers)} followers on the day it went out.
             </p>
           )}
 
           {young && (
             <p className="muted" style={{ margin: 0, fontSize: 12.5, padding: "8px 10px",
                  border: "1px solid var(--border)", borderRadius: 8 }}>
-              <strong>Too early to judge.</strong> Instagram is still counting, and reports
+              <strong>Too early to judge.</strong> {platform} is still counting, and reports
               nothing at all for the first stretch after publishing. Numbers below will keep
               climbing for a day or more, so a low figure now is not a verdict.
             </p>

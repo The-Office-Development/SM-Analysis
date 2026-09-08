@@ -1,6 +1,9 @@
 import type { useDash } from "../context/DashboardContext";
 import { seriesByDay, followersByDay, sum, latest, engagementRate } from "./api";
 import { periodCompare, bestTimes, anomalies } from "./analytics";
+import {
+  publishTiming, followerCost, reachMultiples, reachConcentration,
+} from "./insights";
 import { PLATFORMS } from "./platforms";
 import type { Platform } from "./types";
 
@@ -22,6 +25,28 @@ export interface ReportSnapshot {
   top: { title: string; platform: string; views: number | null; likes: number | null; comments: number | null }[];
   windows: string[];
   alerts: { label: string; kind: "spike" | "drop"; deltaPct: number; date: string }[];
+  /*
+   * The analysis Instagram does not do.
+   *
+   * Carried in the snapshot rather than recomputed by the sheet, because the
+   * same object is what a SHARED report is rendered from — with no database, no
+   * session and no metric rows. Leaving these out of it would mean the version a
+   * sponsor opens is the thin one, which is precisely backwards: the sponsor is
+   * the reader these figures were written for.
+   *
+   * `analysis` is optional so a link shared before this existed still renders.
+   */
+  analysis?: {
+    /** Days ranked by how this account's own posts performed. Empty when too few. */
+    timing: { label: string; lift: number; posts: number }[];
+    timingMeasured: number;
+    /** False when the platform has never reported unfollows; then costDays means nothing. */
+    costReported: boolean;
+    costTypical: number | null;
+    costDays: { date: string; unfollows: number; typical: number; posts: string[] }[];
+    multiples: { title: string; date: string; reach: number; followers: number; times: number }[];
+    concentration: { posts: number; postsForHalf: number; topSharePct: number } | null;
+  };
 }
 
 export function buildSnapshot(dash: Dash): ReportSnapshot {
@@ -66,5 +91,44 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
     windows: bestTimes(dash.audience, dash.connectedPlatforms, 3).map((w) => w.label),
     alerts: anomalies(dash.metrics, dash.scope).slice(0, 6)
       .map((a) => ({ label: a.label, kind: a.kind, deltaPct: a.deltaPct, date: a.date })),
+    analysis: buildAnalysis(dash),
+  };
+}
+
+/**
+ * The deep layer, reduced to what a printed page and a shared link can show.
+ *
+ * The guards travel with it. A timing ranking below the threshold arrives as an
+ * EMPTY list, not as a weak one, so a sheet cannot accidentally print a
+ * recommendation the interface refused to make.
+ */
+function buildAnalysis(dash: Dash): ReportSnapshot["analysis"] {
+  const content = dash.content.filter((c) => dash.scope === "all" || c.platform === dash.scope);
+
+  const timing = publishTiming(content);
+  const cost = followerCost(dash.metrics, content, dash.scope);
+  const multiples = reachMultiples(content, dash.metrics, dash.scope);
+  const conc = reachConcentration(content);
+
+  return {
+    timing: timing.enough
+      ? timing.byDay
+          .filter((b): b is typeof b & { lift: number } => b.lift !== null)
+          .slice(0, 4)
+          .map((b) => ({ label: b.label, lift: b.lift, posts: b.posts }))
+      : [],
+    timingMeasured: timing.measured,
+    costReported: cost.reported,
+    costTypical: cost.typical,
+    costDays: cost.days.slice(0, 4).map((d) => ({
+      date: d.date, unfollows: d.unfollows, typical: d.typical,
+      posts: d.posts.map((p) => p.title),
+    })),
+    multiples: multiples.slice(0, 5).map((m) => ({
+      title: m.title, date: m.date, reach: m.reach, followers: m.followers, times: m.times,
+    })),
+    concentration: conc.postsForHalf !== null && conc.topShare !== null
+      ? { posts: conc.posts, postsForHalf: conc.postsForHalf, topSharePct: conc.topShare * 100 }
+      : null,
   };
 }

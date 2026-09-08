@@ -31,6 +31,11 @@ for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){
 # decisions are pure and therefore testable, which is why they live apart from
 # the DOM half in reports.ts.
 ./node_modules/.bin/tsc src/lib/csvReport.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
+# The workbook is written byte by byte rather than by a library, so the ZIP
+# container is tested with the system unzip as an independent reader. A bad CRC
+# does not degrade: the file simply refuses to open, in front of the client's
+# sponsor.
+./node_modules/.bin/tsc src/lib/xlsx.ts src/lib/xlsxReport.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
 node -e '
 const fs=require("fs"),d="verify/build-lib";
 for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){

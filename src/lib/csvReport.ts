@@ -1,6 +1,6 @@
 import { escapeCsvField as esc } from "./csv";
 import { sumKnown } from "./format";
-import { reachConcentration, reachMultiples } from "./insights";
+import { publishTiming, followerCost, reachConcentration, reachMultiples } from "./insights";
 import type { MetricPoint, ContentItem, Platform, Range, Scope } from "./types";
 
 /**
@@ -137,6 +137,52 @@ export function buildCsv(dash: CsvInput): string {
   s("Posts carrying half of all reach", num(conc.postsForHalf),
     conc.postsForHalf === null ? "" : `Out of ${conc.posts} posts with a reach figure`);
   s("Best post's share of all reach %", rate(conc.topShare !== null ? conc.topShare * 100 : null));
+
+  /* ---- the analysis Instagram does not do -------------------------------- */
+  /*
+   * Present in the CSV as well as the workbook. Someone who exports the raw file
+   * should not silently get the thinner report, and these are the figures that
+   * distinguish this from a screenshot of the native app.
+   */
+  const timing = publishTiming(content);
+  const cost = followerCost(dash.metrics, content, dash.scope);
+
+  section("BEYOND INSTAGRAM'S OWN FIGURES");
+  line(esc("None of the following appears in the Instagram app."));
+
+  blank();
+  line(esc("When posts actually performed"));
+  if (!timing.enough) {
+    line(esc(`Only ${timing.measured} posts could be measured. Too few to say anything useful yet.`));
+  } else {
+    line(esc("Day"), esc("Compared with a typical post here"), esc("Posts behind it"));
+    for (const b of timing.byDay.filter((x) => x.lift !== null)) {
+      line(esc(b.label), rate(b.lift, 2), String(b.posts));
+    }
+    line(esc("Time of day"), esc("Compared with a typical post here"), esc("Posts behind it"));
+    for (const b of timing.byBlock.filter((x) => x.lift !== null)) {
+      line(esc(b.label), rate(b.lift, 2), String(b.posts));
+    }
+    line(esc("Note"), esc(
+      "Instagram shows when followers are online. This is when posts published actually did "
+      + "better or worse than this account's own normal. 1.00 is typical."));
+  }
+
+  blank();
+  line(esc("Days that cost followers"));
+  if (!cost.reported) {
+    line(esc("Instagram has never reported follower losses for this account."));
+  } else if (!cost.days.length) {
+    line(esc(`No day stands out. Losses stayed close to the usual ${cost.typical} a day.`));
+  } else {
+    line(esc("Date"), esc("Lost"), esc("Usual"), esc("Above usual"), esc("Published that day"));
+    for (const day of cost.days) {
+      line(esc(day.date), String(day.unfollows), String(day.typical), String(day.excess),
+           esc(day.posts.map((p) => p.title).join(" | ")));
+    }
+    line(esc("Note"), esc(
+      "These posts went out on those days. That does not mean they caused it."));
+  }
 
   /* ---- every day, as stored -------------------------------------------- */
   section("DAILY");

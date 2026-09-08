@@ -1,6 +1,9 @@
 import type { MetricPoint, AudienceSnapshot, ContentItem, Platform, Range, Scope } from "./types";
 import { seriesByDay, followersByDay, sum, latest, engagementRate, type MetricKey } from "./api";
 import { PLATFORMS } from "./platforms";
+import {
+  publishTiming, followerCost, reachMultiples, reachConcentration,
+} from "./insights";
 
 export const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -164,5 +167,52 @@ export function summarizeForAI(d: AISummaryInput): string {
     for (const a of al.slice(0, 5))
       lines.push(`- ${a.label} ${a.kind === "drop" ? "dropped" : "spiked"} ${pct(a.deltaPct)} on ${a.date} (${a.value.toLocaleString()} vs typical ${a.expected.toLocaleString()})`);
   }
+
+  /*
+   * The analysis the platform does not do.
+   *
+   * The assistant is asked "when should I post?" and "why did I lose followers?"
+   * more than anything else, and until now it could only answer the first from
+   * when followers are ONLINE, which is a different question from what worked.
+   *
+   * The guards are carried into the text, not stripped from it. A model handed a
+   * bare ranking will state it as advice; handed the sample size and the caveat,
+   * it repeats them. Where there is too little data the line says so explicitly
+   * rather than being omitted, because an absent line reads as "no pattern" and
+   * an explicit one reads as "not enough evidence".
+   */
+  const content = d.content.filter((c) => d.scope === "all" || c.platform === d.scope);
+  const timing = publishTiming(content);
+  lines.push("When this account's posts ACTUALLY performed (measured on results, not on when followers are online; 1.00 = typical post of the same format):");
+  if (!timing.enough) {
+    lines.push(`- Not enough measurable posts yet (${timing.measured}). Do not offer a best day or time from this; say the evidence is not there.`);
+  } else {
+    for (const b of timing.byDay.filter((x) => x.lift !== null).slice(0, 3))
+      lines.push(`- ${b.label}: ${(b.lift as number).toFixed(2)} across ${b.posts} posts`);
+    for (const b of timing.byBlock.filter((x) => x.lift !== null).slice(0, 3))
+      lines.push(`- ${b.label}: ${(b.lift as number).toFixed(2)} across ${b.posts} posts`);
+  }
+
+  const cost = followerCost(d.metrics, content, d.scope);
+  if (!cost.reported) {
+    lines.push("Follower losses: Instagram has never reported unfollows for this account. Say this cannot be seen rather than that nobody left.");
+  } else if (cost.days.length) {
+    lines.push(`Days that lost unusually many followers (usual is ${cost.typical} a day). CORRELATION ONLY: posts listed went out that day, which is not evidence they caused it.`);
+    for (const day of cost.days.slice(0, 3))
+      lines.push(`- ${day.date}: lost ${day.unfollows}, published ${day.posts.map((x) => `"${x.title.slice(0, 40)}"`).join(", ")}`);
+  }
+
+  const multiples = reachMultiples(content, d.metrics, d.scope);
+  if (multiples.length) {
+    lines.push("Reach against the following the post actually had:");
+    for (const m of multiples.slice(0, 3))
+      lines.push(`- "${m.title.slice(0, 40)}": ${m.times.toFixed(1)}x (${m.reach.toLocaleString()} reach against ${m.followers.toLocaleString()} followers on ${m.date})`);
+  }
+
+  const conc = reachConcentration(content);
+  if (conc.postsForHalf !== null && conc.topShare !== null) {
+    lines.push(`Concentration: ${conc.postsForHalf} of ${conc.posts} posts carry half of all reach; the best single post is ${Math.round(conc.topShare * 100)}% of it.`);
+  }
+
   return lines.join("\n");
 }

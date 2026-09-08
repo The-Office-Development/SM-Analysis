@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { useAuth } from "../context/AuthContext";
 import { PLATFORMS } from "../lib/platforms";
-import { exportCsv } from "../lib/reports";
+import { exportCsv, exportXlsx } from "../lib/reports";
 import { toggleTheme } from "../lib/theme";
 import type { Range, Scope } from "../lib/types";
 import {
@@ -50,7 +50,8 @@ export default function CommandPalette() {
       { id: "nav-reports", group: "Go to", label: "Reports", Icon: IcFile, run: go("/reports"), keywords: "pdf print export share link" },
       { id: "nav-conn", group: "Go to", label: "Connections", Icon: IcLink, run: go("/connections") },
       { id: "sync", group: "Actions", label: "Sync now", Icon: IcRefresh, hint: "pull latest", run: () => { void dash.sync(); close(); }, keywords: "refresh update fetch" },
-      { id: "export", group: "Actions", label: "Export CSV", Icon: IcDownload, run: () => { exportCsv(dash); close(); }, keywords: "download report" },
+      { id: "export", group: "Actions", label: "Download the report (Excel)", Icon: IcDownload, run: () => { exportXlsx(dash); close(); }, keywords: "download report xlsx excel spreadsheet" },
+      { id: "export-csv", group: "Actions", label: "Download raw data (CSV)", Icon: IcDownload, run: () => { exportCsv(dash); close(); }, keywords: "download csv raw data" },
       { id: "theme", group: "Actions", label: "Toggle theme", Icon: IcSun, run: () => { toggleTheme(); close(); }, keywords: "dark light mode" },
       { id: "signout", group: "Actions", label: "Sign out", Icon: IcLogout, run: () => { void signOut(); } },
       ...[7, 30, 90].map((r) => ({ id: `range-${r}`, group: "Set range", label: `Last ${r} days`, Icon: IcCalendar as Ic, run: () => { dash.setRange(r as Range); setOpen(false); } })),

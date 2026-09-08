@@ -7,7 +7,7 @@ import { PLATFORMS } from "../lib/platforms";
 import { initials } from "../lib/format";
 import ThemeToggle from "./ThemeToggle";
 import CommandPalette from "./CommandPalette";
-import { exportCsv } from "../lib/reports";
+import { exportXlsx } from "../lib/reports";
 import {
   IcOverview, IcContent, IcAudience, IcPlatforms, IcLink,
   IcDownload, IcRefresh, IcChevron, IcLogout, IcSearch, IcCalendar, IcMessage, IcFile, IcMenu, IcClose,
@@ -152,7 +152,7 @@ export default function AppLayout() {
           <button className="btn btn--sm" onClick={() => dash.sync()} disabled={dash.syncing || dash.connectedPlatforms.length === 0}>
             <IcRefresh className={dash.syncing ? "spin" : ""} /> {dash.syncing ? "Syncing" : "Sync"}
           </button>
-          <button className="iconbtn" title="Export CSV" aria-label="Export CSV" onClick={() => exportCsv(dash)} disabled={!dash.hasData}><IcDownload /></button>
+          <button className="iconbtn" title="Download the report" aria-label="Download the report" onClick={() => exportXlsx(dash)} disabled={!dash.hasData}><IcDownload /></button>
             <ThemeToggle />
           </div>
         </header>

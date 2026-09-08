@@ -17,6 +17,7 @@ const INSTA = "verify/build/_instagram.js";
 const INSIGHTS = "verify/build-lib/insights.js";
 const FORMAT = "verify/build-lib/format.js";
 const CSVREPORT = "verify/build-lib/csvReport.js";
+const XLSX = "verify/build-lib/xlsx.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -187,6 +188,9 @@ const mutations = [
   { name: "a rate invented where the denominator is unknown", file: CSVREPORT,
     find: 'typeof v === "number" && Number.isFinite(v) ? v.toFixed(dp) : "";',
     replace: 'Number(v).toFixed(dp);' },
+  { name: "an unknown figure written into the workbook as a zero", file: XLSX,
+    find: 'if (cell.v === null || cell.v === undefined || cell.v === "")',
+    replace: 'if (false)' },
   { name: "unknown read time invented as 'just now'", file: FORMAT,
     find: `    if (!iso)
         return null;`,
@@ -196,7 +200,7 @@ const mutations = [
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

@@ -10,6 +10,8 @@ const delta = (n: number | null) => {
 /** Pure, print-friendly render of a report snapshot. Shared by the live
  *  Reports page and the public /r/:slug viewer so they never drift. */
 export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
+  // Optional: links shared before the analysis existed still render.
+  const analysis = snap.analysis;
   const generated = new Date(snap.generatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   return (
     <div className="sheet">
@@ -87,6 +89,112 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
             : <ul className="sheet__list">{snap.alerts.map((a, i) => <li key={i}>{a.label} {a.kind === "drop" ? "dropped" : "spiked"} {Math.abs(Math.round(a.deltaPct))}% on {a.date}</li>)}</ul>}
         </div>
       </div>
+
+      {/*
+        * The half a sponsor is actually reading.
+        *
+        * Everything above this point is available in the Instagram app, so a
+        * report that stops there is a nicer-looking copy of something the client
+        * already has. These four are computed from kept history and appear
+        * nowhere else, which makes them the reason this page is worth sending.
+        *
+        * Rendered from the snapshot, so a SHARED link shows exactly the same
+        * thing with no database behind it.
+        */}
+      {analysis && (
+        <>
+          <h4 className="sheet__h">Beyond the platform's own figures</h4>
+
+          {analysis.timing.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <b style={{ fontSize: 12.5 }}>When posts performed</b>
+              <ul className="sheet__list">
+                {analysis.timing.map((t) => (
+                  <li key={t.label}>
+                    {t.label}: {t.lift >= 1
+                      ? `${Math.round((t.lift - 1) * 100)}% above this account's typical post`
+                      : `${Math.round((1 - t.lift) * 100)}% below typical`}{" "}
+                    ({t.posts} posts)
+                  </li>
+                ))}
+              </ul>
+              <p className="muted" style={{ fontSize: 11, margin: "2px 0 0" }}>
+                Measured on results, not on when followers were online. Each post
+                compared with the typical post of the same kind.
+              </p>
+            </div>
+          )}
+
+          {analysis.multiples.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <b style={{ fontSize: 12.5 }}>Reach against the following at the time</b>
+              <div className="table-wrap">
+                <table className="data">
+                  <thead><tr><th>Post</th><th className="num">Reach</th><th className="num">Followers then</th><th className="num">Times over</th></tr></thead>
+                  <tbody>
+                    {analysis.multiples.map((m, i) => (
+                      <tr key={i}>
+                        <td className="cell-clamp">{m.title}</td>
+                        <td className="num tnum">{full(m.reach)}</td>
+                        <td className="num tnum">{full(m.followers)}</td>
+                        <td className="num tnum"><b>{m.times.toFixed(1)}x</b></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="sheet__cols">
+            {analysis.concentration && (
+              <div>
+                <b style={{ fontSize: 12.5 }}>How concentrated the reach is</b>
+                <p style={{ fontSize: 12.5, margin: "4px 0 0" }}>
+                  {analysis.concentration.postsForHalf} of{" "}
+                  {analysis.concentration.posts} posts carry half of all reach.
+                  The single best post is{" "}
+                  {Math.round(analysis.concentration.topSharePct)}% of it.
+                </p>
+                <p className="muted" style={{ fontSize: 11, margin: "2px 0 0" }}>
+                  A month built on one post reads as a collapse the next month
+                  through nobody's fault. This says which kind of month it was.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <b style={{ fontSize: 12.5 }}>Days that cost followers</b>
+              {!analysis.costReported ? (
+                <p className="muted" style={{ fontSize: 12.5, margin: "4px 0 0" }}>
+                  Instagram did not report follower losses for this account, so
+                  this could not be looked at.
+                </p>
+              ) : analysis.costDays.length === 0 ? (
+                <p style={{ fontSize: 12.5, margin: "4px 0 0" }}>
+                  No day stood out. Losses stayed near the usual{" "}
+                  {full(analysis.costTypical ?? 0)} a day.
+                </p>
+              ) : (
+                <>
+                  <ul className="sheet__list">
+                    {analysis.costDays.map((d) => (
+                      <li key={d.date}>
+                        {d.date}: lost {full(d.unfollows)} against a usual{" "}
+                        {full(d.typical)}. Published: {d.posts.join(", ")}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="muted" style={{ fontSize: 11, margin: "2px 0 0" }}>
+                    These posts went out on those days. That is not proof they
+                    caused it.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       <footer className="sheet__foot">Generated by PulseBoard from live platform data. Figures cover the selected window and scope.</footer>
     </div>
