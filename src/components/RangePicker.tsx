@@ -5,22 +5,48 @@ import { RANGE_PRESETS, RANGE_MIN, RANGE_MAX, clampRange } from "../lib/types";
 /**
  * The date-range control: three common windows and a custom one.
  *
- * The presets cover most days, but they cannot cover the case the product is
- * actually sold on. A campaign runs for eleven days, or from the first of the
- * month to the twenty-third, and neither rounds to 7, 30 or 90. Reporting on a
- * paid campaign with a window that does not match what was paid for is the kind
- * of detail a sponsor notices, so the window has to be the client's to choose.
+ * WHY A CUSTOM WINDOW AT ALL
  *
- * It stays a NUMBER OF DAYS rather than a pair of dates. Every query, every
- * export heading and the whole comparison layer is built on "the last N days",
- * and a from/to pair would change all of them while giving a creator asking
- * "how did the last three weeks go?" nothing extra.
+ * 7, 30 and 90 cannot express the case this product is sold on. A campaign runs
+ * for eleven days, and reporting on a paid campaign over a window that does not
+ * match what was paid for is exactly the detail a sponsor notices.
  *
- * The value is clamped on the way in. A blank field, a pasted word or 99999 all
- * resolve to something the API can actually answer, because the alternative is
- * a query for a window Meta will not serve and an empty dashboard that looks
- * like lost data.
+ * WHY IT IS SHAPED LIKE THIS
+ *
+ * The first version was a bare number field and an Apply button, and it was not
+ * usable. Two reasons, and the second is the more important:
+ *
+ *  - It borrowed the `.pop` menu styles, whose `button{width:100%}` stretched
+ *    Apply across the row and left the number field showing nothing but its
+ *    spinner arrows.
+ *  - More basically, "type a number of days" is not how anyone thinks about a
+ *    date range. Somebody wanting the last six months should not have to work
+ *    out that it is 180.
+ *
+ * So the common answers are one click, the field is there for the rest, and the
+ * actual dates are printed underneath. A window stated as "45" is abstract; the
+ * same window stated as "27 Jul to 10 Sep" is something a client can check
+ * against their own calendar, which is the whole point of letting them choose.
  */
+
+/** One click each. Days, chosen to read as periods people actually ask for. */
+const QUICK = [
+  { days: 14, label: "2 weeks" },
+  { days: 60, label: "2 months" },
+  { days: 180, label: "6 months" },
+  { days: 365, label: "1 year" },
+] as const;
+
+const fmt = (d: Date) =>
+  d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+/** The window a day count actually covers, so the reader can check it. */
+function windowLabel(days: number): string {
+  const to = new Date();
+  const from = new Date(to.getTime() - (days - 1) * 86_400_000);
+  return `${fmt(from)} to ${fmt(to)}`;
+}
+
 export default function RangePicker() {
   const dash = useDash();
   const [open, setOpen] = useState(false);
@@ -29,12 +55,20 @@ export default function RangePicker() {
 
   const isPreset = (RANGE_PRESETS as readonly number[]).includes(dash.range);
 
-  // Focus the field when the popover opens: it exists to be typed into, and a
-  // control that needs a second click to accept input reads as broken.
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-    if (open) setDraft(String(dash.range));
+    if (!open) return;
+    setDraft(String(dash.range));
+    // Select the existing value rather than just focusing, so typing replaces it
+    // instead of appending to it — "30" plus a typed "7" is otherwise 307.
+    inputRef.current?.focus();
+    inputRef.current?.select();
   }, [open, dash.range]);
+
+  function commit(days: number) {
+    dash.setRange(days);
+    setDraft(String(days));
+    setOpen(false);
+  }
 
   function apply() {
     /*
@@ -42,15 +76,15 @@ export default function RangePicker() {
      *
      * `<input type="number">` silently blanks itself when what was typed is not
      * a number, so "abc" arrives here as "". Number("") is 0, which would clamp
-     * to a one-day window — a dashboard that empties itself because somebody
+     * to a one-day window — a dashboard emptying itself because somebody
      * mistyped. Closing untouched is the only reading that is not a surprise.
      */
     if (draft.trim() === "") { setOpen(false); return; }
-    const days = clampRange(Number(draft));
-    dash.setRange(days);
-    setDraft(String(days));
-    setOpen(false);
+    commit(clampRange(Number(draft)));
   }
+
+  // What the field currently describes, clamped, for the live preview below it.
+  const previewDays = draft.trim() === "" ? dash.range : clampRange(Number(draft));
 
   return (
     <span className="menu-anchor" style={{ display: "inline-flex" }}>
@@ -69,7 +103,7 @@ export default function RangePicker() {
           */}
         <button aria-pressed={!isPreset} aria-haspopup="dialog" aria-expanded={open}
                 onClick={() => setOpen((v) => !v)}
-                title="Choose your own window">
+                title="Choose your own date range">
           {isPreset ? "Custom" : `${dash.range}D`}
         </button>
       </div>
@@ -77,30 +111,39 @@ export default function RangePicker() {
       {open && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 55 }} onClick={() => setOpen(false)} />
-          <div className="pop" role="dialog" aria-label="Custom date range"
-               style={{ top: 34, right: 0, minWidth: 232, padding: 12 }}>
-            <label htmlFor="range-days" style={{ fontSize: 12, fontWeight: 550, display: "block", marginBottom: 6 }}>
-              Number of days
+          <div className="rangepop" role="dialog" aria-label="Custom date range" style={{ top: 34, right: 0 }}>
+            <div className="quick">
+              {QUICK.map((q) => (
+                <button key={q.days} aria-pressed={dash.range === q.days}
+                        onClick={() => commit(q.days)} title={`${q.days} days`}>
+                  {q.label}
+                </button>
+              ))}
+            </div>
+
+            <label htmlFor="range-days"
+                   style={{ fontSize: 12, fontWeight: 550, display: "block", marginBottom: 6 }}>
+              Or a number of days
             </label>
-            <div className="row" style={{ gap: 6 }}>
-              <input id="range-days" ref={inputRef} type="number" inputMode="numeric"
+            <div className="entry">
+              <input id="range-days" ref={inputRef} className="input"
+                     type="number" inputMode="numeric"
                      min={RANGE_MIN} max={RANGE_MAX} value={draft}
                      onChange={(e) => setDraft(e.target.value)}
                      onKeyDown={(e) => {
                        if (e.key === "Enter") apply();
                        if (e.key === "Escape") setOpen(false);
-                     }}
-                     style={{
-                       flex: 1, minWidth: 0, height: 30, padding: "0 8px", fontSize: 13,
-                       borderRadius: 6, border: "1px solid var(--border-strong)",
-                       background: "var(--panel)", color: "var(--text)",
                      }} />
               <button className="btn btn--sm btn--primary" onClick={apply}>Apply</button>
             </div>
-            <p className="muted" style={{ margin: "8px 0 0", fontSize: 11, lineHeight: 1.5 }}>
-              Counts back from today, in your own time. Anything from {RANGE_MIN} to{" "}
-              {RANGE_MAX} days. Days that have not been collected yet appear blank
-              rather than as zero.
+
+            {/* The dates, not the arithmetic. This is the line that makes the
+                control checkable against a client's own calendar. */}
+            <p className="muted" style={{ margin: "8px 0 0", fontSize: 11.5, lineHeight: 1.5 }}>
+              {windowLabel(previewDays)}
+            </p>
+            <p className="muted" style={{ margin: "4px 0 0", fontSize: 11, lineHeight: 1.5 }}>
+              Up to {RANGE_MAX} days. Days not collected yet appear blank, not as zero.
             </p>
           </div>
         </>
