@@ -23,3 +23,82 @@ jobs:
         run: npm run build
       - name: Tests
         run: bash verify/run-tests.sh
+      # Kept for the deploy job below, so the site is built exactly once, by the
+      # same run that proved it works. Rebuilding in the deploy job would deploy
+      # an artifact nothing had tested.
+      - name: Keep the build
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 3
+
+  # ---------------------------------------------------------------------------
+  # Deploy.
+  #
+  # WHY THIS EXISTS RATHER THAN CLOUDFLARE'S OWN GIT INTEGRATION
+  #
+  # Pages projects come in two kinds and the kind is fixed when the project is
+  # created. A Git-connected project watches the repository and builds on push.
+  # A Direct Upload project has no idea the repository exists; it only changes
+  # when somebody uploads a built folder to it.
+  #
+  # `pulseboard` is Direct Upload, created by `wrangler pages deploy` during the
+  # move off Netlify rather than through the Connect to Git flow. Cloudflare's
+  # documentation is explicit that this cannot be undone: "If you choose Direct
+  # Upload, you cannot switch to Git integration later." Converting means a new
+  # project and moving app.theoffice.it.com onto it.
+  #
+  # This closes the gap without that surgery, and ends up better than the
+  # integration would have been: Cloudflare's own builds deploy whatever is on
+  # main, passing or failing, whereas this job runs only after the typechecks,
+  # the 119 assertions and the mutation gate have passed. A red build never
+  # reaches a client.
+  #
+  # HOW IT WENT UNNOTICED FOR THIRTEEN COMMITS
+  #
+  # Wrangler stamps the local git branch and commit onto a Direct Upload, so the
+  # dashboard listed "main" and a real commit hash beside deployments that had
+  # nothing to do with GitHub. It looked exactly like a connected project. The
+  # only visible difference was `Git Provider: No` in the project list.
+  #
+  # SECRETS (set once, in the repository's Settings -> Secrets -> Actions)
+  #   CLOUDFLARE_API_TOKEN   — a token with the "Cloudflare Pages: Edit" permission
+  #   CLOUDFLARE_ACCOUNT_ID  — 69b37cce7d7633d2e73be9b548b8021a
+  #
+  # Until both exist this job is skipped rather than failed, so adding the file
+  # ahead of the secrets does not turn CI red.
+  # ---------------------------------------------------------------------------
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Are the credentials present?
+        id: creds
+        run: |
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] && [ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set, so this push was not deployed."
+          fi
+
+      - name: Take the build that passed the tests
+        if: steps.creds.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy to Cloudflare Pages
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # --commit-dirty is not passed: the checkout is clean, and the commit
+        # this deployment records should be the one that was actually tested.
+        run: npx wrangler@4 pages deploy dist --project-name pulseboard --branch main

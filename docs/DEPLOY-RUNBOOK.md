@@ -1,5 +1,39 @@
 # Deploy runbook — zero to a pilot client on real data
 
+> ## Deploying is NOT automatic on push. Read this first.
+>
+> `app.theoffice.it.com` is served by a Cloudflare Pages project called
+> `pulseboard`, and that project is **Direct Upload**, not Git-connected. It does
+> not watch this repository. Pushing to `main` changes GitHub and nothing else.
+>
+> The kind is fixed when a Pages project is created and cannot be changed:
+> Cloudflare's documentation says plainly, "If you choose Direct Upload, you
+> cannot switch to Git integration later." Converting means creating a new
+> project and moving the custom domain onto it.
+>
+> **This is easy to miss, and it was missed for thirteen commits.** Wrangler
+> stamps the local branch and commit onto a Direct Upload, so the dashboard lists
+> "main" and a real commit hash beside deployments that never involved GitHub. It
+> looks connected. The only tell is `Git Provider: No` in `wrangler pages project
+> list`.
+>
+> **The fix is in `.github/workflows/ci.yml`**: a deploy job that uploads the
+> build after the typechecks, the assertions and the mutation gate pass. It needs
+> two repository secrets, `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and
+> skips harmlessly until they exist.
+>
+> To deploy by hand in the meantime:
+>
+> ```bash
+> npm run build && npx wrangler pages deploy dist --project-name pulseboard
+> ```
+>
+> To check what is actually live rather than assuming:
+>
+> ```bash
+> npx wrangler pages deployment list --project-name pulseboard
+> ```
+
 Follow in order. Steps 1 and 2 run in parallel with everything else; start them
 first. Times are working estimates.
 
