@@ -19,8 +19,45 @@ jobs:
         run: npx tsc -b --noEmit
       - name: Typecheck (functions)
         run: npx tsc -p tsconfig.functions.json
+      # VITE_ vars are inlined by Vite AT BUILD TIME. A build without them
+      # succeeds and produces a site that cannot reach Supabase at all: the sign
+      # in form renders and then refuses every attempt. That is exactly what
+      # shipped once, because the first CI build had none of them and nothing
+      # downstream noticed.
+      #
+      # They are not secrets in the cryptographic sense — Vite writes them into
+      # the browser bundle, so every visitor has them. They live in repository
+      # secrets for tidiness, not confidentiality.
       - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SITE_URL: ${{ secrets.VITE_SITE_URL }}
         run: npm run build
+
+      # The guard that would have caught it.
+      #
+      # A missing environment variable does not fail a Vite build; it silently
+      # inlines `undefined` and the defect only appears when a human tries to log
+      # in. Demo mode keeps working, so a smoke test of the dashboard passes
+      # while the product is unusable for every real client.
+      #
+      # This asserts the built bundle actually contains a Supabase project URL
+      # and a publishable key, and fails the run when it does not, so a build
+      # that cannot sign anyone in never reaches the deploy job.
+      - name: The build must be able to reach Supabase
+        run: |
+          BUNDLE=$(ls dist/assets/index-*.js | head -1)
+          if ! grep -q 'supabase\.co' "$BUNDLE"; then
+            echo "::error::No Supabase URL in $BUNDLE — VITE_SUPABASE_URL was missing at build time."
+            exit 1
+          fi
+          if ! grep -qE 'sb_publishable_|eyJhbGciOi' "$BUNDLE"; then
+            echo "::error::No Supabase key in $BUNDLE — VITE_SUPABASE_ANON_KEY was missing at build time."
+            exit 1
+          fi
+          echo "Supabase configuration is present in $BUNDLE."
+
       - name: Tests
         run: bash verify/run-tests.sh
       # Kept for the deploy job below, so the site is built exactly once, by the
