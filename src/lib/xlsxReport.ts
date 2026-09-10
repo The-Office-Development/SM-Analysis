@@ -185,10 +185,10 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
     ["Posts with a reach figure", { v: conc.posts, s: S.NUMBER }, ""],
   ];
 
-  /* ---- 2. Beyond Instagram --------------------------------------------- */
+  /* ---- 2. Deeper analysis ----------------------------------------------- */
   const analysis: Row[] = [
-    note("None of this appears in the Instagram app. Each one needs history kept over time, "
-      + "which is what the app does not do. Where too little has been published to say anything, "
+    note("Each figure below is worked out from this account's history over time rather than "
+      + "read straight off a single day. Where too little has been published to say anything, "
       + "the section says so rather than estimating."),
     [],
     section("When posts actually performed"),
@@ -214,8 +214,8 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
         { v: b.posts, s: S.NUMBER },
       ]),
       [],
-      note("Instagram shows when your followers are ONLINE. This is when the posts you published "
-        + "actually did better or worse than your own normal. Each post is compared with the "
+      note("Measured on results: how the posts you published did against this account's own "
+        + "normal, rather than on when the audience is online. Each post is compared with the "
         + "typical post of the same kind, so reels are not compared with photos, and a day needs "
         + "at least three posts before it appears. 1.0x is typical."),
     );
@@ -259,9 +259,9 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
         { v: m.times, s: S.MULTIPLE },
       ]),
       [],
-      note("Reach alone says nothing about whether a post spread. Against the following it was "
-        + "published to, it does. The divisor is the follower count on that day, not today's, so "
-        + "later growth does not quietly demote an older post."),
+      note("Reach alone says little about whether a post spread. Measured against the following "
+        + "it was published to, it does. The divisor is the follower count on that day, not "
+        + "today's, so later growth does not quietly demote an older post."),
     );
   }
 
@@ -347,7 +347,7 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
   const sheets: Sheet[] = [
     compose({ name: "Summary", heading: `${BRAND.product} report`, id,
               cols: [34, 18, 54], body: summary }),
-    compose({ name: "Beyond Instagram", heading: "Beyond the platform's own figures", id,
+    compose({ name: "Analysis", heading: "Deeper analysis", id,
               cols: [46, 24, 16, 16, 58], body: analysis }),
     compose({ name: "Daily", heading: "Every day, as recorded", id,
               cols: [12, 12, 13, 13, 13, 14, 11, 11, 21, 25, 13], body: daily, freeze: 1 }),

@@ -164,25 +164,24 @@ export default function Overview() {
         </section>
 
         {/*
-          * Three pictures of things the native app never draws.
+          * Three charts, placed high on purpose.
           *
-          * They sit high on the page on purpose. This is the first screen a
-          * client sees, and until now it opened with four numbers in boxes and a
-          * follower line — which is what every tool shows. What follows is what
-          * this product actually knows.
+          * This is the first screen a client sees, and it used to open with four
+          * numbers in boxes and a follower line. A shape answers "how are we
+          * doing" faster than a figure does, so the shapes come first.
           */}
         {flowDays.some((d) => d.gained !== null || d.lost !== null) && (
           <section className="panel col-2">
             <div className="panel__head">
               <h3>Followers gained and lost</h3>
-              <span className="sub">each day · Instagram only shows you the net</span>
+              <span className="sub">each day, both directions</span>
             </div>
             <div className="panel__body">
               <FlowBars days={flowDays} />
               <p className="muted" style={{ fontSize: 11.5, margin: "8px 0 0", lineHeight: 1.55 }}>
                 A net figure hides half the story. Gaining 412 and losing 392 looks
                 identical to gaining 20, and only one of those is a healthy month.
-                Days Instagram did not report are left blank rather than drawn as zero.
+                Days with nothing reported are left blank rather than drawn as zero.
               </p>
             </div>
           </section>

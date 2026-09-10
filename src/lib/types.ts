@@ -86,5 +86,35 @@ export interface Goal {
   created_at: string;
 }
 
-export type Range = 7 | 30 | 90;
+/**
+ * How many days of history the dashboard is showing.
+ *
+ * Was a union of 7 | 30 | 90. Widened to a plain day count so a client can ask
+ * for their own window — a campaign that ran for eleven days is not served by
+ * being rounded up to thirty, and a sponsor report covering "the month we paid
+ * for" needs to cover exactly that.
+ *
+ * Every consumer already reads it as a number of days (`isoDaysAgo(range)`,
+ * "Last N days"), so nothing downstream had to change. `RANGE_PRESETS` keeps the
+ * three common windows as buttons, and `clampRange` guards the input.
+ */
+export type Range = number;
+
+/** The buttons. Everything else arrives through the custom field. */
+export const RANGE_PRESETS = [7, 30, 90] as const;
+
+/**
+ * The furthest back a window may reach.
+ *
+ * Meta serves roughly two years of account insights, so asking for more cannot
+ * return anything and only makes a slower query and a chart with a long empty
+ * tail. One day is the floor because a zero-day window has no meaning.
+ */
+export const RANGE_MIN = 1;
+export const RANGE_MAX = 730;
+
+export function clampRange(days: number): Range {
+  if (!Number.isFinite(days)) return 30;
+  return Math.min(RANGE_MAX, Math.max(RANGE_MIN, Math.round(days)));
+}
 export type Scope = "all" | Platform;

@@ -5,7 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import { PLATFORMS } from "../lib/platforms";
 import { exportCsv, exportXlsx } from "../lib/reports";
 import { toggleTheme } from "../lib/theme";
-import type { Range, Scope } from "../lib/types";
+import type { Scope } from "../lib/types";
+import { RANGE_PRESETS } from "../lib/types";
 import {
   IcOverview, IcContent, IcAudience, IcPlatforms, IcLink, IcCalendar, IcMessage,
   IcRefresh, IcDownload, IcSun, IcLogout, IcCornerReturn, IcSearch, IcArrowRight, IcFile,
@@ -54,7 +55,7 @@ export default function CommandPalette() {
       { id: "export-csv", group: "Actions", label: "Download raw data (CSV)", Icon: IcDownload, run: () => { exportCsv(dash); close(); }, keywords: "download csv raw data" },
       { id: "theme", group: "Actions", label: "Toggle theme", Icon: IcSun, run: () => { toggleTheme(); close(); }, keywords: "dark light mode" },
       { id: "signout", group: "Actions", label: "Sign out", Icon: IcLogout, run: () => { void signOut(); } },
-      ...[7, 30, 90].map((r) => ({ id: `range-${r}`, group: "Set range", label: `Last ${r} days`, Icon: IcCalendar as Ic, run: () => { dash.setRange(r as Range); setOpen(false); } })),
+      ...RANGE_PRESETS.map((r) => ({ id: `range-${r}`, group: "Set range", label: `Last ${r} days`, Icon: IcCalendar as Ic, run: () => { dash.setRange(r); setOpen(false); } })),
       { id: "scope-all", group: "Set scope", label: "All platforms", Icon: IcPlatforms, run: () => { dash.setScope("all"); setOpen(false); } },
       ...dash.connectedPlatforms.map((p) => ({ id: `scope-${p}`, group: "Set scope", label: PLATFORMS[p].name, Icon: IcPlatforms as Ic, run: () => { dash.setScope(p as Scope); setOpen(false); } })),
     ];

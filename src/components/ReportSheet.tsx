@@ -104,19 +104,18 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
       </div>
 
       {/*
-        * The half a sponsor is actually reading.
+        * The interpretation half of the report.
         *
-        * Everything above this point is available in the Instagram app, so a
-        * report that stops there is a nicer-looking copy of something the client
-        * already has. These four are computed from kept history and appear
-        * nowhere else, which makes them the reason this page is worth sending.
+        * Everything above is a measurement; these four are worked out from the
+        * history stored for this account, which is why a report is worth reading
+        * rather than skimming.
         *
         * Rendered from the snapshot, so a SHARED link shows exactly the same
         * thing with no database behind it.
         */}
       {analysis && (
         <>
-          <h4 className="sheet__h">Beyond the platform's own figures</h4>
+          <h4 className="sheet__h">Deeper analysis</h4>
 
           {analysis.timing.length > 0 && (
             <div style={{ marginBottom: 10 }}>
@@ -132,8 +131,8 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
                 ))}
               </ul>
               <p className="muted" style={{ fontSize: 11, margin: "2px 0 0" }}>
-                Measured on results, not on when followers were online. Each post
-                compared with the typical post of the same kind.
+                Measured on results: each post compared with the typical post of
+                the same kind on this account.
               </p>
             </div>
           )}

@@ -134,7 +134,7 @@ export function buildCsv(dash: CsvInput): string {
     conc.postsForHalf === null ? "" : `Out of ${conc.posts} posts with a reach figure`);
   s("Best post's share of all reach %", rate(conc.topShare !== null ? conc.topShare * 100 : null));
 
-  /* ---- the analysis Instagram does not do -------------------------------- */
+  /* ---- the interpretation layer ------------------------------------------ */
   /*
    * Present in the CSV as well as the workbook. Someone who exports the raw file
    * should not silently get the thinner report, and these are the figures that
@@ -143,8 +143,8 @@ export function buildCsv(dash: CsvInput): string {
   const timing = publishTiming(content);
   const cost = followerCost(dash.metrics, content, dash.scope);
 
-  section("BEYOND INSTAGRAM'S OWN FIGURES");
-  line(esc("None of the following appears in the Instagram app."));
+  section("DEEPER ANALYSIS");
+  line(esc("Worked out from this account's history over time, not read off a single day."));
 
   blank();
   line(esc("When posts actually performed"));
@@ -160,8 +160,8 @@ export function buildCsv(dash: CsvInput): string {
       line(esc(b.label), rate(b.lift, 2), String(b.posts));
     }
     line(esc("Note"), esc(
-      "Instagram shows when followers are online. This is when posts published actually did "
-      + "better or worse than this account's own normal. 1.00 is typical."));
+      "Measured on results: how posts published did against this account's own normal, "
+      + "rather than on when the audience is online. 1.00 is typical."));
   }
 
   blank();

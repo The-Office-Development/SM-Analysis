@@ -99,11 +99,27 @@ test("Arabic survives the round trip", () => {
   assert.ok(read(dir, "xl/worksheets/sheet4.xml").includes("مقطع من ورشة العمل"));
 });
 
-test("the analysis Instagram does not do has its own sheet", () => {
+test("the interpretation layer has its own sheet", () => {
   const dir = unpack(buildWorkbook(input()));
   const wb = read(dir, "xl/workbook.xml");
-  for (const name of ["Summary", "Beyond Instagram", "Daily", "Posts", "Notes"]) {
+  for (const name of ["Summary", "Analysis", "Daily", "Posts", "Notes"]) {
     assert.ok(wb.includes(`name="${name}"`), `missing sheet: ${name}`);
+  }
+});
+
+test("the report never sells itself at the platform's expense", () => {
+  /*
+   * These files are read by sponsors and other companies, and a report that
+   * spends its space explaining what a competitor lacks reads as a pitch rather
+   * than as evidence. The figures are the argument; comparisons are not.
+   */
+  const all = [1, 2, 3, 4, 5]
+    .map((i) => read(unpack(buildWorkbook(input())), `xl/worksheets/sheet${i}.xml`)).join(" ");
+  for (const phrase of [
+    "does not appear", "none of this appears", "no native tool",
+    "only shows", "beyond instagram", "unlike instagram", "nowhere else",
+  ]) {
+    assert.ok(!all.toLowerCase().includes(phrase), `sales copy in the workbook: "${phrase}"`);
   }
 });
 

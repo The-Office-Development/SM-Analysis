@@ -99,13 +99,12 @@ function AnalysisInner() {
               </p>
             )}
             <Note>
-              Instagram tells you when your followers are online. This is a
-              different thing: it is when the posts you actually published did
-              better or worse than your own normal. Each post is compared with the
-              typical post of the same kind, so reels are not compared with photos.
-              A day or a time slot needs at least {TIMING_MIN_POSTS} posts before it
-              appears here at all. It is what has happened, not a promise about
-              what will.
+              This is measured on results: how the posts you actually published
+              did against your own normal, rather than on when your audience is
+              online. Each post is compared with the typical post of the same kind,
+              so reels are not compared with photos. A day or a time slot needs at
+              least {TIMING_MIN_POSTS} posts before it appears here at all. It is
+              what has happened, not a promise about what will.
             </Note>
           </>
         )}

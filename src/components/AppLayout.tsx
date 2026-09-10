@@ -7,13 +7,14 @@ import { PLATFORMS } from "../lib/platforms";
 import { initials } from "../lib/format";
 import ThemeToggle from "./ThemeToggle";
 import CommandPalette from "./CommandPalette";
+import RangePicker from "./RangePicker";
 import { exportXlsx } from "../lib/reports";
 import {
   IcOverview, IcContent, IcAudience, IcPlatforms, IcLink,
   IcDownload, IcRefresh, IcChevron, IcLogout, IcSearch, IcCalendar, IcMessage, IcFile, IcMenu, IcClose,
   IcSpark,
 } from "../lib/icons";
-import type { Range, Scope } from "../lib/types";
+import type { Scope } from "../lib/types";
 
 const NAV = [
   { to: "/", label: "Overview", Icon: IcOverview, end: true },
@@ -144,11 +145,7 @@ export default function AppLayout() {
           </div>
 
           <div className="topbar__tools">
-          <div className="seg" role="group" aria-label="Date range">
-            {[7, 30, 90].map((r) => (
-              <button key={r} aria-pressed={dash.range === r} onClick={() => dash.setRange(r as Range)}>{r}D</button>
-            ))}
-          </div>
+          <RangePicker />
 
           <div className="menu-anchor">
             <button className="btn btn--sm" onClick={() => setScopeOpen((v) => !v)}>

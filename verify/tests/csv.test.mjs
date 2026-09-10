@@ -96,6 +96,19 @@ test("an account named the same on two platforms is not repeated", () => {
   assert.ok(/northwind \/ Northwind Co/.test(csv), "genuinely different names are still both shown");
 });
 
+test("the export never sells itself at the platform's expense", () => {
+  // A CSV forwarded to a sponsor should read as evidence, not as a pitch. The
+  // figures make the case; telling the reader what another product lacks does
+  // not, and it invites the reader to go and check the comparison.
+  const csv = buildCsv(input()).toLowerCase();
+  for (const phrase of [
+    "does not appear", "none of the following appears", "no native tool",
+    "only shows", "beyond instagram", "unlike instagram", "nowhere else",
+  ]) {
+    assert.ok(!csv.includes(phrase), `sales copy in the export: "${phrase}"`);
+  }
+});
+
 test("every section a reader needs is present", () => {
   const csv = buildCsv(input());
   for (const heading of ["SUMMARY", "DAILY", "POSTS", "WHAT THESE MEAN"]) {
