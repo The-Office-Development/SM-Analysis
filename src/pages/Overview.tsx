@@ -8,6 +8,8 @@ import { compact, metric, sumKnown, full, pctPlain, ratioPct, shortDate } from "
 import type { Platform } from "../lib/types";
 import StatCard from "../components/StatCard";
 import LineChart, { type Series } from "../components/charts/LineChart";
+import FlowBars from "../components/charts/FlowBars";
+import PostScatter from "../components/charts/PostScatter";
 import BarList from "../components/BarList";
 import EmptyState from "../components/EmptyState";
 import { PlatformBadge } from "../components/PlatformTile";
@@ -32,6 +34,33 @@ export default function Overview() {
     key: p, label: PLATFORMS[p].name, color: PLATFORMS[p].color,
     points: followersByDay(metrics, p),
   }));
+
+  /*
+   * Rows for the three charts below, taken from the stored days directly rather
+   * than through seriesByDay().
+   *
+   * seriesByDay drops any day the platform did not report, which is right for a
+   * line but wrong here: these charts have to be able to draw a GAP. A day
+   * Instagram never reported must not arrive looking like a day when nobody
+   * joined, nobody left, or nobody new was reached.
+   */
+  const dayRows = [...metrics]
+    .filter((m) => scope === "all" || m.platform === scope)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const byDate = new Map<string, { gained: number | null; lost: number | null; f: number | null; nf: number | null }>();
+  for (const m of dayRows) {
+    const prev = byDate.get(m.date);
+    const add = (a: number | null | undefined, b: number | null | undefined) =>
+      typeof a === "number" || typeof b === "number" ? (a ?? 0) + (b ?? 0) : null;
+    byDate.set(m.date, {
+      gained: add(prev?.gained, m.follows),
+      lost: add(prev?.lost, m.unfollows),
+      f: add(prev?.f, m.reach_followers),
+      nf: add(prev?.nf, m.reach_non_followers),
+    });
+  }
+  const flowDays = [...byDate.entries()].map(([date, v]) => ({ date, gained: v.gained, lost: v.lost }));
+  const splitDays = [...byDate.entries()].map(([date, v]) => ({ date, followers: v.f, nonFollowers: v.nf }));
 
   // funnel from real rows
   const impressions = sum(seriesByDay(metrics, scope, "impressions"));
@@ -135,11 +164,55 @@ export default function Overview() {
         </section>
 
         {/*
+          * Three pictures of things the native app never draws.
+          *
+          * They sit high on the page on purpose. This is the first screen a
+          * client sees, and until now it opened with four numbers in boxes and a
+          * follower line — which is what every tool shows. What follows is what
+          * this product actually knows.
+          */}
+        {flowDays.some((d) => d.gained !== null || d.lost !== null) && (
+          <section className="panel col-2">
+            <div className="panel__head">
+              <h3>Followers gained and lost</h3>
+              <span className="sub">each day · Instagram only shows you the net</span>
+            </div>
+            <div className="panel__body">
+              <FlowBars days={flowDays} />
+              <p className="muted" style={{ fontSize: 11.5, margin: "8px 0 0", lineHeight: 1.55 }}>
+                A net figure hides half the story. Gaining 412 and losing 392 looks
+                identical to gaining 20, and only one of those is a healthy month.
+                Days Instagram did not report are left blank rather than drawn as zero.
+              </p>
+            </div>
+          </section>
+        )}
+
+        <section className="panel col-3">
+          <div className="panel__head">
+            <h3>Every post, and how far it got</h3>
+            <span className="sub">by the day it went out</span>
+          </div>
+          <div className="panel__body">
+            <PostScatter posts={scopedContent
+              .filter((c) => typeof c.reach === "number" && (c.reach as number) > 0)
+              .map((c) => ({
+                id: c.id,
+                title: c.title || "Untitled",
+                date: c.published_at,
+                format: c.media_type,
+                reach: c.reach as number,
+                engagements: sumKnown(c.likes, c.comments, c.shares, c.saves),
+              }))} />
+          </div>
+        </section>
+
+        {/*
           * The interpretation layer — the reason this costs 50 JD and not $20.
           * Everything above is a chart any tool draws; these four answer the
           * questions a client actually asks and a sponsor actually pays for.
           */}
-        <DiscoveryPanel metrics={metrics} scope={scope} />
+        <DiscoveryPanel metrics={metrics} scope={scope} days={splitDays} />
         <ChurnPanel metrics={metrics} scope={scope} />
         <FormatPanel content={scopedContent} />
         <ReachDriversPanel

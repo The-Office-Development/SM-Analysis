@@ -1,6 +1,7 @@
 import { discovery, churn, formatPerformance, reachDrivers } from "../lib/insights";
 import { compact } from "../lib/format";
 import type { MetricPoint, ContentItem, Scope } from "../lib/types";
+import SplitArea, { type SplitDay } from "./charts/SplitArea";
 
 /**
  * The panels the product is actually sold on.
@@ -28,10 +29,13 @@ function Unavailable({ what }: { what: string }) {
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-export function DiscoveryPanel({ metrics, scope }: { metrics: MetricPoint[]; scope: Scope }) {
+export function DiscoveryPanel(
+  { metrics, scope, days }: { metrics: MetricPoint[]; scope: Scope; days?: SplitDay[] },
+) {
   const d = discovery(metrics, scope);
+  const hasTrend = (days ?? []).some((x) => x.followers !== null && x.nonFollowers !== null);
   return (
-    <section className="panel">
+    <section className={"panel" + (hasTrend ? " col-2" : "")}>
       <div className="panel__head">
         <h3>Who you reached</h3>
         <span className="sub">followers vs new people</span>
@@ -43,10 +47,22 @@ export function DiscoveryPanel({ metrics, scope }: { metrics: MetricPoint[]; sco
               <span style={{ fontSize: 30, fontWeight: 650, letterSpacing: "-.02em" }}>{pct(d.discoveryRate)}</span>
               <span className="muted" style={{ fontSize: 13 }}>of reach was people who don't follow you</span>
             </div>
-            {/* One bar, two parts — the comparison is the whole point. */}
+            {/*
+              * One bar, two parts — the comparison is the whole point.
+              *
+              * Painted from --fb and --ig, the same two tokens the trend below
+              * uses, so "already followed you" is one colour and "new people" is
+              * the other everywhere on this page. It previously read
+              * `var(--brand, …)` and `var(--ok, …)`, and NEITHER token exists in
+              * this stylesheet, so it had always been drawing its hardcoded
+              * fallbacks: an off-system blue and green that matched nothing else
+              * and put the same two categories in different colours in different
+              * places. The pair here separates at dE 29.6 under the worst colour
+              * vision deficiency, where blue against green does not.
+              */}
             <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: "var(--border)" }}>
-              <div style={{ width: pct(1 - d.discoveryRate), background: "var(--brand, #4f7cff)" }} />
-              <div style={{ width: pct(d.discoveryRate), background: "var(--ok, #2f9e6e)" }} />
+              <div style={{ width: pct(1 - d.discoveryRate), background: "var(--fb)" }} />
+              <div style={{ width: pct(d.discoveryRate), background: "var(--ig)" }} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
               <span className="muted">Existing followers {compact(d.followers ?? 0)}</span>
@@ -57,6 +73,9 @@ export function DiscoveryPanel({ metrics, scope }: { metrics: MetricPoint[]; sco
               already follow you is new audience for their brand.
               {d.partial && " Some reach could not be attributed to either group, so the split covers less than total reach."}
             </p>
+            {/* The same fact over time. The headline says how much; this says
+                whether it is holding, growing or was one good week. */}
+            {hasTrend && <SplitArea days={days as SplitDay[]} height={188} />}
           </>
         )}
       </div>
