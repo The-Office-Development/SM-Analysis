@@ -187,7 +187,13 @@ zero stories captured to date.
 PDPL questions and legal-page placeholders (§0).
 
 **Deferred:** everything in §7 — share-link expiry is the largest security gap —
-plus TikTok (never worked live), the Facebook path, and LinkedIn.
+plus TikTok (never worked live), the Facebook path, and LinkedIn — researched
+2026-09-10, written up in `docs/LINKEDIN.md`. Short version: LinkedIn now has a
+read-only member analytics API that fits this product well, but access is a
+vetted two-tier approval with a screencast, Development Tier allows only 500
+calls per app per day, and one unresolved question (how to enumerate a member's
+posts, when `r_member_social` is closed) decides whether it is a real
+integration or an account-level summary. Ask that question before writing code.
 
 ---
 
