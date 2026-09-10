@@ -77,6 +77,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Dependencies are needed even though the site is already built.
+      #
+      # `wrangler pages deploy` uploads dist AND bundles the Pages Functions in
+      # functions/, which import through to netlify/functions and from there to
+      # @anthropic-ai/sdk and @supabase/supabase-js. Without node_modules the
+      # bundler cannot resolve them and the deploy fails with "Could not resolve
+      # @anthropic-ai/sdk" — while the static half looks perfectly fine.
+      #
+      # This never showed up in a manual deploy because a developer's machine
+      # always has node_modules already.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
       - name: Are the credentials present?
         id: creds
         run: |
