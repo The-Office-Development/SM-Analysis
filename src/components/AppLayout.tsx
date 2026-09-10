@@ -95,18 +95,41 @@ export default function AppLayout() {
               </div>
             </>
           )}
-        </div>
-          <div style={{ marginTop: "auto", paddingTop: 12, display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11.5 }}>
+
+          {/*
+            * The legal block lives INSIDE the footer.
+            *
+            * It used to be two stray siblings after it, one of them carrying its
+            * own `margin-top: auto` while .side__foot already has one. Two auto
+            * margins split the free space between them, so the block was pushed
+            * past the panel's bottom edge, and being outside the footer it had
+            * none of its padding either — the registration line was cut in half
+            * against the very bottom of the sidebar.
+            *
+            * Nested here it inherits the footer's padding and border, and the
+            * nav above it scrolls instead.
+            */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11.5, marginTop: 10 }}>
             <a className="muted" href="/privacy" target="_blank" rel="noreferrer">Privacy</a>
             <a className="muted" href="/terms" target="_blank" rel="noreferrer">Terms</a>
             <a className="muted" href="/data-deletion" target="_blank" rel="noreferrer">Data deletion</a>
           </div>
-          {/* A reviewer sees the brand "The Office" and an Arabic registration
-              naming الحجرة; nothing otherwise connects them. State it. */}
-          <div className="muted" style={{ paddingTop: 6, fontSize: 10.5, lineHeight: 1.45 }}>
+
+          {/*
+            * Why this sentence exists at all.
+            *
+            * Meta's App Review reads the app under the brand "The Office", then
+            * reads a Jordanian commercial registration issued to الحجرة /
+            * Al-Hujra. Nothing else on the site connects the two names, and an
+            * unexplained mismatch between a trading name and the registered
+            * entity is a routine reason for a business verification to be
+            * rejected. One line closes it.
+            */}
+          <div className="muted" style={{ marginTop: 8, fontSize: 10.5, lineHeight: 1.5 }}>
             The Office is a product of Al-Hujra Information Technology Company / Limited Liability,
             Amman, Jordan · commercial registration 83622
           </div>
+        </div>
       </aside>
 
       <div className="main">
