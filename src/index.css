@@ -43,6 +43,14 @@
   --fb:#2f73e8; --fb-weak:#e9f0fd;
   --ig:#d65a0a; --ig-weak:#fbeee2;
   --tt:#0c8f80; --tt-weak:#e2f2f0;
+  /* LinkedIn.
+     NOT LinkedIn's brand blue (#0A66C2): it sits within a few degrees of --fb,
+     and two blues in one legend is the adjacency failure the chart palette was
+     validated to avoid. Violet separates cleanly from blue, orange and teal, and
+     survives greyscale, which is how a printed media kit arrives.
+     TODO: re-run scripts/validate_palette.js over all four together — it was
+     unavailable when this was added, so this pair is reasoned, not measured. */
+  --li:#7a4fd6; --li-weak:#efe8fb;
 
   --grid:rgba(20,23,28,.06);
   --radius:9px; --radius-sm:6px; --radius-lg:13px;
@@ -73,6 +81,7 @@
   --fb:#5b9bff; --fb-weak:rgba(91,155,255,.14);
   --ig:#f2853f; --ig-weak:rgba(242,133,63,.14);
   --tt:#2bc4b2; --tt-weak:rgba(43,196,178,.14);
+  --li:#a98cf0; --li-weak:rgba(169,140,240,.14);
 
   --grid:rgba(236,238,241,.07);
 }
@@ -93,6 +102,8 @@
     --fb:#5b9bff; --fb-weak:rgba(91,155,255,.14);
     --ig:#f2853f; --ig-weak:rgba(242,133,63,.14);
     --tt:#2bc4b2; --tt-weak:rgba(43,196,178,.14);
+    --li:#a98cf0; --li-weak:rgba(169,140,240,.14);
+  --li:#a98cf0; --li-weak:rgba(169,140,240,.14);
     --grid:rgba(236,238,241,.07);
   }
 }

@@ -91,6 +91,34 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
     ],
   },
 
+  linkedin: {
+    summary: "LinkedIn connects a COMPANY PAGE, not a personal profile, and needs an approved Community Management app.",
+    requires: [
+      "A LinkedIn Company Page",
+      "The ADMINISTRATOR role on that page (Content Admin is not enough to read reporting)",
+    ],
+    steps: [
+      {
+        text: "Create a developer app, associated with your own Company Page.",
+        link: { href: "https://developer.linkedin.com/", label: "developer.linkedin.com" },
+      },
+      { text: "Request Community Management API access, Development Tier. It must be a NEW app that holds no other API product." },
+      { text: "Request the scopes: r_organization_social, rw_organization_admin." },
+      { text: "Add the callback URL below to the app's authorised redirect URLs." },
+      { text: "Copy the Client ID and Client Secret into the environment variables below." },
+      { text: "Apply for Standard Tier once there is something to show. It requires a screencast demonstrating each use case in the request form." },
+    ],
+    redirectPath: "/api/oauth-linkedin-callback",
+    env: ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"],
+    notes: [
+      "Personal profiles are not supported. Reading a member's own posts needs r_member_social, which LinkedIn states is closed and not accepting requests, so a profile connection could only ever be partial. Company Pages have the full set.",
+      "rw_organization_admin is read AND write. LinkedIn publishes no read-only scope for page reporting, so connecting a page grants a token that could post as it. This product never calls a write endpoint, but the client is agreeing to more than they do on Instagram and should be told so.",
+      "Statistics reach back twelve months on a rolling window. Anything older is not an error, it is simply absent.",
+      "Development Tier allows 500 API calls per app per day and 100 per member. The sync is built around one call for the whole daily series and one for all posts, but this is a real ceiling on how many pages one app can carry.",
+      "LinkedIn sunsets an API version roughly every year, against Meta's two. The version is pinned in one place, LI.VERSION, and moving it is a deliberate act.",
+      "Nothing here has been verified against a live response yet. See docs/LINKEDIN.md.",
+    ],
+  },
   tiktok: {
     summary: "TikTok uses its own developer app and Login Kit, entirely separate from Meta.",
     requires: ["A TikTok account"],

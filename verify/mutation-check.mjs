@@ -14,6 +14,7 @@ const LIB = "verify/build/_lib.js";
 const TOKENS = "verify/build/_tokens.js";
 const DELETION = "verify/build/meta-data-deletion.js";
 const INSTA = "verify/build/_instagram.js";
+const LINKEDIN = "verify/build/_linkedin.js";
 const INSIGHTS = "verify/build-lib/insights.js";
 const FORMAT = "verify/build-lib/format.js";
 const CSVREPORT = "verify/build-lib/csvReport.js";
@@ -209,6 +210,18 @@ const mutations = [
   { name: "an unknown figure written into the workbook as a zero", file: XLSX,
     find: 'if (cell.v === null || cell.v === undefined || cell.v === "")',
     replace: 'if (false)' },
+  /*
+   * LinkedIn. Two defects that have already happened once on the Meta path, and
+   * one that is specific to holding a write-capable scope.
+   */
+  { name: "LinkedIn asks for a write scope on top of reading", file: LINKEDIN,
+    find: 'SCOPES: ["r_organization_social", "rw_organization_admin"],',
+    replace: 'SCOPES: ["r_organization_social", "rw_organization_admin", "w_organization_social"],' },
+  { name: "an unreported LinkedIn figure becomes a zero", file: LINKEDIN,
+    find: "export const liNum = (v) => typeof v === \"number\" && Number.isFinite(v) ? v : null;",
+    replace: "export const liNum = (v) => typeof v === \"number\" && Number.isFinite(v) ? v : 0;" },
+  { name: "LinkedIn history reaches past the window the API serves", file: LINKEDIN,
+    find: "MAX_HISTORY_DAYS: 365,", replace: "MAX_HISTORY_DAYS: 3650," },
   { name: "unknown read time invented as 'just now'", file: FORMAT,
     find: `    if (!iso)
         return null;`,
@@ -218,7 +231,7 @@ const mutations = [
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs", "verify/tests/linkedin.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

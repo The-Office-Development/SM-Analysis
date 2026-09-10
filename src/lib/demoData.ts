@@ -108,6 +108,10 @@ const TITLES: Record<Platform, string[]> = {
   facebook: ["Behind the scenes of our new launch", "Community Q&A: your questions answered", "5 things we learned this quarter", "Customer spotlight: Sara's story", "Live event recap", "New feature walkthrough", "Weekend giveaway announcement", "How we build in public"],
   instagram: ["Golden hour photo dump", "Reel: 3 quick styling tips", "Carousel: before and after", "Studio tour in 60 seconds", "This or that? Drop your pick", "Monday motivation reel", "Product close-up shots", "Trend remix"],
   tiktok: ["POV: your first day here", "This trend but make it real", "Tutorial in 15 seconds", "Duet with our biggest fan", "Day in the life", "Rating your suggestions", "Green screen explainer", "Satisfying process clip"],
+  // Company Page posts read differently from creator content: longer, and
+  // written for a professional audience. The demo should look like the platform
+  // it claims to be rather than the same captions in a different colour.
+  linkedin: ["We're hiring: two roles on the delivery team", "What we learned shipping in Ramadan", "Case study: cutting onboarding from 3 weeks to 4 days", "Our take on the new regulation", "Meet the team: engineering", "Quarterly update from the founders", "Why we moved our stack", "Partnering with a Jordanian supplier"],
 };
 
 export const demoContent: ContentItem[] = (() => {

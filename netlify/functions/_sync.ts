@@ -1,5 +1,6 @@
 import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, log } from "./_lib";
 import { igGet, IG } from "./_instagram";
+import { LI, liGet, liNum, liLikes, liTime, liDayKey, type LiShareStats } from "./_linkedin";
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
@@ -417,6 +418,7 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
   else if (acc.platform === "instagram") ({ days, posts } = await syncInstagram(acc, token, start, counter, window.end, anchor));
   else if (acc.platform === "facebook") ({ days, posts } = await syncFacebook(acc, token, start, counter));
   else if (acc.platform === "tiktok") ({ days, posts } = await syncTiktok(acc, token, counter));
+  else if (acc.platform === "linkedin") ({ days, posts } = await syncLinkedIn(acc, token, start, counter, window.end));
 
   let rowsWritten = 0;
   if (days.length) {
@@ -1774,4 +1776,231 @@ function mapCountryNames(raw: Record<string, number>): Record<string, number> {
 function hasAudience(a: Audience): boolean {
   return Object.keys(a.age).length > 0 || Object.keys(a.gender).length > 0 ||
     Object.keys(a.countries).length > 0 || a.active_hours.some((r) => r.some((v) => v > 0));
+}
+
+/* ===========================================================================
+ * LinkedIn — Company Page.
+ *
+ * Shaped very differently from the Meta paths, and the differences are the
+ * reason this is its own function rather than a branch inside one of them:
+ *
+ *  - ONE call returns the whole daily series. `organizationalEntityShareStatistics`
+ *    with `timeGranularityType: DAY` gives every day in the range at once, where
+ *    Instagram's total_value metrics cost a call per metric per day. That is
+ *    fortunate, because LinkedIn's Development Tier allows only 500 calls per app
+ *    per day against Meta's effectively unlimited — the Instagram sync alone
+ *    spends about 2,100 a day on a single account. A LinkedIn sync that cost per
+ *    day would be impossible.
+ *  - Per-post statistics are LIFETIME ONLY. "Time-bound statistics is not
+ *    supported for specific share queries." So `content` gets lifetime counters,
+ *    which is what that table already holds, and no per-post daily series exists
+ *    to build.
+ *  - Twelve months of history, hard. Nothing older is an error; it is simply
+ *    absent, and absence must not become zero.
+ * ======================================================================== */
+async function syncLinkedIn(
+  acc: AccountRow, token: string, start: string, c: { calls: number }, end: string,
+): Promise<{ days: DayRow[]; posts: Post[] }> {
+  const urn = `urn:li:organization:${acc.external_id}`;
+  const days: DayRow[] = [];
+  const posts: Post[] = [];
+
+  /*
+   * Clamp to LinkedIn's rolling twelve-month window before asking.
+   *
+   * Requesting further back is not rejected, it just returns nothing, and a
+   * silently empty response is indistinguishable from a page with no activity.
+   * Clamping makes the boundary explicit rather than inferred from a gap.
+   */
+  const floor = addDays(today(), -(LI.MAX_HISTORY_DAYS - 1));
+  const from = start < floor ? floor : start;
+
+  /* ---- the daily series, in one call ----------------------------------- */
+  spend(c);
+  const stats = await liGet<{ elements?: { timeRange?: { start?: number }; totalShareStatistics?: LiShareStats }[] }>(
+    LI.SHARE_STATS,
+    {
+      q: "organizationalEntity",
+      organizationalEntity: urn,
+      // Rest.li 2.0 object syntax. `end` is EXCLUSIVE, so a day is added to
+      // include the last day asked for — the opposite convention to Meta's
+      // end_time, and the single easiest place to file every figure a day out.
+      timeIntervals: `(timeRange:(start:${liTime(from)},end:${liTime(addDays(end, 1))}),timeGranularityType:DAY)`,
+    },
+    { token },
+  );
+
+  for (const el of stats.elements ?? []) {
+    const date = liDayKey(el.timeRange?.start ?? NaN);
+    if (!date) continue;
+    const s = el.totalShareStatistics ?? {};
+    days.push({
+      date,
+      // A Company Page follower total is a lifetime figure from a different
+      // endpoint, not part of this series. Left unknown here and filled below
+      // for today only; back-dating today's count across the window would be
+      // inventing a follower history that was never measured.
+      followers: null,
+      reach: liNum(s.uniqueImpressionsCount),
+      impressions: liNum(s.impressionCount),
+      // LinkedIn has no "views" for a page the way Instagram does. Impressions
+      // is the nearest thing and it is already stored in its own column; putting
+      // it in both would double-count it in any total.
+      views: null,
+      engagements: sumIfAny([liNum(s.likeCount), liNum(s.commentCount), liNum(s.shareCount)]),
+      // No follower movement or discovery split exists for a page. Null, not
+      // zero: the churn and discovery panels must stay silent rather than
+      // reporting that nobody left and nobody new was reached.
+      follows: null, unfollows: null,
+      reach_followers: null, reach_non_followers: null,
+      provisional: isProvisional(date, today()),
+    });
+  }
+
+  /* ---- today's follower total ------------------------------------------ */
+  try {
+    spend(c);
+    const net = await liGet<{ firstDegreeSize?: number }>(
+      `${LI.NETWORK_SIZE}/${urn}`, { edgeType: LI.FOLLOWER_EDGE }, { token },
+    );
+    const total = liNum(net.firstDegreeSize);
+    if (total !== null) {
+      const t = today();
+      const row = days.find((d) => d.date === t);
+      if (row) row.followers = total;
+      else days.push({
+        date: t, followers: total, reach: null, impressions: null, views: null,
+        engagements: null, follows: null, unfollows: null,
+        reach_followers: null, reach_non_followers: null, provisional: true,
+      });
+    }
+  } catch (e) {
+    // Never swallow these two: a throttle that looks like "no followers" is how
+    // rate limiting turns into data loss.
+    if (isThrottleError(e) || isAuthError(e)) throw e;
+  }
+
+  /* ---- the page's posts ------------------------------------------------- */
+  spend(c);
+  const list = await liGet<{ elements?: {
+    id?: string; commentary?: string; publishedAt?: number; createdAt?: number;
+    content?: Record<string, unknown>;
+  }[] }>(
+    LI.POSTS,
+    { q: "author", author: urn, count: String(LI.POSTS_PAGE), sortBy: "CREATED" },
+    { token },
+  ).catch((e) => {
+    if (isThrottleError(e) || isAuthError(e)) throw e;
+    return { elements: [] };
+  });
+
+  const found = (list.elements ?? []).filter((p) => p.id);
+  if (found.length) {
+    /*
+     * Statistics for those posts, in ONE more call.
+     *
+     * The endpoint takes a List() of share URNs, so the whole page costs a
+     * single request rather than one per post. That is the difference between
+     * fitting inside 500 calls a day and not.
+     */
+    spend(c);
+    const perPost = await liGet<{ elements?: { share?: string; ugcPost?: string; totalShareStatistics?: LiShareStats }[] }>(
+      LI.SHARE_STATS,
+      {
+        q: "organizationalEntity",
+        organizationalEntity: urn,
+        shares: `List(${found.map((p) => encodeURIComponent(p.id as string)).join(",")})`,
+      },
+      { token },
+    ).catch((e) => {
+      if (isThrottleError(e) || isAuthError(e)) throw e;
+      return { elements: [] };
+    });
+
+    const statsByUrn = new Map<string, LiShareStats>();
+    for (const el of perPost.elements ?? []) {
+      const key = el.share ?? el.ugcPost;
+      if (key) statsByUrn.set(key, el.totalShareStatistics ?? {});
+    }
+
+    for (const p of found) {
+      const id = p.id as string;
+      /*
+       * A post ABSENT from the per-post response is a real zero here.
+       *
+       * LinkedIn states it outright: "Shares that are not returned in the list
+       * of elements can be assumed to have counts of 0 for all statistics."
+       * That is the opposite of Instagram, where absence means unreported, and
+       * it is the one place in this codebase where a missing figure may become a
+       * zero. It applies ONLY when the request succeeded and the post was
+       * omitted — which is why the empty-elements failure path above returns
+       * early rather than falling through to mark every post as zero.
+       */
+      const known = statsByUrn.get(id);
+      const s: LiShareStats = known ?? (perPost.elements ? {
+        impressionCount: 0, likeCount: 0, commentCount: 0, shareCount: 0, clickCount: 0,
+      } : {});
+
+      const publishedMs = p.publishedAt ?? p.createdAt;
+      posts.push({
+        external_id: id,
+        // The commentary is the post text; LinkedIn has no title. Trimmed to one
+        // line so a table row stays a row.
+        title: (p.commentary ?? "").replace(/\s+/g, " ").trim().slice(0, 200) || "Untitled",
+        media_type: linkedInFormat(p.content),
+        permalink: `https://www.linkedin.com/feed/update/${id}/`,
+        published_at: publishedMs ? new Date(publishedMs).toISOString() : new Date().toISOString(),
+        // Impressions, not views: LinkedIn counts a display, and calling it a
+        // view would put a different quantity under a column heading clients
+        // read across platforms.
+        views: liNum(s.impressionCount),
+        likes: liLikes(s.likeCount),
+        comments: liNum(s.commentCount),
+        shares: liNum(s.shareCount),
+        // LinkedIn has no per-post save count.
+        saves: null,
+        /*
+         * Reach is NULL for a LinkedIn post, and deliberately.
+         *
+         * `uniqueImpressionsCount` appears on the daily and lifetime page
+         * aggregates but NOT in the per-share response, so there is no per-post
+         * reach to report. Copying impressions into it would inflate every
+         * reach-derived figure — the multiple over following, the engagement
+         * rate, the discovery split — with a number that means something else.
+         */
+        reach: null,
+        avg_watch_seconds: null, retention_pct: null,
+      });
+    }
+  }
+
+  return { days, posts };
+}
+
+/** Sum the parts that were reported; null when none of them were. */
+function sumIfAny(parts: (number | null)[]): number | null {
+  let total = 0, seen = false;
+  for (const p of parts) if (p !== null) { total += p; seen = true; }
+  return seen ? total : null;
+}
+
+/**
+ * What kind of post this is, from the content object.
+ *
+ * LinkedIn does not label the format; it is inferred from which content key is
+ * present. Unknown shapes fall back to "Post" rather than guessing, because
+ * format drives the median comparison and a mislabelled post would be compared
+ * against the wrong peer group.
+ */
+function linkedInFormat(content: Record<string, unknown> | undefined): string {
+  if (!content || typeof content !== "object") return "Post";
+  if ("article" in content) return "Article";
+  if ("poll" in content) return "Poll";
+  if ("multiImage" in content) return "Images";
+  const media = content.media as { id?: string } | undefined;
+  const id = media?.id ?? "";
+  if (id.startsWith("urn:li:video:")) return "Video";
+  if (id.startsWith("urn:li:image:")) return "Image";
+  if (id.startsWith("urn:li:document:")) return "Document";
+  return "Post";
 }

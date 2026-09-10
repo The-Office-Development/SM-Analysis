@@ -28,6 +28,8 @@ import { handler as oauthInstagram } from "../../netlify/functions/oauth-instagr
 import { handler as oauthInstagramCallback } from "../../netlify/functions/oauth-instagram-callback";
 import { handler as oauthMeta } from "../../netlify/functions/oauth-meta";
 import { handler as oauthMetaCallback } from "../../netlify/functions/oauth-meta-callback";
+import { handler as oauthLinkedin } from "../../netlify/functions/oauth-linkedin";
+import { handler as oauthLinkedinCallback } from "../../netlify/functions/oauth-linkedin-callback";
 import { handler as oauthTiktok } from "../../netlify/functions/oauth-tiktok";
 import { handler as oauthTiktokCallback } from "../../netlify/functions/oauth-tiktok-callback";
 import { handler as refreshPost } from "../../netlify/functions/refresh-post";
@@ -41,6 +43,8 @@ const ROUTES: Record<string, NetlifyHandler> = {
   "disconnect": disconnect as NetlifyHandler,
   "meta-data-deletion": metaDataDeletion as NetlifyHandler,
   "meta-deauthorize": metaDeauthorize as NetlifyHandler,
+  "oauth-linkedin": oauthLinkedin as NetlifyHandler,
+  "oauth-linkedin-callback": oauthLinkedinCallback as NetlifyHandler,
   "oauth-instagram": oauthInstagram as NetlifyHandler,
   "oauth-instagram-callback": oauthInstagramCallback as NetlifyHandler,
   "oauth-meta": oauthMeta as NetlifyHandler,

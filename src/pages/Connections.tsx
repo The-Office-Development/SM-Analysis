@@ -47,7 +47,10 @@ export default function Connections() {
       // POSTed rather than placed in a URL where it would land in history and logs.
       // Instagram connects directly, with no linked Facebook Page required.
       // Facebook Pages still use the Meta path.
-      const route = platform === "tiktok" ? "tiktok" : platform === "instagram" ? "instagram" : "meta";
+      const route = platform === "tiktok" ? "tiktok"
+        : platform === "instagram" ? "instagram"
+        : platform === "linkedin" ? "linkedin"
+        : "meta";
       window.location.href = await startOAuth(route);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not start the connection.");
