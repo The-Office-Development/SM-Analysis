@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { discovery, churn, formatPerformance, reachDrivers, genderSplit } from "../build-lib/insights.js";
+import { discovery, churn, formatPerformance, reachDrivers, genderSplit, totalReported, bestTimes, activeGrid } from "../build-lib/insights.js";
 
 /**
  * These functions produce the numbers a client is shown and a sponsor is
@@ -276,4 +276,70 @@ test("a real gender split still adds up, and the remainder is Other", async () =
 test("a gender split that over-reports does not go negative", async () => {
   const g = genderSplit({ female: 0.7, male: 0.5 });
   assert.equal(g.other, 0, "clamped at zero rather than drawing a negative bar");
+});
+
+/* ---- a total nobody measured -------------------------------------------- */
+
+test("a metric the platform never reported has no total, not a total of zero", async () => {
+  /*
+   * Found on the Platforms page with a LinkedIn account connected: the tile read
+   * "VIEWS 30D · 0". A Company Page has no page-level views at all, so the
+   * series is empty and summing it gave a confident zero for a figure LinkedIn
+   * has never produced.
+   */
+  assert.equal(totalReported([]), null, "no day reported it, so there is no total");
+});
+
+test("a real zero is still a zero", async () => {
+  /*
+   * The distinction that matters: a day on which nobody saw anything IS zero and
+   * must keep summing to zero. Collapsing both cases to null would be the same
+   * defect facing the other way.
+   */
+  assert.equal(totalReported([{ value: 0 }, { value: 0 }]), 0);
+  assert.equal(totalReported([{ value: 3 }, { value: 4 }]), 7);
+});
+
+/* ---- the posting window that was advice about nothing --------------------- */
+
+const emptyGrid = () => Array.from({ length: 7 }, () => Array(24).fill(0));
+const snap = (platform, active_hours) => ({
+  account_id: "a", platform, captured_on: "2026-09-01",
+  age: {}, gender: {}, countries: {}, devices: {}, active_hours,
+});
+
+test("an account with no hourly activity gets no posting recommendation", async () => {
+  /*
+   * Overview used to scan the grid itself with the best score seeded at -1, so
+   * every cell of a ZERO grid beat it and the first one won: "Your audience is
+   * most active Sun 12am." A LinkedIn Company Page reports no hourly activity at
+   * all, and neither does a Facebook Page connected after 14 March 2024 — both
+   * were being handed a fabricated peak window as advice.
+   */
+  assert.deepEqual(bestTimes([snap("linkedin", emptyGrid())], ["linkedin"], 5), [],
+    "a grid of zeros is not a measurement of anything");
+  assert.deepEqual(bestTimes([], ["instagram"], 5), [], "no snapshot at all");
+});
+
+test("a real heatmap still ranks its strongest hour first", async () => {
+  const grid = emptyGrid();
+  grid[2][19] = 9;   // Tuesday 7pm, the peak
+  grid[4][8] = 4;    // Thursday 8am
+  const [first, second] = bestTimes([snap("instagram", grid)], ["instagram"], 5);
+  assert.equal(first.day, 2);
+  assert.equal(first.hour, 19);
+  assert.equal(first.score, 1, "the peak is the reference");
+  assert.equal(second.day, 4);
+  assert.ok(first.label.includes("7pm"), `label reads for a person: ${first.label}`);
+});
+
+test("another platform's heatmap is not borrowed for the one in scope", async () => {
+  // The grid is summed across the SCOPED platforms only. Borrowing Instagram's
+  // peak and presenting it as a LinkedIn page's would be advice about the wrong
+  // audience, which reads as confidently as the right one.
+  const grid = emptyGrid();
+  grid[1][20] = 5;
+  const audience = [snap("instagram", grid), snap("linkedin", emptyGrid())];
+  assert.deepEqual(bestTimes(audience, ["linkedin"], 5), []);
+  assert.equal(bestTimes(audience, ["instagram"], 5)[0].hour, 20);
 });

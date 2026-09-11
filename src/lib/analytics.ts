@@ -2,54 +2,21 @@ import type { MetricPoint, AudienceSnapshot, ContentItem, Platform, Range, Scope
 import { seriesByDay, followersByDay, sum, latest, engagementRate, type MetricKey } from "./api";
 import { PLATFORMS } from "./platforms";
 import {
-  publishTiming, followerCost, reachMultiples, reachConcentration,
+  publishTiming, followerCost, reachMultiples, reachConcentration, bestTimes,
 } from "./insights";
 
 export const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-export const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-export function fmtHour(h: number): string {
-  const ap = h < 12 ? "am" : "pm";
-  const hh = (h % 12) || 12;
-  return `${hh}${ap}`;
-}
-
-/** Sum the audience active-hours [7][24] grids across the scoped snapshots. */
-export function activeGrid(audience: AudienceSnapshot[], platforms: Platform[]): number[][] {
-  const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
-  for (const a of audience) {
-    if (!platforms.includes(a.platform)) continue;
-    const h = a.active_hours;
-    if (!Array.isArray(h)) continue;
-    for (let d = 0; d < 7 && d < h.length; d++)
-      for (let hr = 0; hr < 24; hr++) grid[d][hr] += Number(h[d]?.[hr] ?? 0);
-  }
-  return grid;
-}
-
-export interface BestWindow { day: number; hour: number; score: number; label: string; }
-
-/**
- * Which timezone the posting-window hours are expressed in is set by the
- * platform, not by us, and has not been confirmed for Instagram. Until it is,
- * every recommendation must be shown with this caveat rather than implying the
- * viewer's local time — a "best time" that is silently hours out is advice a
- * client will act on.
+/*
+ * The posting-window interpretation moved to `insights.ts` so the test suite can
+ * reach it. This module imports `api.ts` and `platforms.tsx`, so it drags in the
+ * Supabase client and the React tree and cannot be compiled for a test — which
+ * is why a defect in `bestTimes` went unnoticed. Re-exported here so existing
+ * callers are unchanged.
  */
-export const BEST_TIME_NOTE =
-  "Hours are as the platform reports them and may not match your local timezone. Confirm against your own Instagram insights before scheduling.";
-
-/** Rank the strongest posting windows from the audience heatmap. */
-export function bestTimes(audience: AudienceSnapshot[], platforms: Platform[], top = 5): BestWindow[] {
-  const grid = activeGrid(audience, platforms);
-  const max = Math.max(...grid.flat());
-  if (max <= 0) return [];
-  const cells: BestWindow[] = [];
-  for (let d = 0; d < 7; d++)
-    for (let hr = 0; hr < 24; hr++)
-      cells.push({ day: d, hour: hr, score: grid[d][hr] / max, label: `${DOW[d]} · ${fmtHour(hr)}` });
-  return cells.filter((c) => c.score > 0).sort((a, b) => b.score - a.score).slice(0, top);
-}
+export {
+  DOW_SHORT, fmtHour, activeGrid, bestTimes, BEST_TIME_NOTE,
+} from "./insights";
+export type { BestWindow } from "./insights";
 
 export type AnomalyKind = "spike" | "drop";
 export interface Anomaly {
@@ -88,7 +55,17 @@ export function anomalies(metrics: MetricPoint[], scope: Scope): Anomaly[] {
   return out.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 }
 
-export interface Compare { key: MetricKey | "followers"; label: string; current: number; previous: number; deltaPct: number; }
+export interface Compare {
+  key: MetricKey | "followers"; label: string; current: number; previous: number; deltaPct: number;
+  /**
+   * False when the platform never reported this metric over the window.
+   *
+   * `current` is 0 in that case because the series was empty, and a 0 here is
+   * read by the AI assistant and printed in a sponsor's report as a measurement.
+   * A LinkedIn Company Page reports no page-level views at all.
+   */
+  reported: boolean;
+}
 
 /** This half of the window vs the prior half (matches the app's momentum proxy). */
 export function periodCompare(metrics: MetricPoint[], scope: Scope): Compare[] {
@@ -100,16 +77,16 @@ export function periodCompare(metrics: MetricPoint[], scope: Scope): Compare[] {
   ];
   return defs.map(({ key, label }) => {
     const s = key === "followers" ? followersByDay(metrics, scope) : seriesByDay(metrics, scope, key);
-    if (s.length < 4) return { key, label, current: 0, previous: 0, deltaPct: 0 };
+    if (s.length < 4) return { key, label, current: 0, previous: 0, deltaPct: 0, reported: s.length > 0 };
     const half = Math.floor(s.length / 2);
     if (key === "followers") {
       const previous = s[half - 1]?.value ?? 0;
       const current = s[s.length - 1]?.value ?? 0;
-      return { key, label, current, previous, deltaPct: previous ? ((current - previous) / previous) * 100 : 0 };
+      return { key, label, current, previous, deltaPct: previous ? ((current - previous) / previous) * 100 : 0, reported: true };
     }
     const previous = s.slice(0, half).reduce((a, x) => a + x.value, 0);
     const current = s.slice(s.length - half).reduce((a, x) => a + x.value, 0);
-    return { key, label, current, previous, deltaPct: previous ? ((current - previous) / previous) * 100 : 0 };
+    return { key, label, current, previous, deltaPct: previous ? ((current - previous) / previous) * 100 : 0, reported: true };
   });
 }
 

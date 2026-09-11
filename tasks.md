@@ -263,6 +263,44 @@ what turns that into "works". Unlike Instagram, there **is** a visible oracle �
 the page's own Analytics tab shows these same breakdowns — so the reconciliation
 should be run before a client sees the Audience page.
 
+## 12. LinkedIn in the demo — 2026-09-12, and what it caught
+
+`demoData.ts` now carries a fourth account, a Company Page, so the preview shows
+the platform the product supports. Each demo account declares what its platform
+**actually reports**, and the generators write null where it does not: LinkedIn
+has no page views, no follower churn, no discovery split, no per-post reach and
+no hourly activity. A demo that filled those in would sell a report nobody can
+deliver, and leave the operator explaining the absence to a paying client.
+
+**Generating it found three defects, none of them LinkedIn-specific**, all the
+same shape — a zero shown where nothing was measured:
+
+- **"Video views · 0" on the Overview KPI card**, and "VIEWS 30D · 0" on the
+  Platforms tile. `seriesByDay` correctly drops unreported days, so a metric the
+  platform never reports yields an empty series and `sum([])` is 0. Now
+  `totalReported()` → null → "n/a", including in the AI assistant's snapshot and
+  the sponsor report sheet, where a 0 would have been repeated as fact.
+- **"Your audience is most active Sun 12am"**, advice given to any account with
+  no hourly data. Overview scanned the grid itself with the best score seeded at
+  `-1`, so every cell of a grid of zeros beat it and the first one won. Fixed by
+  using `bestTimes`, which already guarded this — and which was **untestable**
+  where it lived, because `analytics.ts` imports the Supabase client and the
+  React tree. It moved to `insights.ts` and now has tests.
+- **An empty-state naming the wrong platform** — "Instagram has not reported
+  follower losses" shown to a LinkedIn account.
+
+Affected accounts are not hypothetical: every Facebook Page connected after
+14 March 2024 gets no demographics and no hourly activity, so all three have been
+reaching real Pages, not just the new LinkedIn path.
+
+164 assertions, 61/61 mutations.
+
+**One mutation had to be rewritten to be honest.** Removing the `max <= 0` guard
+in `bestTimes` changes nothing, because `0/0` is NaN and the `score > 0` filter
+drops it; mutating either guard alone survives. That says the two are redundant,
+not that the test is weak, and the mutation now injects the unguarded shape the
+page actually had.
+
 ## 11. Connecting a client — written 2026-09-11
 
 `docs/CLIENT-CONNECT-INSTAGRAM.md`. There was no guide for this: the in-app

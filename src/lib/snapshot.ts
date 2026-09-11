@@ -2,7 +2,7 @@ import type { useDash } from "../context/DashboardContext";
 import { seriesByDay, followersByDay, sum, latest, engagementRate } from "./api";
 import { periodCompare, bestTimes, anomalies } from "./analytics";
 import {
-  publishTiming, followerCost, reachMultiples, reachConcentration,
+  publishTiming, followerCost, reachMultiples, reachConcentration, totalReported,
 } from "./insights";
 import { PLATFORMS } from "./platforms";
 import { accountLabel } from "./reportMeta";
@@ -22,9 +22,15 @@ export interface ReportSnapshot {
   account?: string;
   scopeLabel: string;
   range: number;
-  headline: { label: string; total: number; deltaPct: number | null }[];
+  headline: { label: string; total: number | null; deltaPct: number | null }[];
   engagementRate: number;
-  platforms: { name: string; followers: number; reach: number; views: number; engagements: number }[];
+  /*
+   * reach / views / engagements are nullable: a platform that does not report a
+   * figure has no total, and a zero here is read by the AI assistant and printed
+   * in a sponsor's report as if it were measured. `followers` stays a number —
+   * every platform reports a follower count.
+   */
+  platforms: { name: string; followers: number; reach: number | null; views: number | null; engagements: number | null }[];
   top: { title: string; platform: string; views: number | null; likes: number | null; comments: number | null }[];
   windows: string[];
   alerts: { label: string; kind: "spike" | "drop"; deltaPct: number; date: string }[];
@@ -60,16 +66,16 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
     label: c.label,
     total: c.key === "followers"
       ? latest(followersByDay(dash.metrics, dash.scope))
-      : sum(seriesByDay(dash.metrics, dash.scope, c.key)),
+      : totalReported(seriesByDay(dash.metrics, dash.scope, c.key)),
     deltaPct: c.deltaPct,
   }));
 
   const platforms = dash.connectedPlatforms.map((p) => ({
     name: PLATFORMS[p].name,
     followers: latest(followersByDay(dash.metrics, p)),
-    reach: sum(seriesByDay(dash.metrics, p, "reach")),
-    views: sum(seriesByDay(dash.metrics, p, "views")),
-    engagements: sum(seriesByDay(dash.metrics, p, "engagements")),
+    reach: totalReported(seriesByDay(dash.metrics, p, "reach")),
+    views: totalReported(seriesByDay(dash.metrics, p, "views")),
+    engagements: totalReported(seriesByDay(dash.metrics, p, "engagements")),
   }));
 
   const top = [...dash.content]

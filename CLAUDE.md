@@ -222,6 +222,21 @@ P0 finding. There is a test and a mutation guarding every one.
   in the `organicFollowerCount` field. Do not refer to the `paidFollowerCount`
   field for professional demographic statistics." Summing them counts every paid
   follower twice, and it looks exactly like a fix. Guarded by a mutation.
+- **Never total an empty series into a displayed figure.** `seriesByDay` drops
+  days the platform said nothing about, so a metric it does not report at all
+  yields an EMPTY series — and `sum([])` is `0`. That put "Video views · 0" on
+  the Overview KPI card and "VIEWS 30D · 0" on the Platforms tile for a LinkedIn
+  page, which has no page-level views at all. Use `totalReported()`, which
+  returns null, and render it with `metric()`. A day on which nobody watched IS
+  a zero; a metric nobody reports is unknown. Guarded by a mutation.
+- **Never seed a "best" scan below the range of the data.** The Overview peak
+  window scanned the activity grid with `bv = -1`, so a grid of ZEROS matched its
+  first cell and the product advised posting **Sunday at midnight** — to any
+  account with no hourly data, which is every LinkedIn page and every Facebook
+  Page connected after 14 March 2024. Use `bestTimes()`, which returns nothing
+  for an empty grid. It now lives in `insights.ts` precisely so it can be tested;
+  `analytics.ts` cannot be compiled for a test because it pulls in the Supabase
+  client and the React tree.
 - **Never decide whether a panel has data from the arithmetic on its shares.**
   The Audience gender panel derived "other" as `1 - female - male` and drew
   itself whenever the three summed above zero, so an account the platform
@@ -242,6 +257,18 @@ P0 finding. There is a test and a mutation guarding every one.
   functions at 30s and they cannot be background functions.
 - `buildCsv` uses `seriesByDay(..., "followers")` while the dashboard uses
   `followersByDay()`. These agree: the primary key is `(account_id, date)`.
+
+### The demo is part of the product, not a fixture
+`src/lib/demoData.ts` is what a prospective client sees before they believe any
+of this, so it must not promise a panel the platform cannot fill. Each account
+carries a `reports` block naming what its platform actually makes available, and
+the generators write `null` where it does not — LinkedIn has no page views, no
+follower churn, no discovery split, no per-post reach and no hourly activity.
+
+**Adding LinkedIn to it found three defects in a day**, all of them the same
+shape and none LinkedIn-specific: a zero displayed where nothing was measured.
+Generating demo data for a platform with genuine gaps is the cheapest test of
+null handling this repo has, and it should be done for the next platform too.
 
 ### Testing
 - `verify/tests/` is the suite that counts. `tests/mock-graph.mjs` knows each

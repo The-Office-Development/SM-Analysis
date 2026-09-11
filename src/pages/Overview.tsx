@@ -5,6 +5,7 @@ import {
   seriesByDay, followersByDay, sum, latest, stockDelta, momentum, engagementRate,
 } from "../lib/api";
 import { compact, metric, sumKnown, full, pctPlain, ratioPct, shortDate } from "../lib/format";
+import { bestTimes, DOW_SHORT, fmtHour, totalReported } from "../lib/insights";
 import type { Platform } from "../lib/types";
 import StatCard from "../components/StatCard";
 import LineChart, { type Series } from "../components/charts/LineChart";
@@ -131,8 +132,17 @@ export default function Overview() {
     <>
       <div className="kpis">
         <StatCard label="Followers" value={compact(latest(follSeries))} delta={stockDelta(follSeries)} spark={follSeries.map((d) => d.value)} color="var(--text-2)" />
-        <StatCard label="Reach" value={compact(reachTotal)} delta={momentum(reachSeries)} spark={reachSeries.map((d) => d.value)} color="var(--fb)" />
-        <StatCard label="Video views" value={compact(sum(viewSeries))} delta={momentum(viewSeries)} spark={viewSeries.map((d) => d.value)} color="var(--tt)" />
+        {/*
+          * metric(totalReported(...)), not compact(sum(...)).
+          *
+          * A platform that does not report a metric produces an empty series,
+          * and summing it gives 0 — so a LinkedIn Company Page, which has no
+          * page-level "views" at all, showed "Video views · 0 · +0.0%" on the
+          * most prominent card in the product. The delta goes with it: there is
+          * no movement to report in a figure nobody measured.
+          */}
+        <StatCard label="Reach" value={metric(totalReported(reachSeries))} delta={reachSeries.length ? momentum(reachSeries) : undefined} spark={reachSeries.map((d) => d.value)} color="var(--fb)" />
+        <StatCard label="Video views" value={metric(totalReported(viewSeries))} delta={viewSeries.length ? momentum(viewSeries) : undefined} spark={viewSeries.map((d) => d.value)} color="var(--tt)" />
         <StatCard label="Engagement rate" value={pctPlain(engagementRate(metrics, scope))} delta={momentum(engSeries)} spark={engSeries.map((d) => d.value)} color="var(--ig)" />
       </div>
 
@@ -320,13 +330,21 @@ function buildInsights(dash: ReturnType<typeof useDash>) {
       color: PLATFORMS[byEr[0].p].color, Icon: IcSpark,
     });
   }
-  // best time from audience
-  const aud = dash.audience.find((a) => platforms.includes(a.platform));
-  if (aud?.active_hours?.length) {
-    let bd = 0, bh = 0, bv = -1;
-    aud.active_hours.forEach((row, d) => row.forEach((v, h) => { if (v > bv) { bv = v; bd = d; bh = h; } }));
-    const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][bd];
-    out.push({ title: "Post around your peak window", body: `Your audience is most active ${dow} ${(bh % 12) || 12}${bh < 12 ? "am" : "pm"}.`, color: "var(--fb)", Icon: IcClock });
+  /*
+   * Best time from the audience heatmap, via bestTimes.
+   *
+   * This used to scan the grid here, starting the best score at -1 — so a grid
+   * of ZEROS "found" its first cell and advised posting Sunday at midnight. A
+   * LinkedIn Company Page reports no hourly activity at all, and neither does a
+   * Facebook Page connected after 14 March 2024, so both were being given a
+   * fabricated peak window as advice a client would act on.
+   *
+   * bestTimes already returns nothing for an empty grid, and is now tested.
+   */
+  const [peak] = bestTimes(dash.audience, platforms, 1);
+  if (peak) {
+    const dow = DOW_SHORT[peak.day];
+    out.push({ title: "Post around your peak window", body: `Your audience is most active ${dow} ${fmtHour(peak.hour)}.`, color: "var(--fb)", Icon: IcClock });
   }
   const reachMom = momentum(seriesByDay(dash.metrics, dash.scope, "reach"));
   if (reachMom < 0) {

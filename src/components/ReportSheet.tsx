@@ -45,7 +45,7 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
           <thead><tr><th>Metric</th><th className="num">Total</th><th className="num">Trend</th></tr></thead>
           <tbody>
             {snap.headline.map((h) => (
-              <tr key={h.label}><td>{h.label}</td><td className="num tnum">{full(h.total)}</td><td className="num">{delta(h.deltaPct)}</td></tr>
+              <tr key={h.label}><td>{h.label}</td><td className="num tnum">{h.total === null ? "n/a" : full(h.total)}</td><td className="num">{delta(h.deltaPct)}</td></tr>
             ))}
             <tr><td>Engagement rate</td><td className="num tnum">{snap.engagementRate.toFixed(1)}%</td><td className="num muted">n/a</td></tr>
           </tbody>
@@ -61,9 +61,9 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
               <tr key={p.name}>
                 <td>{p.name}</td>
                 <td className="num tnum">{compact(p.followers)}</td>
-                <td className="num tnum">{compact(p.reach)}</td>
-                <td className="num tnum">{compact(p.views)}</td>
-                <td className="num tnum">{compact(p.engagements)}</td>
+                <td className="num tnum">{metric(p.reach)}</td>
+                <td className="num tnum">{metric(p.views)}</td>
+                <td className="num tnum">{metric(p.engagements)}</td>
               </tr>
             ))}
           </tbody>

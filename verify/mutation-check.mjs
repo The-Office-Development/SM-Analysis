@@ -244,6 +244,22 @@ const mutations = [
    * The gender panel measuring an account nothing was reported for. This one
    * actually shipped; it was found by rendering the page, not by reading it.
    */
+  /*
+   * A posting window invented from a grid of zeros — the "most active Sun 12am"
+   * an account with no hourly data was being given as advice.
+   *
+   * This one has to remove BOTH guards at once, and finding that out was worth
+   * the detour: `max <= 0` returns early, and independently `score > 0` drops
+   * the NaN that 0/0 produces. Mutating either alone changes nothing and the
+   * mutation survives, which says the two are redundant rather than that the
+   * test is weak. Injected here as the unguarded version the page actually had.
+   */
+  { name: "a posting window invented from a heatmap of zeros", file: INSIGHTS,
+    find: "    if (max <= 0)\n        return [];",
+    replace: "    if (false)\n        return [];\n    if (!(max > 0))\n        return [{ day: 0, hour: 0, score: 0, label: `Sunday · 12am` }];" },
+  { name: "a metric nobody reported totalled as a confident zero", file: INSIGHTS,
+    find: "    return series.length ? series.reduce((s, x) => s + x.value, 0) : null;",
+    replace: "    return series.reduce((s, x) => s + x.value, 0);" },
   { name: "an unreported gender split rendered as 100% Other", file: INSIGHTS,
     find: "    if (!reported)\n        return { reported: false, female: 0, male: 0, other: 0 };",
     replace: "    if (false)\n        return { reported: false, female: 0, male: 0, other: 0 };" },

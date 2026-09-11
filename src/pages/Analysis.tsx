@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
+import { PLATFORMS } from "../lib/platforms";
 import { compact, full, shortDate } from "../lib/format";
 import {
   publishTiming, followerCost, reachMultiples, reachConcentration, TIMING_MIN_POSTS,
@@ -115,9 +116,15 @@ function AnalysisInner() {
              sub={cost.reported && cost.typical !== null ? `usually ${full(cost.typical)} a day` : undefined}>
         {!cost.reported ? (
           <Note>
-            Instagram has not reported follower losses for this account, so there
-            is nothing to look at here. It is not that nobody left; it is that we
-            cannot see it.
+            {/*
+              * Named by scope, not hard-coded to Instagram. A LinkedIn Company
+              * Page reports no follower losses AT ALL — it is a platform-wide
+              * absence, not this account's — and telling a LinkedIn client that
+              * "Instagram has not reported" reads as a bug in the product.
+              */}
+            {dash.scope === "linkedin"
+              ? "LinkedIn does not report follower losses for a Company Page at all, so there is nothing to look at here. It is not that nobody left; it is that the platform never says."
+              : `${dash.scope === "all" ? "The platform has" : PLATFORMS[dash.scope].name + " has"} not reported follower losses for this account, so there is nothing to look at here. It is not that nobody left; it is that we cannot see it.`}
           </Note>
         ) : cost.days.length === 0 ? (
           <Note>

@@ -1,7 +1,8 @@
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
 import { followersByDay, seriesByDay, sum, latest, stockDelta, engagementRate } from "../lib/api";
-import { compact, pctPlain } from "../lib/format";
+import { compact, metric, pctPlain } from "../lib/format";
+import { totalReported } from "../lib/insights";
 import PlatformTile from "../components/PlatformTile";
 import Delta from "../components/Delta";
 import LineChart, { type Series } from "../components/charts/LineChart";
@@ -31,8 +32,14 @@ function PlatformsInner() {
           const stat = [
             { k: "Followers", v: compact(latest(foll)), delta: stockDelta(foll) },
             { k: "Eng. rate", v: pctPlain(engagementRate(dash.metrics, p)) },
-            { k: `Reach ${dash.range}d`, v: compact(sum(seriesByDay(dash.metrics, p, "reach"))) },
-            { k: `Views ${dash.range}d`, v: compact(sum(seriesByDay(dash.metrics, p, "views"))) },
+            /*
+             * metric(), not compact(). A platform that does not report a figure
+             * at all yields an empty series, and summing that gives 0 — which
+             * this tile showed as "VIEWS 30D · 0" for a LinkedIn page, a number
+             * LinkedIn has never once produced.
+             */
+            { k: `Reach ${dash.range}d`, v: metric(totalReported(seriesByDay(dash.metrics, p, "reach"))) },
+            { k: `Views ${dash.range}d`, v: metric(totalReported(seriesByDay(dash.metrics, p, "views"))) },
           ];
           return (
             <section className="panel" key={p}>

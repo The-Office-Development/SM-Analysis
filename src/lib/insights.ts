@@ -1,4 +1,4 @@
-import type { MetricPoint, ContentItem, Scope } from "./types";
+import type { MetricPoint, ContentItem, Scope, AudienceSnapshot, Platform } from "./types";
 
 /* ===========================================================================
  * The interpretation layer.
@@ -695,3 +695,78 @@ export function genderSplit(raw: Record<string, number> | undefined): GenderSpli
   const male = raw!["male"] ?? 0;
   return { reported: true, female, male, other: Math.max(0, 1 - female - male) };
 }
+
+/**
+ * The total of a daily series, or null when the platform never reported it.
+ *
+ * `seriesByDay` already drops days the platform said nothing about, so a metric
+ * it does not report at all produces an EMPTY series — and summing an empty
+ * series gives 0, which then renders as a measured zero. A LinkedIn Company Page
+ * reports no page-level "views" at all, and the Platforms tile read
+ * "VIEWS 30D · 0" for it: a figure the platform has never once produced,
+ * displayed with the same confidence as a real one.
+ *
+ * Zero and unreported are genuinely different. A day on which nobody saw a post
+ * IS a zero and must keep summing to zero; a metric that does not exist is
+ * unknown. The difference is whether any day reported it, not what the total
+ * came to.
+ */
+export function totalReported(series: { value: number }[]): number | null {
+  return series.length ? series.reduce((s, x) => s + x.value, 0) : null;
+}
+
+/* --------------------------- posting windows ------------------------------
+ *
+ * Moved here from `analytics.ts` on 2026-09-12 so the suite can reach it.
+ * `analytics.ts` imports the Supabase client and the React tree, so it cannot be
+ * compiled for a test — and an untestable module is where the "Sun 12am" defect
+ * below survived.
+ */
+
+const DOW_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export function fmtHour(h: number): string {
+  const ap = h < 12 ? "am" : "pm";
+  const hh = (h % 12) || 12;
+  return `${hh}${ap}`;
+}
+
+/** Sum the audience active-hours [7][24] grids across the scoped snapshots. */
+export function activeGrid(audience: AudienceSnapshot[], platforms: Platform[]): number[][] {
+  const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (const a of audience) {
+    if (!platforms.includes(a.platform)) continue;
+    const h = a.active_hours;
+    if (!Array.isArray(h)) continue;
+    for (let d = 0; d < 7 && d < h.length; d++)
+      for (let hr = 0; hr < 24; hr++) grid[d][hr] += Number(h[d]?.[hr] ?? 0);
+  }
+  return grid;
+}
+
+export interface BestWindow { day: number; hour: number; score: number; label: string; }
+
+/**
+ * Which timezone the posting-window hours are expressed in is set by the
+ * platform, not by us, and has not been confirmed for Instagram. Until it is,
+ * every recommendation must be shown with this caveat rather than implying the
+ * viewer's local time — a "best time" that is silently hours out is advice a
+ * client will act on.
+ */
+export const BEST_TIME_NOTE =
+  "Hours are as the platform reports them and may not match your local timezone. Confirm against your own Instagram insights before scheduling.";
+
+/** Rank the strongest posting windows from the audience heatmap. */
+export function bestTimes(audience: AudienceSnapshot[], platforms: Platform[], top = 5): BestWindow[] {
+  const grid = activeGrid(audience, platforms);
+  const max = Math.max(...grid.flat());
+  if (max <= 0) return [];
+  const cells: BestWindow[] = [];
+  for (let d = 0; d < 7; d++)
+    for (let hr = 0; hr < 24; hr++)
+      cells.push({ day: d, hour: hr, score: grid[d][hr] / max, label: `${DOW_LONG[d]} · ${fmtHour(hr)}` });
+  return cells.filter((c) => c.score > 0).sort((a, b) => b.score - a.score).slice(0, top);
+}
+

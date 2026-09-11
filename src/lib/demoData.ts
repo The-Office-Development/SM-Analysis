@@ -37,10 +37,46 @@ function isoDay(offset: number): string {
 const nowIso = () => new Date().toISOString();
 
 /* ------------------------------- accounts -------------------------------- */
-const ACCOUNTS: { platform: Platform; id: string; username: string; base: number; reachMul: number; er: number; viewMul: number }[] = [
-  { platform: "facebook", id: "demo-fb", username: "northwind.co", base: 48200, reachMul: 2.4, er: 3.1, viewMul: 1.2 },
-  { platform: "instagram", id: "demo-ig", username: "northwind", base: 71400, reachMul: 2.0, er: 4.7, viewMul: 2.2 },
-  { platform: "tiktok", id: "demo-tt", username: "northwind", base: 126800, reachMul: 3.9, er: 6.9, viewMul: 5.2 },
+/**
+ * `reports` is what the PLATFORM makes available, not what we chose to show.
+ *
+ * The demo is the last thing a client sees before they believe the product, so
+ * it must not promise a panel the platform cannot fill. LinkedIn is the case
+ * that forced this to be explicit: a Company Page reports no follower churn, no
+ * discovery split and no page "views", and a demo that generated all three
+ * would sell a report nobody can ever deliver — then leave the operator
+ * explaining the absence to a paying client. Each `false` below matches a
+ * documented absence and a null in `syncLinkedIn`.
+ */
+interface DemoAccount {
+  platform: Platform; id: string; username: string;
+  base: number; reachMul: number; er: number; viewMul: number;
+  reports: {
+    /** A page-level "views" figure distinct from impressions. */
+    views: boolean;
+    /** Gross follows and unfollows per day. */
+    churn: boolean;
+    /** Reach split by follower / non-follower. */
+    discovery: boolean;
+    /** Per-post reach, as opposed to per-post impressions. */
+    postReach: boolean;
+    /** Saves, and video watch-through. */
+    saves: boolean;
+    watch: boolean;
+  };
+}
+const FULL = { views: true, churn: true, discovery: true, postReach: true, saves: true, watch: true };
+const ACCOUNTS: DemoAccount[] = [
+  { platform: "facebook", id: "demo-fb", username: "northwind.co", base: 48200, reachMul: 2.4, er: 3.1, viewMul: 1.2, reports: FULL },
+  { platform: "instagram", id: "demo-ig", username: "northwind", base: 71400, reachMul: 2.0, er: 4.7, viewMul: 2.2, reports: FULL },
+  { platform: "tiktok", id: "demo-tt", username: "northwind", base: 126800, reachMul: 3.9, er: 6.9, viewMul: 5.2, reports: FULL },
+  /*
+   * A Company Page, and deliberately the smallest account here. A LinkedIn page
+   * with 126k followers would be remarkable; 9.4k is what a Jordanian company
+   * page looks like, and the demo is more persuasive for being plausible.
+   */
+  { platform: "linkedin", id: "demo-li", username: "northwind-co", base: 9400, reachMul: 1.3, er: 2.4, viewMul: 0,
+    reports: { views: false, churn: false, discovery: false, postReach: false, saves: false, watch: false } },
 ];
 
 export const demoAccounts: SocialAccount[] = ACCOUNTS.map((a, i) => ({
@@ -90,8 +126,18 @@ export const demoMetrics: MetricPoint[] = (() => {
 
       rows.push({
         account_id: a.id, platform: a.platform, date,
-        followers: Math.round(followers), reach, impressions, views, engagements,
-        follows, unfollows, reach_followers, reach_non_followers,
+        followers: Math.round(followers), reach, impressions, engagements,
+        /*
+         * null where the platform does not report it, exactly as the sync
+         * writes it. A demo that filled these in would be teaching a client to
+         * expect a churn panel and a discovery split from a LinkedIn page, and
+         * the first thing they would do on connecting is ask where they went.
+         */
+        views: a.reports.views ? views : null,
+        follows: a.reports.churn ? follows : null,
+        unfollows: a.reports.churn ? unfollows : null,
+        reach_followers: a.reports.discovery ? reach_followers : null,
+        reach_non_followers: a.reports.discovery ? reach_non_followers : null,
       });
     }
   }
@@ -124,24 +170,40 @@ export const demoContent: ContentItem[] = (() => {
       const views = Math.round((last.reach ?? 0) * viral * (a.platform === "tiktok" ? 1.6 : 1));
       const er = a.er * (0.5 + r() * 1.6);
       const eng = Math.round((views * er) / 100);
-      const isVideo = a.platform !== "facebook" && r() > 0.35;
+      const isVideo = a.platform !== "facebook" && a.platform !== "linkedin" && r() > 0.35;
+      /*
+       * LinkedIn's own format vocabulary, which is not the others'. The sync
+       * derives these from the post's content union (`linkedInFormat`), so a
+       * demo showing "Reel" or "Photo" on a Company Page would be showing a
+       * value the product can never produce.
+       */
+      const liFormat = ["Post", "Article", "Images", "Document", "Video", "Poll"][i % 6];
       items.push({
         id: `${a.id}-c${i}`,
         account_id: a.id,
         platform: a.platform,
         external_id: `${a.id}-c${i}`,
         title,
-        media_type: a.platform === "facebook" ? "Post" : isVideo ? (a.platform === "instagram" ? "Reel" : "Video") : "Photo",
+        media_type: a.platform === "linkedin" ? liFormat
+          : a.platform === "facebook" ? "Post"
+          : isVideo ? (a.platform === "instagram" ? "Reel" : "Video") : "Photo",
         permalink: null,
         published_at: isoDay(-Math.floor(r() * 80)) + "T12:00:00Z",
         views,
         likes: Math.round(eng * 0.72),
         comments: Math.round(eng * 0.09),
         shares: Math.round(eng * 0.1),
-        saves: Math.round(eng * 0.09),
-        reach: Math.round(views * (0.8 + r() * 0.3)),
-        avg_watch_seconds: isVideo ? Math.round(6 + r() * 30) : null,
-        retention_pct: isVideo ? Math.round(28 + r() * 52) : null,
+        saves: a.reports.saves ? Math.round(eng * 0.09) : null,
+        /*
+         * A LinkedIn post has no reach. `uniqueImpressionsCount` exists on the
+         * page's daily aggregate but NOT in the per-share response, so the sync
+         * stores null rather than copying impressions across — see the comment
+         * on `reach` in syncLinkedIn. The demo has to show the same gap, since
+         * it is the gap a client will ask about.
+         */
+        reach: a.reports.postReach ? Math.round(views * (0.8 + r() * 0.3)) : null,
+        avg_watch_seconds: isVideo && a.reports.watch ? Math.round(6 + r() * 30) : null,
+        retention_pct: isVideo && a.reports.watch ? Math.round(28 + r() * 52) : null,
         // A few minutes ago, as a real sync would leave it. The demo has to show
         // the freshness line too, since that line is half of what stops a client
         // reading a difference against Instagram as an error.
@@ -167,6 +229,9 @@ function heat(seed: number): number[][] {
   }
   return grid;
 }
+/** A page that reports no hourly activity at all — LinkedIn does not. */
+const emptyHeat = (): number[][] => Array.from({ length: 7 }, () => Array(24).fill(0));
+
 export const demoAudience: AudienceSnapshot[] = [
   {
     account_id: "demo-ig", platform: "instagram", captured_on: isoDay(0),
@@ -181,6 +246,42 @@ export const demoAudience: AudienceSnapshot[] = [
     gender: { female: 0.47, male: 0.52, other: 0.01 },
     countries: { "United States": 0.36, "United Kingdom": 0.13, Canada: 0.1, Australia: 0.08, Germany: 0.07, France: 0.05 },
     devices: {}, active_hours: heat(22),
+  },
+  /*
+   * The Company Page. Age and gender are EMPTY on purpose — LinkedIn reports
+   * neither, and the Audience page says so in words rather than drawing a bar.
+   * What it reports instead is professional, and richer than Instagram's:
+   * industry, seniority, job function, company size and market area.
+   *
+   * "Unknown" is in the industry mix deliberately. LinkedIn caps each facet at
+   * its top 100 values and can only classify the followers it has data for, so
+   * a real page has a remainder. A demo without one would set an expectation
+   * that the first real page breaks.
+   */
+  {
+    account_id: "demo-li", platform: "linkedin", captured_on: isoDay(0),
+    age: {}, gender: {},
+    countries: { Jordan: 0.44, "United Arab Emirates": 0.17, "Saudi Arabia": 0.12, "United States": 0.11, Egypt: 0.09, Germany: 0.07 },
+    devices: {}, active_hours: emptyHeat(),
+    dimensions: {
+      industry: {
+        "Software Development": 0.26, "Advertising Services": 0.16, "Retail Groceries": 0.12,
+        "Food and Beverage Manufacturing": 0.1, Banking: 0.08, "Higher Education": 0.07, Unknown: 0.21,
+      },
+      seniority: { Senior: 0.26, Entry: 0.24, Manager: 0.19, Director: 0.12, Owner: 0.08, Partner: 0.06, Training: 0.05 },
+      function: {
+        Engineering: 0.21, Marketing: 0.18, "Business Development": 0.14, Operations: 0.12,
+        Sales: 0.11, Finance: 0.09, "Quality Assurance": 0.08, Purchasing: 0.07,
+      },
+      company_size: {
+        "2–10 employees": 0.29, "11–50 employees": 0.26, "51–200 employees": 0.18,
+        "201–500 employees": 0.12, "1 employee": 0.09, "1001+ employees": 0.06,
+      },
+      regions: {
+        "Amman Governorate, Jordan": 0.38, "Dubai, United Arab Emirates": 0.15,
+        "Riyadh, Saudi Arabia": 0.11, "Greater London": 0.08, "Cairo, Egypt": 0.07,
+      },
+    },
   },
 ];
 
