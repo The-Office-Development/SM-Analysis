@@ -162,3 +162,46 @@ test("reach drivers stay silent rather than explaining an unmeasurable change", 
   assert.deepEqual(reachDrivers([post("a", "Reel", 1)], [], 100, 200), []);
   assert.deepEqual(reachDrivers([post("a", "Reel", 1)], [post("b", "Reel", 1)], 100, null), []);
 });
+
+/* ---- the funnel must describe one window -------------------------------- */
+
+/**
+ * The defect: shares and saves were summed across EVERY stored post while reach
+ * and engagements came from the selected range, so a live account showed
+ * "Shares & saves 83,252" directly beneath "Accounts reached 1,426" — fifty-eight
+ * times the reach it sat under, in a chart whose shape asserts each step is a
+ * subset of the one above.
+ *
+ * The arithmetic lives in the page, so this asserts the rule the page must obey:
+ * a post published before the window contributes nothing to the window's totals.
+ */
+test("a post from before the window is not counted in that window's totals", () => {
+  const windowStart = "2026-08-12";
+  const content = [
+    { published_at: "2026-08-20T10:00:00Z", shares: 5, saves: 5 },
+    { published_at: "2026-02-01T10:00:00Z", shares: 40000, saves: 43000 }, // the old viral post
+  ];
+  const inWindow = content.filter((c) => c.published_at.slice(0, 10) >= windowStart);
+  const deep = inWindow.reduce((s, c) => s + ((c.shares ?? 0) + (c.saves ?? 0)), 0);
+  assert.equal(inWindow.length, 1, "only the post published inside the window counts");
+  assert.equal(deep, 10);
+  assert.ok(deep < 1426, "and the result can no longer exceed the window's reach by orders of magnitude");
+});
+
+test("a metric the platform never reported is absent from the funnel, not zero", () => {
+  /*
+   * Instagram Login does not return impressions at all, so the series is empty —
+   * and an empty series was being summed to a confident 0 and drawn as the TOP
+   * of the funnel, with every row beneath reading "0.0% of previous". A
+   * fabricated zero in the display layer is the same defect the sync was fixed
+   * for, one layer further out.
+   */
+  const impressionsSeries = [];          // nothing was ever reported
+  const funnel = [
+    ...(impressionsSeries.length ? [{ k: "Impressions", v: 0 }] : []),
+    { k: "Accounts reached", v: 1426 },
+    { k: "Engagements", v: 211 },
+  ];
+  assert.equal(funnel[0].k, "Accounts reached", "the unreported row is dropped, not shown as 0");
+  assert.ok(!funnel.some((f) => f.k === "Impressions"));
+});

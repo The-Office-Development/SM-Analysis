@@ -81,9 +81,39 @@ export default function Overview() {
   const currentReach = midpoint ? reachSeries.slice(reachSeries.length - half).reduce((a, x) => a + x.value, 0) : null;
   const priorContent = midpoint ? scopedContent.filter((c) => c.published_at.slice(0, 10) <= midpoint) : [];
   const recentContent = midpoint ? scopedContent.filter((c) => c.published_at.slice(0, 10) > midpoint) : [];
-  const deep = scopedContent.reduce((s, c) => s + (sumKnown(c.shares, c.saves) ?? 0), 0);
+  /*
+   * The funnel must describe ONE window.
+   *
+   * It used to sum shares and saves across every stored post while reach and
+   * engagements came from the selected range, so an account with one old viral
+   * post showed "Shares & saves 83,252" under "Accounts reached 1,426" — a
+   * figure fifty-eight times the reach it was drawn beneath, in a chart whose
+   * whole shape says each step is a subset of the one above. Posts are not
+   * filtered by date anywhere else on purpose (a post from last year is still
+   * this account's best post), which is exactly why this one had to be.
+   *
+   * Restricted to posts PUBLISHED in the window. It remains an approximation —
+   * lifetime counters cannot say how many of a post's shares happened this month
+   * — and the caption says so rather than implying a precision that is not there.
+   */
+  const windowStart = reachSeries[0]?.date ?? null;
+  const inWindow = windowStart
+    ? scopedContent.filter((c) => c.published_at.slice(0, 10) >= windowStart)
+    : scopedContent;
+  const deep = inWindow.reduce((s, c) => s + (sumKnown(c.shares, c.saves) ?? 0), 0);
+
+  /*
+   * A metric the platform never reported is LEFT OUT, not drawn as zero.
+   *
+   * seriesByDay drops unreported days, so an empty series means "never
+   * reported". Instagram Login does not return impressions at all, and the
+   * funnel was printing a confident 0 at the top of it — then computing every
+   * row beneath as "0.0% of previous". That is a fabricated zero in the display
+   * layer, the same defect the sync was fixed for.
+   */
+  const impressionsSeries = seriesByDay(metrics, scope, "impressions");
   const funnel = [
-    { k: "Impressions", v: impressions, c: "var(--fb)" },
+    ...(impressionsSeries.length ? [{ k: "Impressions", v: impressions, c: "var(--fb)" }] : []),
     { k: "Accounts reached", v: reachTotal, c: "var(--text)" },
     { k: "Engagements", v: engTotal, c: "var(--ig)" },
     { k: "Shares & saves", v: deep, c: "var(--tt)" },
@@ -147,9 +177,22 @@ export default function Overview() {
                     */}
                   <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, ratioPct(f.v, fMax)))}%`, background: f.c, borderRadius: 6, transition: "width .5s" }} />
                 </div>
-                <span className="muted" style={{ fontSize: 11 }}>{i ? `${ratioPct(f.v, funnel[i - 1].v).toFixed(1)}% of previous` : "top of funnel"}</span>
+                {/* A share of the step above only means something when that step
+                    actually carried a figure. 0.0% under a row whose parent was
+                    never reported reads as a collapse rather than as silence. */}
+                <span className="muted" style={{ fontSize: 11 }}>
+                  {i === 0 ? "top of funnel"
+                    : funnel[i - 1].v > 0 ? `${ratioPct(f.v, funnel[i - 1].v).toFixed(1)}% of previous`
+                    : "no figure above to compare with"}
+                </span>
               </div>
             ))}
+            <p className="muted" style={{ fontSize: 11, margin: "2px 0 0", lineHeight: 1.5 }}>
+              Shares and saves count posts published in this window. Instagram
+              reports them as running totals per post, not per day, so a post from
+              an earlier window is not included here even if people saved it
+              recently.
+            </p>
           </div>
         </section>
 
