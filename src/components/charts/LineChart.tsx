@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useElementWidth } from "../../hooks/useElementWidth";
 import { compact, full, shortDate } from "../../lib/format";
 
@@ -26,6 +26,16 @@ export default function LineChart({ series, height = 240, legend = true, baselin
   const { ref, width } = useElementWidth<HTMLDivElement>();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [hover, setHover] = useState<number | null>(null);
+  /**
+   * True while a finger or button is held down, so a drag keeps reading.
+   *
+   * A REF, not state, and that distinction is load-bearing. React had not
+   * committed `setScrubbing(true)` before the first pointermove arrived, so the
+   * opening movement of a drag was discarded by the guard below and a quick
+   * flick registered nothing at all. A ref updates synchronously, and nothing
+   * renders from this value, so state bought nothing and cost the first frame.
+   */
+  const scrubbing = useRef(false);
 
   const visible = series.filter((s) => !hidden.has(s.key) && s.points.length > 0);
   // Series can differ in length (e.g. a Page synced before its linked IG account),
@@ -74,17 +84,68 @@ export default function LineChart({ series, height = 240, legend = true, baselin
   const yticks = 4;
   const step = Math.max(1, Math.round(n / 5));
 
+  /**
+   * Which data point a screen x sits over.
+   *
+   * Shared by every pointer handler so a mouse and a finger cannot disagree
+   * about where they are, and clamped to the series so dragging past either end
+   * pins to the first or last day rather than reading undefined.
+   */
+  const indexAt = (clientX: number, el: SVGSVGElement): number => {
+    const rect = el.getBoundingClientRect();
+    if (!rect.width) return 0;
+    const mx = ((clientX - rect.left) / rect.width) * W;
+    const i = Math.round((mx - padL) / ((W - padL - padR) / Math.max(1, n - 1)));
+    return Math.min(n - 1, Math.max(0, i));
+  };
+
   return (
     <div className="chart" ref={ref}>
       <svg viewBox={`0 0 ${W} ${height}`} height={height} role="img" aria-label="Trend chart"
-        onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const mx = ((e.clientX - rect.left) / rect.width) * W;
-          let i = Math.round((mx - padL) / ((W - padL - padR) / Math.max(1, n - 1)));
-          i = Math.min(n - 1, Math.max(0, i));
-          setHover(i);
+        /*
+         * POINTER events, not mouse events.
+         *
+         * A phone fires no mousemove, so on a touch screen the crosshair could
+         * only ever be summoned by a tap that also counted as a click — which
+         * meant the chart was, in practice, unreadable on the device most
+         * clients open it on. Pointer events cover mouse, touch and stylus in
+         * one path, so there is one interaction to reason about rather than two
+         * that drift.
+         *
+         * setPointerCapture is what makes it a SCRUBBER rather than a tap: once
+         * a finger is down the element keeps receiving moves even when the
+         * finger travels outside the chart, so dragging off the edge and back
+         * does not drop the readout.
+         */
+        style={{
+          // Vertical page scrolling still works; horizontal movement is ours.
+          // `none` would trap the page whenever a finger landed on the chart,
+          // and `auto` would let the browser steal the drag as a scroll.
+          touchAction: "pan-y",
+          // Stops a long press selecting the SVG or raising the iOS callout.
+          userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none",
         }}
-        onMouseLeave={() => setHover(null)}
+        onPointerDown={(e) => {
+          scrubbing.current = true;
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+          setHover(indexAt(e.clientX, e.currentTarget));
+        }}
+        onPointerMove={(e) => {
+          // A mouse reads on hover; a finger only once it is down. Without this
+          // a passing touch would leave a crosshair stranded on the chart.
+          if (e.pointerType !== "mouse" && !scrubbing.current) return;
+          setHover(indexAt(e.clientX, e.currentTarget));
+        }}
+        onPointerUp={(e) => {
+          scrubbing.current = false;
+          e.currentTarget.releasePointerCapture?.(e.pointerId);
+          // The readout stays after a finger lifts. On a phone it is the only
+          // way to actually read the value you stopped on, and it clears on the
+          // next touch elsewhere.
+          if (e.pointerType === "mouse") setHover(null);
+        }}
+        onPointerCancel={() => { scrubbing.current = false; }}
+        onPointerLeave={(e) => { if (e.pointerType === "mouse") setHover(null); }}
       >
         {/* gridlines + y labels */}
         {Array.from({ length: yticks + 1 }, (_, t) => {
@@ -139,15 +200,35 @@ export default function LineChart({ series, height = 240, legend = true, baselin
         )}
       </svg>
 
-      {hover !== null && (
+      {hover !== null && (() => {
+        /*
+         * Keep the readout on screen.
+         *
+         * The tooltip is centred over the point and floats above it, which is
+         * right in the middle of a wide chart and wrong at both ends: on a phone
+         * the box is a large fraction of the screen, so a crosshair near either
+         * edge pushed half of it outside the panel. Scrubbing to the newest day —
+         * the one people actually drag to — put it off the right edge every time.
+         *
+         * Rather than measure the box, the anchor moves: near the left edge it
+         * grows rightwards, near the right edge leftwards, and in between it stays
+         * centred. And if the point sits high in the plot the box flips BELOW it,
+         * because otherwise it is clipped by the top of the panel.
+         */
+        const fx = X(hover) / W;
+        const anchorX = fx < 0.18 ? "0" : fx > 0.82 ? "-100%" : "-50%";
+        const topFrac = Y(Math.max(...visible.map((s) => s.points[hover]?.value ?? yMin))) / height;
+        const below = topFrac < 0.28;
+        return (
         <div className="tooltip" style={{
-          left: `${(X(hover) / W) * 100}%`,
+          transform: `translate(${anchorX}, ${below ? "12px" : "calc(-100% - 12px)"})`,
+          left: `${fx * 100}%`,
           // Position on the HIGHEST value at this index. Math.max(0, ...) assumed a
           // zero floor, which is wrong once the axis can start elsewhere: on a
           // follower chart every value exceeds 0, so the 0 was harmless there, but
           // a series that dips below its own baseline would have pinned the
           // tooltip to the wrong row. Use the series values alone.
-          top: `${(Y(Math.max(...visible.map((s) => s.points[hover]?.value ?? yMin))) / height) * 100}%`,
+          top: `${topFrac * 100}%`,
           opacity: 1,
         }}>
           <div className="d">{shortDate((axisPoints[hover] ?? axisPoints[axisPoints.length - 1]).date)}</div>
@@ -157,7 +238,8 @@ export default function LineChart({ series, height = 240, legend = true, baselin
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
 
       {legend && series.length > 1 && (
         <div className="legend" style={{ marginTop: 12 }}>
