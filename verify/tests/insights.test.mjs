@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { discovery, churn, formatPerformance, reachDrivers } from "../build-lib/insights.js";
+import { discovery, churn, formatPerformance, reachDrivers, genderSplit } from "../build-lib/insights.js";
 
 /**
  * These functions produce the numbers a client is shown and a sponsor is
@@ -242,4 +242,38 @@ test("every follower chart is drawn on its own scale, not from zero", () => {
         `${f}: a follower chart must set baseline="auto" or it draws real movement as a flat line:\n${tag.slice(0, 160)}`);
     }
   }
+});
+
+/* ---- the gender split, and the panel that measured nothing ---------------- */
+
+test("an unreported gender breakdown is absent, not 100% Other", async () => {
+  /*
+   * The defect this guards shipped and was found by looking at the page with a
+   * LinkedIn account selected. "Other" was derived as 1 - female - male and the
+   * panel was drawn whenever the three summed above zero — which, for an account
+   * with no breakdown at all, is 1 - 0 - 0 = 1. Every such account rendered a
+   * full bar reading "Other 100%".
+   *
+   * Not a LinkedIn problem: a Facebook Page connected after 14 March 2024 gets
+   * no demographics either, and has been showing the same thing.
+   */
+  for (const empty of [undefined, {}, { female: 0, male: 0 }]) {
+    const g = genderSplit(empty);
+    assert.equal(g.reported, false, `nothing reported for ${JSON.stringify(empty)}`);
+    assert.equal(g.other, 0, "an unreported split must not invent a category");
+  }
+});
+
+test("a real gender split still adds up, and the remainder is Other", async () => {
+  const g = genderSplit({ female: 0.58, male: 0.4 });
+  assert.equal(g.reported, true);
+  assert.ok(Math.abs(g.female - 0.58) < 1e-9);
+  assert.ok(Math.abs(g.male - 0.4) < 1e-9);
+  // The platform reports two buckets and the rest is genuinely unaccounted for.
+  assert.ok(Math.abs(g.other - 0.02) < 1e-9, "the remainder is Other, not zero");
+});
+
+test("a gender split that over-reports does not go negative", async () => {
+  const g = genderSplit({ female: 0.7, male: 0.5 });
+  assert.equal(g.other, 0, "clamped at zero rather than drawing a negative bar");
 });

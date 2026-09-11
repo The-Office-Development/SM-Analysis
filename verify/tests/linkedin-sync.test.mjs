@@ -370,7 +370,18 @@ test("enum facets are rendered without inventing a value", async () => {
   const snap = snapshot(db);
   assert.ok("1 employee" in snap.dimensions.company_size, "SIZE_1");
   assert.ok("2–10 employees" in snap.dimensions.company_size, "SIZE_2_TO_10");
-  assert.ok("Employee" in snap.dimensions.association, "EMPLOYEE");
+});
+
+test("the association facet is not stored as a distribution", async () => {
+  /*
+   * LinkedIn returns it, and the mock serves it, but it has ONE bucket —
+   * EMPLOYEE — counting followers who work at the company. Normalising a single
+   * bucket is 1.0, so storing it beside the real distributions renders
+   * "Employee 100%" for every page that ever connects. Flattering and wrong.
+   */
+  const { db } = await run();
+  assert.equal(snapshot(db).dimensions.association, undefined,
+    "a one-bucket count must not be stored as a share");
 });
 
 test("age and gender stay empty for a page that reports neither", async () => {

@@ -240,6 +240,13 @@ const mutations = [
    * Phase 2 — follower demographics. Four defects that all produce a plausible
    * chart, which is why they are here rather than trusted to review.
    */
+  /*
+   * The gender panel measuring an account nothing was reported for. This one
+   * actually shipped; it was found by rendering the page, not by reading it.
+   */
+  { name: "an unreported gender split rendered as 100% Other", file: INSIGHTS,
+    find: "    if (!reported)\n        return { reported: false, female: 0, male: 0, other: 0 };",
+    replace: "    if (false)\n        return { reported: false, female: 0, male: 0, other: 0 };" },
   { name: "paid followers counted twice in every demographic", file: LINKEDIN,
     find: "export const liDemographicCount = (fc) => liNum(fc?.organicFollowerCount);",
     replace: "export const liDemographicCount = (fc) => liNum((fc?.organicFollowerCount ?? 0) + (fc?.paidFollowerCount ?? 0));" },

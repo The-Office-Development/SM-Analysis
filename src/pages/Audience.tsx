@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { useDash } from "../context/DashboardContext";
 import { followersByDay } from "../lib/api";
 import { pctPlain } from "../lib/format";
+import { genderSplit } from "../lib/insights";
 import type { AudienceSnapshot, Platform } from "../lib/types";
 import BarList from "../components/BarList";
 import RequireData from "../components/RequireData";
@@ -88,10 +89,12 @@ function AudienceInner() {
   const countryRows = Object.entries(countries).sort((a, b) => b[1] - a[1]).slice(0, 6)
     .map(([k, v]) => ({ key: k, label: k, value: v, display: pctPlain(v * 100, 0), color: "var(--fb)" }));
 
-  const female = gender["female"] ?? 0;
-  const male = gender["male"] ?? 0;
-  const other = Math.max(0, 1 - female - male);
-  const hasGender = female + male + other > 0.001;
+  /*
+   * Absence comes from whether the platform reported a breakdown, NOT from the
+   * shares. Deriving it from `female + male + other` made an unreported account
+   * render "Other 100%" — see genderSplit.
+   */
+  const { reported: hasGender, female, male, other } = genderSplit(gender);
 
   return (
     <div className="dash">
@@ -133,7 +136,12 @@ function AudienceInner() {
       {dimKeys.map((k) => {
         const dist = mergeDist((s) => s.dimensions?.[k] ?? {});
         const rows = Object.entries(dist)
-          .sort((a, b) => b[1] - a[1])
+          /*
+           * Unknown last, however large it is. It is not a category a client can
+           * act on, and letting it win the top row turns "we could not name 22%
+           * of these" into the headline finding of the panel.
+           */
+          .sort((a, b) => (a[0] === "Unknown" ? 1 : b[0] === "Unknown" ? -1 : b[1] - a[1]))
           .slice(0, 8)
           .map(([label, v]) => ({
             key: label, label, value: v,
@@ -151,9 +159,9 @@ function AudienceInner() {
                 * and no longer returns a follower total on that endpoint to
                 * check it against — so this is a share of what it answered.
                 */}
-              <span className="sub">share of followers it could classify</span>
+              <span className="sub">of followers it could classify</span>
             </div>
-            <div className="panel__body"><BarList keyWidth={150} rows={rows} /></div>
+            <div className="panel__body"><BarList keyWidth={172} rows={rows} /></div>
           </section>
         );
       })}

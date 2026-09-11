@@ -229,8 +229,11 @@ connection.
   stored** and the Audience page stays empty with nothing logged. Apply 0014 and
   0015 together. (That unchecked upsert is pre-existing and applies to every
   platform's audience write — worth fixing separately.) The Audience page renders industry, seniority, job function, company
-  size, market areas and association, and says plainly that age and gender are
-  not reported for a Company Page rather than showing an empty panel.
+  size and market areas, and says plainly that age and gender are not reported
+  for a Company Page rather than showing an empty panel. Rendering it found two
+  more defects that code review had not — one of them already shipped and
+  affecting Facebook Pages: an account with no gender data was drawing a full bar
+  reading "Other 100%".
 - **Phase 3, live verification — blocked** on Community Management API access,
   which needs a brand-new developer application holding no other API product.
 
@@ -254,8 +257,8 @@ in `syncLinkedIn` said no follower movement exists for a Company Page. It does �
 whether a gain is gross or net and a net figure in a gross column is a wrong
 number no test can see. First thing to settle on the first live call.
 
-**Nothing LinkedIn has ever been verified against a live response.** 155
-assertions and 58 mutations cover what the documentation says; a real call is
+**Nothing LinkedIn has ever been verified against a live response.** 159
+assertions and 59 mutations cover what the documentation says; a real call is
 what turns that into "works". Unlike Instagram, there **is** a visible oracle —
 the page's own Analytics tab shows these same breakdowns — so the reconciliation
 should be run before a client sees the Audience page.

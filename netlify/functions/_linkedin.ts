@@ -348,16 +348,25 @@ export interface LiFollowerCounts {
  * follower, since a follower appears in both.
  *
  * The value field is NOT uniformly named. It is `industry`, `seniority`,
- * `function`, `staffCountRange`, `associationType` or `geo` depending on the
- * facet, which is exactly the sort of detail that is wrong when written from
- * memory — so it lives in one table beside the field it belongs to.
+ * `function`, `staffCountRange` or `geo` depending on the facet, which is
+ * exactly the sort of detail that is wrong when written from memory — so it
+ * lives in one table beside the field it belongs to.
+ *
+ * THE SEVENTH FACET IS DELIBERATELY ABSENT. `followerCountsByAssociationType`
+ * is real and is returned, but it is not a distribution: it has a single bucket,
+ * `EMPLOYEE`, counting how many of the page's followers work there. Normalising
+ * one bucket gives 1.0, so storing it beside the others renders "Employee 100%"
+ * on every page in the world — a wrong number, and a flattering one, which is
+ * the worst kind. Expressing it honestly needs the page's follower total as the
+ * denominator, which this endpoint no longer returns; `networkSizes` has it and
+ * the daily sync already calls it. Left out until it can be shown as what it is:
+ * a count against a total, not a share of a pie. Caught by looking at the page.
  */
 export const LI_FACETS = [
   { field: "followerCountsByIndustry", value: "industry", kind: "industry", into: "industry" },
   { field: "followerCountsBySeniority", value: "seniority", kind: "seniority", into: "seniority" },
   { field: "followerCountsByFunction", value: "function", kind: "function", into: "function" },
   { field: "followerCountsByStaffCountRange", value: "staffCountRange", kind: "enum", into: "company_size" },
-  { field: "followerCountsByAssociationType", value: "associationType", kind: "enum", into: "association" },
   { field: "followerCountsByGeoCountry", value: "geo", kind: "geo", into: "countries" },
   { field: "followerCountsByGeo", value: "geo", kind: "geo", into: "regions" },
 ] as const;

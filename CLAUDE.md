@@ -222,6 +222,14 @@ P0 finding. There is a test and a mutation guarding every one.
   in the `organicFollowerCount` field. Do not refer to the `paidFollowerCount`
   field for professional demographic statistics." Summing them counts every paid
   follower twice, and it looks exactly like a fix. Guarded by a mutation.
+- **Never decide whether a panel has data from the arithmetic on its shares.**
+  The Audience gender panel derived "other" as `1 - female - male` and drew
+  itself whenever the three summed above zero, so an account the platform
+  reported nothing for rendered "Other 100%". Absence comes from whether the
+  platform reported a bucket. `genderSplit` in `insights.ts`, with a mutation.
+- **Never show a single-bucket count as a share.** LinkedIn's
+  `followerCountsByAssociationType` has one bucket; normalising it gives 1.0 and
+  renders "Employee 100%" for every page. It is deliberately not stored.
 - **Never ask for LinkedIn demographics with a `timeIntervals` parameter.** A
   date range makes the endpoint return aggregates with every facet absent, at
   HTTP 200 — indistinguishable from a page whose followers have no recorded

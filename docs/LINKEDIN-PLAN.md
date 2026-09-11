@@ -93,7 +93,29 @@ LinkedIn-only account says plainly that age, gender and follower-activity hours
 are **not reported for a Company Page** — not "not available yet", because they
 are not coming later.
 
-**Still no live call.** 155 tests, 58/58 mutations, all against a mock built from
+**The seventh facet is deliberately not stored.**
+`followerCountsByAssociationType` is returned and is real, but it is not a
+distribution: one bucket, `EMPLOYEE`, counting followers who work at the company.
+Normalising a single bucket gives 1.0, so it rendered **"Employee 100%"** — which
+would have been true of every page that ever connected, and flattering, which is
+the worst kind of wrong. Showing it honestly needs the page's follower total as
+the denominator; this endpoint no longer returns one, though `networkSizes` does
+and the daily sync already calls it. Left out until it can be shown as a count
+against a total rather than a slice of a pie.
+
+**Two defects were found by rendering the page, not by reading the code.**
+Both had passed typecheck, tests and review:
+
+- the gender panel showed **"Other 100%"** for an account with no gender data,
+  because absence was decided by `1 - female - male` rather than by whether the
+  platform reported anything. **This one had already shipped** and was never
+  LinkedIn-specific — a Facebook Page connected after 14 March 2024 gets no
+  demographics either, and every one of them has been showing it. Fixed in
+  `genderSplit` (`src/lib/insights.ts`), with a test and a mutation.
+- "Unknown" sorted by size, so it could take the top row of a panel and turn
+  "we could not name 22% of these" into the headline finding. It now sorts last.
+
+**Still no live call.** 159 tests, 59/59 mutations, all against a mock built from
 the documentation. That is the same position Instagram was in when three of its
 four daily metrics were wrong.
 

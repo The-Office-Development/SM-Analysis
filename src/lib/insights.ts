@@ -658,3 +658,40 @@ export function reachConcentration(content: ContentItem[]): Concentration {
     topShare: reaches[0] / totalReach,
   };
 }
+
+/* -------------------------------- audience -------------------------------- */
+
+export interface GenderSplit {
+  /** True when the platform actually reported a gender breakdown. */
+  reported: boolean;
+  female: number;
+  male: number;
+  other: number;
+}
+
+/**
+ * The gender split, and whether there is one at all.
+ *
+ * THIS EXISTS BECAUSE OF A BUG THAT SHIPPED. The Audience page derived "other"
+ * as `1 - female - male` and then decided whether to draw the panel from
+ * `female + male + other > 0`. For an account the platform reports NO gender for,
+ * that arithmetic is `1 - 0 - 0 = 1`, so the panel rendered a full bar reading
+ * **"Other 100%"** — a confident measurement of nothing.
+ *
+ * It was found by looking at the page with a LinkedIn account selected, which
+ * reports no gender for a Company Page at all. It was never LinkedIn-specific:
+ * a Facebook Page connected after 14 March 2024 gets no demographics either, and
+ * `audienceFacebook` says so in its own comment. Every such Page has been
+ * showing "Other 100%".
+ *
+ * Absence is decided by whether the platform reported any bucket, never by the
+ * arithmetic on the shares. There is a mutation for this.
+ */
+export function genderSplit(raw: Record<string, number> | undefined): GenderSplit {
+  const reported = !!raw && Object.keys(raw).length > 0
+    && Object.values(raw).some((v) => Number.isFinite(v) && v > 0);
+  if (!reported) return { reported: false, female: 0, male: 0, other: 0 };
+  const female = raw!["female"] ?? 0;
+  const male = raw!["male"] ?? 0;
+  return { reported: true, female, male, other: Math.max(0, 1 - female - male) };
+}
