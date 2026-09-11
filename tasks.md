@@ -206,6 +206,45 @@ address and phone only, so both are needed.
 
 **The PDPL questions and legal-page placeholders (§0)** remain genuinely parallel.
 
+---
+
+## 10. LinkedIn — building, 2026-09-11
+
+Researched, built, and phased in `docs/LINKEDIN-PLAN.md`. Short version: the
+Company Page path gives everything (daily statistics, per-post statistics, post
+enumeration); the member path is deliberately not implemented because
+`r_member_social` is closed, so a personal profile could only ever be a partial
+connection.
+
+- **Phase 1, the connection lifecycle — DONE.** Tokens cannot be refreshed
+  server-side (LinkedIn issues programmatic refresh to partners only), so the
+  cron flags the account ten days out instead of pretending, and Connections
+  gained a "Renew soon" state. Revocation does not exist either, so disconnect
+  says where the client withdraws it themselves. Migration **0014**
+  (`needs_reauth`) is **not yet applied**.
+- **Phase 2, audience demographics — next.** Without it the Audience page is
+  empty for a LinkedIn account. Two real decisions first: LinkedIn's buckets are
+  professional (industry, seniority, function) and do not fit the Instagram-shaped
+  `audience_snapshots`, and its values are URNs that need resolving to words.
+- **Phase 3, live verification — blocked** on Community Management API access,
+  which needs a brand-new developer application holding no other API product.
+
+**Nothing LinkedIn has ever been verified against a live response.** 146
+assertions and 54 mutations cover what the documentation says; a real call is
+what turns that into "works".
+
+## 11. Connecting a client — written 2026-09-11
+
+`docs/CLIENT-CONNECT-INSTAGRAM.md`. There was no guide for this: the in-app
+setup guide is for the operator configuring a Meta app, and `CLIENT-MESSAGE.md`
+addresses a different client about test-account access.
+
+**The detail that wastes a meeting:** an Instagram tester invitation does not
+appear in the mobile app at all. It is accepted on `instagram.com` in a desktop
+browser. Everyone reaches for their phone first, finds nothing, and concludes the
+invitation was never sent. Learned connecting the first account; now recorded in
+both the guide and `DEPLOY-RUNBOOK.md` §8.
+
 **Deferred:** everything in §7 — share-link expiry is the largest security gap —
 plus TikTok (never worked live), the Facebook path, and LinkedIn — researched
 2026-09-10, written up in `docs/LINKEDIN.md`. Short version: LinkedIn now has a

@@ -156,9 +156,15 @@ from documentation, not from live responses.
 ## 8. Pilot client via Tester role (30 min)
 
 App dashboard → App roles → Roles → add the client's Instagram account as a
-**Tester**. They accept the invitation **from their own Instagram settings** —
-no Facebook account is involved anywhere in this flow, which is why an Instagram
-Login connection works without one.
+**Tester**. They accept the invitation **from their own Instagram settings, on a
+DESKTOP browser** — no Facebook account is involved anywhere in this flow, which
+is why an Instagram Login connection works without one.
+
+**The mobile app does not show tester invites.** The screen is not there, so a
+client checking their phone concludes nothing was sent. Found the hard way while
+connecting the first account. See
+[`CLIENT-CONNECT-INSTAGRAM.md`](CLIENT-CONNECT-INSTAGRAM.md) for the walkthrough
+to hand a client.
 
 They can then connect through the app and see real data, with no App Review and
 no Business Verification. Meta confirms the second part directly: "If your app
