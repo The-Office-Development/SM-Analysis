@@ -51,7 +51,23 @@ function PlatformsInner() {
                     </div>
                   ))}
                 </div>
-                <LineChart series={[{ key: p, label: PLATFORMS[p].name, color: PLATFORMS[p].color, points: foll }]} height={120} legend={false} />
+                {/*
+                  * baseline="auto", because this is a FOLLOWER COUNT.
+                  *
+                  * Zero is not a real possibility for a stock like this, and
+                  * anchoring there hides the only thing anyone is looking at: an
+                  * account at 1.1K losing a handful of people drew a change of a
+                  * fraction of one per cent of the chart height — a dead flat
+                  * line sitting above a "-0.1%" that plainly says otherwise. The
+                  * Overview chart was fixed for exactly this; this one was
+                  * missed, because the default is right for flows and wrong for
+                  * stocks and the caller has to remember which it has.
+                  *
+                  * The reach comparison below keeps the zero baseline: reach can
+                  * genuinely be zero, and its height is the magnitude.
+                  */}
+                <LineChart series={[{ key: p, label: PLATFORMS[p].name, color: PLATFORMS[p].color, points: foll }]}
+                           height={120} legend={false} baseline="auto" />
               </div>
             </section>
           );

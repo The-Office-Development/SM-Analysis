@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { discovery, churn, formatPerformance, reachDrivers } from "../build-lib/insights.js";
 
 /**
@@ -204,4 +205,41 @@ test("a metric the platform never reported is absent from the funnel, not zero",
   ];
   assert.equal(funnel[0].k, "Accounts reached", "the unreported row is dropped, not shown as 0");
   assert.ok(!funnel.some((f) => f.k === "Impressions"));
+});
+
+/* ---- a stock is never drawn from zero ------------------------------------ */
+
+/**
+ * This defect has now occurred twice: once on the Overview, fixed, and then
+ * again on the Platforms page, because the fix was a prop at one call site and
+ * nothing stopped the next chart from omitting it.
+ *
+ * A follower count is a STOCK. Zero is not a real possibility, so anchoring the
+ * axis there spends the whole chart height on the distance from nothing to the
+ * account's size and leaves the actual movement invisible — a live account at
+ * 1.1K followers drew a dead flat line directly above a "-0.1%" that said
+ * otherwise. That is a wrong number told in pixels.
+ *
+ * A flow like reach is the opposite: zero is meaningful and the height carries
+ * the magnitude, so those charts keep the default.
+ *
+ * Source-level, because the rule is about how the component is CALLED. A unit
+ * test of the component cannot see a caller that forgot the prop.
+ */
+test("every follower chart is drawn on its own scale, not from zero", () => {
+  const files = ["src/pages/Overview.tsx", "src/pages/Platforms.tsx", "src/pages/Audience.tsx"];
+  for (const f of files) {
+    let src;
+    try { src = readFileSync(f, "utf8"); } catch { continue; }
+    // Each <LineChart ...> up to its closing bracket.
+    for (const m of src.matchAll(/<LineChart[\s\S]{0,400}?\/>/g)) {
+      const tag = m[0];
+      // A chart is a follower chart when the series it is handed came from the
+      // follower series builder, whatever the local variable happens to be named.
+      const feedsFollowers = /\bfoll\b|followersByDay|growth/.test(tag);
+      if (!feedsFollowers) continue;
+      assert.match(tag, /baseline=\{?"auto"\}?/,
+        `${f}: a follower chart must set baseline="auto" or it draws real movement as a flat line:\n${tag.slice(0, 160)}`);
+    }
+  }
 });
