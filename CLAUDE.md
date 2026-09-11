@@ -283,7 +283,22 @@ null handling this repo has, and it should be done for the next platform too.
 ### Schema changes
 `supabase/schema.sql` is `create table if not exists` throughout, so **re-running
 it after an edit does nothing**. Every change goes in a new numbered file in
-`supabase/migrations/`, applied in order. Keep a record of what has been applied.
+`supabase/migrations/`, applied in order.
+
+**Do not claim a migration is applied without running `npm run verify:schema`.**
+It probes for the columns each migration adds, cross-checks the
+`pulseboard.schema_migrations` ledger and the files on disk, and exits non-zero
+when it fails *or when it cannot check*. Every migration from 0016 onward ends by
+inserting its own row; the ledger alone is not proof, since a row can be inserted
+without the DDL running, which is why the columns are probed too.
+
+**The failure this replaced is worth remembering.** The only check available was
+a PostgREST read with the anon key, and it answered `42501 permission denied` —
+which is exactly what a correctly locked-down database returns for a column that
+DOES exist, because permission is resolved before the column is. A missing column
+and a healthy refusal were the same response. A check that cannot fail cannot
+pass, and reporting it as reassurance is the same mistake as citing the old
+`verify/*.mjs` printers.
 
 ### Epistemic status of the documentation
 `developers.facebook.com` and `developers.tiktok.com` were unreachable from the

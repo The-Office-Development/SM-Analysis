@@ -96,6 +96,41 @@ Then **Project settings → API → Exposed schemas**: add `pulseboard`, keep
 edit does nothing — every statement in it is `create table if not exists`, so a
 later change silently does not happen.
 
+### Then check it, rather than recording it and hoping
+
+```bash
+npm run verify:schema
+```
+
+It probes the database for the **columns** each migration adds, compares them
+against the `pulseboard.schema_migrations` ledger and against the files on disk,
+and exits non-zero if anything is missing **or if it could not check**.
+
+**Why a script and not a query.** On 2026-09-12 a session was asked whether 0014
+and 0015 had been applied and could not answer. The only channel it had was a
+PostgREST read with the anon key, which returns `42501 permission denied` — the
+identical answer a correctly locked-down database gives for a column that DOES
+exist, because permission is resolved before the column is. The check could not
+fail, so it could not pass either. That is the same defect as the old
+`verify/*.mjs` printers in `CLAUDE.md`, and the script is built so that "cannot
+verify" is a loud non-zero exit rather than a tidy summary of the half it managed.
+
+It needs `SUPABASE_SERVICE_ROLE_KEY` in `.env` (gitignored, already in
+`.env.example`) for the schema half. Without it the schema half reports
+UNVERIFIED and fails. The anon half needs no secret and checks the opposite
+thing — that anon is still locked out of every table.
+
+**Every migration from 0016 onward records itself.** End the file with:
+
+```sql
+insert into pulseboard.schema_migrations (version) values ('00NN_name')
+  on conflict (version) do nothing;
+```
+
+The ledger is not the proof — a row can be inserted without the DDL ever
+running, which is why `check-schema.mjs` probes the column too and reports a row
+without its column as a failure.
+
 ## 4. Secrets (15 min)
 
 Generate:
