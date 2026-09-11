@@ -223,9 +223,12 @@ connection.
   says where the client withdraws it themselves. Migration **0014**
   (`needs_reauth`) is **not yet applied**.
 - **Phase 2, audience demographics — DONE 2026-09-12.** Migration **0015**
-  (`dimensions` on `audience_snapshots`) is **not yet applied**; until it is, a
-  LinkedIn snapshot write will fail on the missing column, so apply 0014 and 0015
-  together. The Audience page renders industry, seniority, job function, company
+  (`dimensions` on `audience_snapshots`) is **not yet applied**. Until it is, the
+  snapshot write names a column that does not exist; PostgREST returns an error
+  which this call site does not check, so the demographics are **silently not
+  stored** and the Audience page stays empty with nothing logged. Apply 0014 and
+  0015 together. (That unchecked upsert is pre-existing and applies to every
+  platform's audience write — worth fixing separately.) The Audience page renders industry, seniority, job function, company
   size, market areas and association, and says plainly that age and gender are
   not reported for a Company Page rather than showing an empty panel.
 - **Phase 3, live verification — blocked** on Community Management API access,
