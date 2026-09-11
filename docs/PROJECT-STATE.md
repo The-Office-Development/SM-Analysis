@@ -103,6 +103,16 @@ Three things decided it:
 
 1. **App Review was never the blocker for client one.** Tester roles read real
    data today (§3). The vendor buys scale we do not need this week.
+
+   **Qualified 2026-09-11, and the qualification matters.** "Not the blocker for
+   client one" is true about capability and misleading about permission. Meta
+   describes Development Mode as "restricted to internal testing only" and
+   "designed for testing purposes with your team"; `COMPLETE-AUDIT.md` reads
+   running a client service on it as a Platform Terms violation, and records a
+   cap of about five testers. So the tester route is a way to run a pilot WHILE
+   App Review is in the queue, not a way to postpone App Review. Written down
+   because the temptation to treat it as the latter is strong, has already come
+   up once, and the consequence lands on the client's account rather than ours.
 2. **The vendor puts someone else's name on the consent screen.** The client
    authorises *Metricool*, not us. That reintroduces precisely the discovery risk
    that got resale rejected in §2, at the moment of connection. The operator's

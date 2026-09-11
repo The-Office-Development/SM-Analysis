@@ -156,10 +156,41 @@ from documentation, not from live responses.
 ## 8. Pilot client via Tester role (30 min)
 
 App dashboard → App roles → Roles → add the client's Instagram account as a
-**Tester**. They accept the invitation from their own Instagram settings. They
-can then connect through your app and see real data, with no App Review.
+**Tester**. They accept the invitation **from their own Instagram settings** —
+no Facebook account is involved anywhere in this flow, which is why an Instagram
+Login connection works without one.
 
-This is for pilots, not the business — see [`PROJECT-STATE.md`](PROJECT-STATE.md).
+They can then connect through the app and see real data, with no App Review and
+no Business Verification. Meta confirms the second part directly: "If your app
+will only be used by app users who have a role on the app itself you do not need
+to complete verification."
+
+### Read this before running a client on it
+
+**This is a temporary state, not a launch route**, and the runbook used to say so
+nowhere. Two limits, and the first is the one that matters.
+
+Meta describes Development Mode as "restricted to internal testing only",
+"designed for testing purposes with your team", and says apps "should not be
+switched to Live mode until app development is complete". A paying client — or a
+free trial that is expected to become one — is not internal testing. Our own
+audit put it more sharply: onboarding a client this way "technically works and is
+**a Platform Terms violation to run a service on**".
+
+Weigh that against the constraint in `CLAUDE.md` §2: these accounts are valuable
+and must not be put at risk. An enforcement action lands on the CLIENT'S
+Instagram account, not on the app.
+
+And it does not scale regardless: the audit records a cap of roughly **five
+testers**, reached at about client three or four — which is to say, exactly when
+things are going well.
+
+**So use it for what it is.** A pilot that proves the product while App Review is
+in the queue is defensible. A pilot that is the plan *instead of* App Review is
+not. Start Business Verification and App Review in parallel with the pilot, not
+after it.
+
+See [`PROJECT-STATE.md`](PROJECT-STATE.md).
 
 ## 9. App Review (after step 7, weeks of waiting)
 

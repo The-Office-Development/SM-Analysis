@@ -183,8 +183,28 @@ as work. Migrations 0001-0012 are all applied.
 **Carried into the pilot:** story capture (§6c) — built, never once verified,
 zero stories captured to date.
 
-**Parallel, blocking nothing:** Business Verification and App Review (§6), the
-PDPL questions and legal-page placeholders (§0).
+**Parallel, and no longer "blocking nothing".** Business Verification and App
+Review were parked on the reasoning that Tester roles cover client one. That is
+true about capability and wrong about permission: Meta calls Development Mode
+"restricted to internal testing only", the audit reads a client service on it as
+a Platform Terms violation, and it caps at about five testers. The pilot may run
+on testers WHILE review is in the queue; it must not run there INSTEAD. See
+`DEPLOY-RUNBOOK.md` §8, rewritten 2026-09-11.
+
+**State as of 2026-09-11.** The Meta app is `PulseBoard`, ID 934736295759559,
+type Business, **mode Development**, and it has **no Business portfolio
+attached** — which is the first click, since verification is a property of the
+portfolio and Advanced Access reaches the app only through that link. There is no
+portfolio on the account at all yet; `business.facebook.com/settings` redirects to
+an unrelated personal Page because it has nothing else to show. Also missing on
+Settings → Basic: the app icon and App domains. Present and correct: contact
+email, privacy policy, terms, and the data-deletion callback.
+
+**Blocked on one document:** a utility bill in the company's name. The commercial
+registration proves the legal name; Meta is explicit that a utility bill proves
+address and phone only, so both are needed.
+
+**The PDPL questions and legal-page placeholders (§0)** remain genuinely parallel.
 
 **Deferred:** everything in §7 — share-link expiry is the largest security gap —
 plus TikTok (never worked live), the Facebook path, and LinkedIn — researched
