@@ -162,6 +162,9 @@ export const handler: Handler = async (event) => {
         auth_mode: "linkedin_organization",
         write_scopes: writeScopes,
         scopes_checked_at: new Date().toISOString(),
+        // Cleared here, because this IS the reconnection the flag was asking for.
+        // Leaving it set would keep nagging a client who has just done the thing.
+        needs_reauth: false,
       })
       .eq("id", accountId);
 

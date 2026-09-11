@@ -15,6 +15,7 @@ const TOKENS = "verify/build/_tokens.js";
 const DELETION = "verify/build/meta-data-deletion.js";
 const INSTA = "verify/build/_instagram.js";
 const LINKEDIN = "verify/build/_linkedin.js";
+const TOKENS_LI = "verify/build/_tokens.js";
 const INSIGHTS = "verify/build-lib/insights.js";
 const FORMAT = "verify/build-lib/format.js";
 const CSVREPORT = "verify/build-lib/csvReport.js";
@@ -228,6 +229,13 @@ const mutations = [
    * impressions, a day filed one out because of the exclusive end, and a
    * per-page figure spread backwards across days nobody measured.
    */
+  /*
+   * A LinkedIn token reported as refreshed when nothing refreshed it. The cron
+   * cannot renew one; claiming it did lets the connection lapse in silence and
+   * the client discovers it as an empty dashboard.
+   */
+  { name: "a LinkedIn token claimed as refreshed when it cannot be", file: TOKENS_LI,
+    find: '    return "skipped";\n}', replace: '    return "refreshed";\n}' },
   { name: "a LinkedIn post's reach faked from its impressions", file: SYNC,
     find: "                reach: null,\n                avg_watch_seconds: null, retention_pct: null,",
     replace: "                reach: liNum(s.impressionCount),\n                avg_watch_seconds: null, retention_pct: null," },

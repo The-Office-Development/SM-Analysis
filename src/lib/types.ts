@@ -11,6 +11,16 @@ export interface SocialAccount {
   status: "connected" | "expired" | "revoked";
   connected_at: string;
   last_synced_at: string | null;
+  /**
+   * The client must re-authorise this account from a browser.
+   *
+   * Distinct from `status: "expired"`, which is what an account becomes AFTER it
+   * has stopped working. This is the warning before that: the connection is
+   * still live and still syncing, and a single click renews it silently. Once it
+   * lapses the same click becomes a full consent screen, which for a LinkedIn
+   * Company Page means finding an administrator. See migration 0014.
+   */
+  needs_reauth?: boolean;
 }
 
 /** One day of metrics for one account (rows come from metrics_daily). */

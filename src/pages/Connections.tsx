@@ -109,13 +109,39 @@ export default function Connections() {
                     <div className="st">Not connected</div>
                   ) : accts.map((a) => (
                     <div className="st" key={a.id}>
-                      <span className={`chip ${a.status === "connected" ? "chip--ok" : "chip--warn"}`}>
-                        {a.status === "connected" ? <IcCheck style={{ width: 12, height: 12 }} /> : <IcAlert style={{ width: 12, height: 12 }} />}
-                        {a.status === "connected" ? "Connected" : a.status}
-                      </span>
+                      {/*
+                        * Three states, not two.
+                        *
+                        * "Connected" and "expired" describe a connection that is
+                        * working or has already stopped. `needs_reauth` is the
+                        * window between them, and it is the only one where the
+                        * client can fix things with a single silent click —
+                        * LinkedIn skips the consent screen while the token is
+                        * still alive. Showing it as plain "Connected" wastes that
+                        * window and turns a click into a support call.
+                        */}
+                      {a.status === "connected" && a.needs_reauth ? (
+                        <span className="chip chip--warn">
+                          <IcAlert style={{ width: 12, height: 12 }} />
+                          Renew soon
+                        </span>
+                      ) : (
+                        <span className={`chip ${a.status === "connected" ? "chip--ok" : "chip--warn"}`}>
+                          {a.status === "connected" ? <IcCheck style={{ width: 12, height: 12 }} /> : <IcAlert style={{ width: 12, height: 12 }} />}
+                          {a.status === "connected" ? "Connected" : a.status}
+                        </span>
+                      )}
                       <span>@{a.username}</span>
                       {a.last_synced_at && <span className="muted">· synced {formatDistanceToNow(new Date(a.last_synced_at), { addSuffix: true })}</span>}
                       <button className="btn btn--sm btn--danger" style={{ marginLeft: 8, height: 24 }} onClick={() => disconnect(a.id, PLATFORMS[p].name)}>Disconnect</button>
+                      {a.status === "connected" && a.needs_reauth && (
+                        <div className="muted" style={{ flexBasis: "100%", fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>
+                          {PLATFORMS[p].name} connections expire and cannot be renewed for
+                          you. Press <strong>Reconnect</strong> while this still says
+                          "Renew soon" and it happens without you being asked anything.
+                          Leave it and you will have to grant access again from scratch.
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

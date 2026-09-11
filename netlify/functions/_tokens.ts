@@ -19,6 +19,8 @@ const RENEW_WITHIN_MS_TIKTOK = 6 * 60 * 60 * 1000;    // TikTok: 6 hours of a 24
  * be recovered at all: the client has to re-authorise. Renew early.
  */
 const RENEW_WITHIN_MS_INSTAGRAM = 14 * 24 * 60 * 60 * 1000;
+/** LinkedIn: ten days of WARNING, not of headroom. See flagLinkedInExpiry. */
+const RENEW_WITHIN_MS_LINKEDIN = 10 * 24 * 60 * 60 * 1000;
 /** A lock older than this is considered abandoned by a crashed invocation. */
 const LOCK_STALE_MS = 5 * 60 * 1000;
 
@@ -32,6 +34,11 @@ export function needsRefresh(id: Identity, now = Date.now()): boolean {
   if (!id.expires_at) return false;                    // no stated expiry to act on
   const window = id.provider === "tiktok" ? RENEW_WITHIN_MS_TIKTOK
     : id.provider === "instagram" ? RENEW_WITHIN_MS_INSTAGRAM
+    // LinkedIn cannot be refreshed from a server at all (see flagLinkedInExpiry),
+    // so the "window" is how much WARNING the client gets, not how long we have
+    // to act. Ten days is enough for somebody to notice an email, be away, and
+    // still have time to click one button before the account goes dark.
+    : id.provider === "linkedin" ? RENEW_WITHIN_MS_LINKEDIN
     : RENEW_WITHIN_MS;
   return Date.parse(id.expires_at) - now < window;
 }
@@ -163,6 +170,7 @@ export async function refreshIdentity(db: Db, id: Identity): Promise<"skipped" |
     if (id.provider === "meta") await refreshMeta(db, id);
     else if (id.provider === "instagram") await refreshInstagram(db, id);
     else if (id.provider === "tiktok") await refreshTiktok(db, id);
+    else if (id.provider === "linkedin") return await flagLinkedInExpiry(db, id);
     else return "skipped";
     log("token.refreshed", { identity: id.id, provider: id.provider });
     return "refreshed";
@@ -176,4 +184,53 @@ export async function refreshIdentity(db: Db, id: Identity): Promise<"skipped" |
   } finally {
     await releaseRefreshLock(db, id.id);
   }
+}
+
+/**
+ * LinkedIn cannot be refreshed from a server, and pretending otherwise would be
+ * worse than doing nothing.
+ *
+ * Every other platform here hands back a new token for an old one, which is why
+ * this module is a cron job. LinkedIn does not, and says so plainly: "To refresh
+ * an access token, go through the authorization process again to fetch a new
+ * token", and separately, "Programmatic refresh tokens are available for a
+ * limited set of partners." We are not one of those partners, so there is no
+ * server-side path — the member's BROWSER has to make the round trip.
+ *
+ * The one mercy is that the round trip is silent while the token is still alive:
+ * the consent screen is skipped "provided the member is still logged into
+ * linkedin.com and the member's current access token has not expired". Miss that
+ * window and the client sees the full consent screen again, which for a Company
+ * Page means an admin has to be found and walked through it.
+ *
+ * So this function does the only honest thing a cron can do: it marks the
+ * account as needing attention EARLY, while a single click still fixes it, and
+ * it returns "skipped" because nothing was refreshed. Reporting a refresh that
+ * did not happen would let a token lapse silently and present the client with an
+ * empty dashboard and no explanation.
+ *
+ * Tokens last 60 days: "Currently, all access tokens are issued with a 60-day
+ * lifespan."
+ */
+export async function flagLinkedInExpiry(
+  db: Db, id: Identity,
+): Promise<"skipped" | "refreshed" | "locked" | "failed"> {
+  const expiresAt = id.expires_at ? Date.parse(id.expires_at) : NaN;
+  const daysLeft = Number.isFinite(expiresAt)
+    ? Math.floor((expiresAt - Date.now()) / 86_400_000) : null;
+
+  // `needs_reauth` is what the Connections page reads to put a reconnect prompt
+  // in front of the client. Set on the ACCOUNT rather than the identity because
+  // that is the thing they recognise: a page with a name, not a token.
+  await db.from("social_accounts")
+    .update({ needs_reauth: true })
+    .eq("identity_id", id.id);
+
+  log("token_refresh.linkedin_needs_browser", {
+    identity: id.id, provider: id.provider, days_left: daysLeft,
+    detail: "LinkedIn issues no programmatic refresh to this app. The client must "
+      + "reconnect from a browser while the token is still valid, which skips the "
+      + "consent screen. After expiry they see full consent again.",
+  });
+  return "skipped";
 }

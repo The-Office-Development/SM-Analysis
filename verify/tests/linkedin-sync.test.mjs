@@ -193,3 +193,49 @@ test("history is clamped to the twelve months LinkedIn serves", async () => {
   const oldest = Date.now() - 366 * 86_400_000;
   assert.ok(start >= oldest, "the window must not reach past the rolling twelve months");
 });
+
+/* ---- the connection lifecycle -------------------------------------------- */
+
+import { flagLinkedInExpiry, needsRefresh } from "../build/_tokens.js";
+
+test("a LinkedIn token is never reported as refreshed, because it cannot be", async () => {
+  /*
+   * Every other platform swaps an old token for a new one in a cron. LinkedIn
+   * does not offer that to this app: "Programmatic refresh tokens are available
+   * for a limited set of partners", and otherwise "go through the authorization
+   * process again to fetch a new token" — which needs the member's browser.
+   *
+   * Returning "refreshed" would let a token lapse silently and hand the client
+   * an empty dashboard with no explanation.
+   */
+  const updates = [];
+  const db = {
+    from: () => ({
+      update: (patch) => ({ eq: async (col, val) => { updates.push({ patch, col, val }); } }),
+    }),
+  };
+  const id = {
+    id: "idn-1", user_id: "u1", provider: "linkedin", external_user_id: "5515715",
+    access_token: "x", refresh_token: null,
+    expires_at: new Date(Date.now() + 5 * 86_400_000).toISOString(), refresh_lock_at: null,
+  };
+  const result = await flagLinkedInExpiry(db, id);
+  assert.equal(result, "skipped", "nothing was refreshed, so nothing may claim to be");
+  assert.equal(updates.length, 1, "the account should be flagged for the client");
+  assert.equal(updates[0].patch.needs_reauth, true);
+});
+
+test("the client is warned while a silent reconnect still works", () => {
+  /*
+   * LinkedIn skips the consent screen only while the token is still valid. The
+   * warning therefore has to arrive BEFORE expiry, not on it — after that the
+   * same click becomes a full consent screen and, for a Company Page, a hunt for
+   * an administrator.
+   */
+  const at = (days) => ({
+    provider: "linkedin", expires_at: new Date(Date.now() + days * 86_400_000).toISOString(),
+  });
+  assert.equal(needsRefresh(at(30)), false, "a month out is not yet worth nagging about");
+  assert.equal(needsRefresh(at(5)), true, "five days out the client must be told");
+  assert.equal(needsRefresh(at(-1)), true, "and an already-lapsed account still needs them");
+});

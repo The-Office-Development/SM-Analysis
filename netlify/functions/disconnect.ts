@@ -57,7 +57,15 @@ export const handler: Handler = async (event) => {
   return json(200, {
     message: revoked
       ? `${acc.username} disconnected. Access revoked and stored data deleted.`
-      : `${acc.username} disconnected and its stored data deleted.`,
+      : acc.platform === "linkedin"
+        // Named rather than left vague. "Disconnected" with no further detail
+        // invites a client to assume the app no longer has access, when what
+        // actually happened is that we deleted our copy and cannot reach
+        // LinkedIn to withdraw the grant on their behalf.
+        ? `${acc.username} disconnected and its stored data deleted. LinkedIn does not let us `
+          + `withdraw the permission for you — remove PulseBoard yourself under Settings and `
+          + `Privacy, Data privacy, Permitted services.`
+        : `${acc.username} disconnected and its stored data deleted.`,
     revoked,
   });
 };
@@ -81,6 +89,28 @@ async function revokeIdentity(db: Db, identityId: string, platform: string): Pro
         signal: AbortSignal.timeout(8000),
       });
       return res.ok;
+    }
+    if (idRow.provider === "linkedin") {
+      /*
+       * LinkedIn publishes no token-revocation endpoint in the OAuth flow it
+       * documents for this app, and inventing a URL to POST a live credential at
+       * would be worse than not trying.
+       *
+       * So this returns false deliberately, and the caller's message is already
+       * written for that case: it says the account was disconnected and its data
+       * deleted, and does NOT claim access was revoked. Our copy of the token is
+       * destroyed with the rest of the row either way.
+       *
+       * What the client should be told, and what the interface now tells them,
+       * is that removing the app is done on LinkedIn's side:
+       * Settings & Privacy -> Data privacy -> Permitted services.
+       */
+      log("account.revoke_unavailable", {
+        platform,
+        detail: "LinkedIn documents no revocation endpoint for this flow; the stored "
+          + "token is deleted and the client is told to remove the app in LinkedIn settings.",
+      });
+      return false;
     }
     if (idRow.provider === "tiktok") {
       const res = await fetch("https://open.tiktokapis.com/v2/oauth/revoke/", {
