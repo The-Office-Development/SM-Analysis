@@ -1,4 +1,4 @@
-import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, log } from "./_lib";
+import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log } from "./_lib";
 import { igGet, IG } from "./_instagram";
 import { LI, liGet, liNum, liLikes, liTime, liDayKey, type LiShareStats } from "./_linkedin";
 
@@ -1890,7 +1890,11 @@ async function syncLinkedIn(
     { q: "author", author: urn, count: String(LI.POSTS_PAGE), sortBy: "CREATED" },
     { token },
   ).catch((e) => {
-    if (isThrottleError(e) || isAuthError(e)) throw e;
+    // Platform errors are re-thrown, as everywhere else. So is anything that is
+    // NOT a platform error: this catch exists for LinkedIn saying no, and a
+    // programming mistake quietly becoming "this page has no posts" is how the
+    // read-only guard above hid itself until a test looked.
+    if (isThrottleError(e) || isAuthError(e) || !(e instanceof GraphError)) throw e;
     return { elements: [] };
   });
 
@@ -1913,7 +1917,7 @@ async function syncLinkedIn(
       },
       { token },
     ).catch((e) => {
-      if (isThrottleError(e) || isAuthError(e)) throw e;
+      if (isThrottleError(e) || isAuthError(e) || !(e instanceof GraphError)) throw e;
       return { elements: [] };
     });
 

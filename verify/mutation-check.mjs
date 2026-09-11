@@ -222,6 +222,17 @@ const mutations = [
     replace: "export const liNum = (v) => typeof v === \"number\" && Number.isFinite(v) ? v : 0;" },
   { name: "LinkedIn history reaches past the window the API serves", file: LINKEDIN,
     find: "MAX_HISTORY_DAYS: 365,", replace: "MAX_HISTORY_DAYS: 3650," },
+  /*
+   * Now that a mock exists, the sync itself can be mutated. These three are the
+   * defects most likely to reach a client: a post's reach invented from
+   * impressions, a day filed one out because of the exclusive end, and a
+   * per-page figure spread backwards across days nobody measured.
+   */
+  { name: "a LinkedIn post's reach faked from its impressions", file: SYNC,
+    find: "                reach: null,\n                avg_watch_seconds: null, retention_pct: null,",
+    replace: "                reach: liNum(s.impressionCount),\n                avg_watch_seconds: null, retention_pct: null," },
+  { name: "the exclusive end drops the last day asked for", file: SYNC,
+    find: "end:${liTime(addDays(end, 1))}", replace: "end:${liTime(end)}" },
   { name: "unknown read time invented as 'just now'", file: FORMAT,
     find: `    if (!iso)
         return null;`,
@@ -231,7 +242,7 @@ const mutations = [
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs", "verify/tests/linkedin.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs", "verify/tests/linkedin.test.mjs", "verify/tests/linkedin-sync.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

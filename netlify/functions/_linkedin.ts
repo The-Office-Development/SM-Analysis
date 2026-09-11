@@ -72,9 +72,15 @@ export const LI = {
   SCOPES: ["r_organization_social", "rw_organization_admin"],
 
   /**
-   * Endpoints this integration must NEVER call, listed so their absence is
-   * checkable rather than assumed. `rw_organization_admin` makes them possible;
-   * nothing here makes them happen. Guarded by a test.
+   * Paths that become MUTATIONS when sent with a method other than GET.
+   *
+   * Documentation, not a blocklist. `/posts` is on it and is also the finder the
+   * sync depends on: `GET /posts?q=author` lists a page's posts, `POST /posts`
+   * publishes one. A path-based refusal therefore blocks a legitimate read while
+   * catching nothing, which is exactly what it did until a test caught it.
+   *
+   * `rw_organization_admin` makes these possible; nothing in this codebase makes
+   * them happen, and that is enforced by asserting liGet issues only GETs.
    */
   WRITE_ENDPOINTS: ["/posts", "/comments", "/reactions"] as string[],
 
@@ -181,13 +187,20 @@ interface LiGetOptions {
 export async function liGet<T = any>(
   path: string, params: Record<string, string>, opts: LiGetOptions,
 ): Promise<T> {
-  if (LI.WRITE_ENDPOINTS.includes(path)) {
-    // A programming error, caught loudly rather than sent. Reading the posts
-    // FINDER uses /posts with q=author, which is a GET; this only guards against
-    // a future caller reaching for a mutation through this helper.
-    throw new Error(`liGet refuses ${path}: this integration is read-only.`);
-  }
-
+  /*
+   * There is deliberately NO path check here any more.
+   *
+   * There was one, refusing anything in WRITE_ENDPOINTS, and it was wrong: it is
+   * the METHOD that makes a request a mutation, not the path. `/posts` is both
+   * the endpoint that creates a post AND the finder that lists them, and this
+   * helper only ever issues GET — so the guard blocked the one call the sync
+   * most needs and could never have blocked an actual write, because a write
+   * would not come through here.
+   *
+   * The mock-based sync test found it on its first run, storing zero posts. The
+   * list stays as documentation of what a mutation would look like, and the real
+   * guarantee is the test asserting this function issues nothing but GETs.
+   */
   const url = new URL(LI.REST + path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
