@@ -62,7 +62,7 @@ const mutations = [
     find: "if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected))\n        return null;",
     replace: "if (false)\n        return null;" },
   { name: "deletion acknowledges without deleting", file: DELETION,
-    find: "await db.from(\"account_secrets\").delete().eq(\"account_id\", a.id);",
+    find: "gone(\"account_secrets\", await db.from(\"account_secrets\").delete().eq(\"account_id\", a.id));",
     replace: "" },
   { name: "deploy previews allowed to touch the production database", file: LIB,
     find: "if ((context === \"deploy-preview\" || context === \"branch-deploy\") && !process.env.ALLOW_NONPROD_DB) {",
@@ -257,6 +257,48 @@ const mutations = [
     replace: "                reach: liNum(s.impressionCount),\n                avg_watch_seconds: null, retention_pct: null," },
   { name: "the exclusive end drops the last day asked for", file: SYNC,
     find: "end:${liTime(addDays(end, 1))}", replace: "end:${liTime(end)}" },
+  /*
+   * A write that fails without saying so.
+   *
+   * supabase-js resolves rather than throws on a PostgREST error, so deleting
+   * the check restores exactly the original defect: the demographics are
+   * fetched, refused by the database, and reported as stored. Passing `null` in
+   * place of the error is what a call site that never destructured it looked
+   * like — the write still happens, the failure just stops existing.
+   *
+   * Nothing downstream can catch this. The table is empty either way, which is
+   * the same thing a platform with no demographics to give produces, so only the
+   * log distinguishes them and only a test that reads the log can tell.
+   */
+  { name: "a refused audience write discarded, so demographics vanish silently", file: SYNC,
+    find: 'writeFailed("sync.audience_write_failed", error, {',
+    replace: 'writeFailed("sync.audience_write_failed", null, {' },
+  { name: "a lost last_synced_at stamp discarded", file: SYNC,
+    find: 'writeFailed("sync.last_synced_write_failed", stampErr, {',
+    replace: 'writeFailed("sync.last_synced_write_failed", null, {' },
+  /*
+   * And the helper itself. Every call site above delegates its honesty to this
+   * one line, so a `writeFailed` that quietly returns false makes all of them
+   * silent again at once — including the ones no test drives directly.
+   */
+  /*
+   * A deletion acknowledged as complete over data still held.
+   *
+   * The count of accounts reached is identical either way — the loop runs to the
+   * end whether every delete succeeded or every one was refused — so this is a
+   * confirmation code issued against an erasure that did not happen, which the
+   * deletion tests call an App Review failure and an enforcement risk. The
+   * status page is the only channel Meta leaves open for saying otherwise.
+   */
+  { name: "a refused deletion still recorded as completed", file: LIB,
+    find: "    if (failed > 0)\n        return \"failed\";",
+    replace: "    if (false)\n        return \"failed\";" },
+  { name: "refused deletes not counted, so the request looks clean", file: DELETION,
+    find: "{ provider: \"meta\", account: a.id, table }))\n                    failed++;",
+    replace: "{ provider: \"meta\", account: a.id, table }))\n                    failed += 0;" },
+  { name: "writeFailed reports every failed write as a success", file: LIB,
+    find: "    if (!error)\n        return false;",
+    replace: "    if (error)\n        return false;" },
   { name: "unknown read time invented as 'just now'", file: FORMAT,
     find: `    if (!iso)
         return null;`,
@@ -266,7 +308,7 @@ const mutations = [
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs", "verify/tests/linkedin.test.mjs", "verify/tests/linkedin-sync.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs", "verify/tests/linkedin.test.mjs", "verify/tests/linkedin-sync.test.mjs", "verify/tests/write-errors.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

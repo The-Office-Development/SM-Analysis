@@ -1,6 +1,6 @@
 import type { Handler } from "./_lib";
 import crypto from "node:crypto";
-import { admin, env, json, log, type Db } from "./_lib";
+import { admin, env, json, log, writeFailed, deletionStatus, type Db, type WriteError } from "./_lib";
 
 /**
  * Meta data-deletion callback.  POST /api/meta-data-deletion
@@ -22,18 +22,51 @@ export const handler: Handler = async (event) => {
 
   const db = admin();
   const code = crypto.randomBytes(12).toString("hex");
-  const deleted = await deleteEverythingForMetaUser(db, String(payload.user_id));
+  const { deleted, failed } = await deleteEverythingForMetaUser(db, String(payload.user_id));
 
-  await db.from("deletion_requests").insert({
+  /*
+   * The recorded status is what actually happened, not what was attempted.
+   *
+   * This row is the only place the truth can be told. Meta's callback response
+   * has exactly two fields, `url` and `confirmation_code` — there is no failure
+   * channel and no "partial" — but Meta does require the confirmation URL to
+   * carry "a human-readable explanation of the status of their request,
+   * including a legitimate justification for any refusal to delete". So the page
+   * behind that URL is the failure channel, and it can only say "failed" if this
+   * row can hold it. `failed` needs migration 0016.
+   */
+  const status = deletionStatus(deleted > 0, failed);
+  const { error: recErr } = await db.from("deletion_requests").insert({
     confirmation_code: code,
     provider: "meta",
     external_user_id: String(payload.user_id),
     completed_at: new Date().toISOString(),
     accounts_deleted: deleted,
-    status: deleted > 0 ? "completed" : "not_found",
+    status,
   });
+  writeFailed("deletion.record_write_failed", recErr, { provider: "meta", code, accounts: deleted, status });
 
-  log("deletion.completed", { provider: "meta", accounts: deleted, code });
+  if (failed > 0) {
+    // An operator has to finish this by hand, and has 30 days to do it. Nothing
+    // here can retry on the subject's behalf.
+    log("deletion.incomplete", {
+      provider: "meta", code, accounts: deleted, failed_writes: failed,
+      detail: "some rows for this subject could not be deleted. The confirmation page reports "
+        + "this as failed. Complete the erasure manually and update the request row.",
+    });
+  } else {
+    log("deletion.completed", { provider: "meta", accounts: deleted, code });
+  }
+
+  /*
+   * Still a 200 with a code, even when the erasure failed.
+   *
+   * Not an acknowledgement that it worked — the status behind the code says
+   * plainly that it did not. Meta documents no error shape here, and answering
+   * with a 500 would leave the subject with no confirmation code and no status
+   * URL at all, which is strictly worse for the person the right belongs to:
+   * they would have nothing to quote and nowhere to look.
+   */
   // Meta reads exactly these two fields.
   return json(200, {
     url: `${env.SITE_URL}/data-deletion?code=${code}`,
@@ -41,29 +74,50 @@ export const handler: Handler = async (event) => {
   });
 };
 
-/** Deletes every account, token and metric tied to a Meta user id. */
-export async function deleteEverythingForMetaUser(db: Db, externalUserId: string): Promise<number> {
+/**
+ * Deletes every account, token and metric tied to a Meta user id.
+ *
+ * Returns BOTH counts. `deleted` alone cannot distinguish an erasure that
+ * worked from one where every delete was refused — the loop reaches the end
+ * either way — and the caller has to tell those apart before it records a
+ * status and issues a confirmation code.
+ */
+export async function deleteEverythingForMetaUser(
+  db: Db, externalUserId: string,
+): Promise<{ deleted: number; failed: number }> {
   const { data: identities } = await db
     .from("provider_identities")
     .select("id")
     .eq("provider", "meta")
     .eq("external_user_id", externalUserId);
-  if (!identities?.length) return 0;
+  if (!identities?.length) return { deleted: 0, failed: 0 };
 
   let deleted = 0;
+  let failed = 0;
   for (const identity of identities) {
     const { data: accounts } = await db.from("social_accounts").select("id").eq("identity_id", identity.id);
     for (const a of accounts ?? []) {
-      await db.from("account_secrets").delete().eq("account_id", a.id);
-      await db.from("metrics_daily").delete().eq("account_id", a.id);
-      await db.from("content").delete().eq("account_id", a.id);
-      await db.from("audience_snapshots").delete().eq("account_id", a.id);
-      await db.from("social_accounts").delete().eq("id", a.id);
+      /*
+       * A delete that fails is worse here than anywhere else in this codebase:
+       * the endpoint answers Meta with a confirmation code either way, so the
+       * request is closed while the data is still present. That is an App
+       * Review failure and a PDPL one. Nothing here can retry on the subject's
+       * behalf, but it must not pass in silence.
+       */
+      const gone = (table: string, res: { error?: WriteError | null }) => {
+        if (writeFailed("deletion.delete_failed", res.error, { provider: "meta", account: a.id, table })) failed++;
+      };
+      gone("account_secrets", await db.from("account_secrets").delete().eq("account_id", a.id));
+      gone("metrics_daily", await db.from("metrics_daily").delete().eq("account_id", a.id));
+      gone("content", await db.from("content").delete().eq("account_id", a.id));
+      gone("audience_snapshots", await db.from("audience_snapshots").delete().eq("account_id", a.id));
+      gone("social_accounts", await db.from("social_accounts").delete().eq("id", a.id));
       deleted++;
     }
-    await db.from("provider_identities").delete().eq("id", identity.id);
+    const { error: idErr } = await db.from("provider_identities").delete().eq("id", identity.id);
+    if (writeFailed("deletion.delete_failed", idErr, { provider: "meta", identity: identity.id, table: "provider_identities" })) failed++;
   }
-  return deleted;
+  return { deleted, failed };
 }
 
 function parseFormField(body: string, field: string): string | null {

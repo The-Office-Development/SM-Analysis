@@ -1,7 +1,7 @@
 import type { Handler } from "./_lib";
 import {
   verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
-  backToApp, encryptToken, log, AccountOwnedByAnotherTenant,
+  backToApp, encryptToken, log, writeFailed, AccountOwnedByAnotherTenant,
 } from "./_lib";
 import { LI, liGet, administeredOrganizations } from "./_linkedin";
 
@@ -156,7 +156,9 @@ export const handler: Handler = async (event) => {
      * the same warning here as there.
      */
     const writeScopes = LI.SCOPES.filter((s) => s.startsWith("rw_") || s.startsWith("w_"));
-    await db.from("social_accounts")
+    // Checked: `needs_reauth: false` below is the whole point of a reconnection,
+    // and losing it silently keeps nagging a client who has just done the thing.
+    const { error: linkErr } = await db.from("social_accounts")
       .update({
         identity_id: identity.id,
         auth_mode: "linkedin_organization",
@@ -167,6 +169,9 @@ export const handler: Handler = async (event) => {
         needs_reauth: false,
       })
       .eq("id", accountId);
+    writeFailed("oauth.account_link_write_failed", linkErr, {
+      uid: state.uid, account: accountId, provider: "linkedin",
+    });
 
     log("oauth.connected", {
       provider: "linkedin", uid: state.uid, mode: "organization",

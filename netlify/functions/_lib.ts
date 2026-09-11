@@ -70,6 +70,75 @@ export function log(event: string, fields: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ t: new Date().toISOString(), event, ...safe }));
 }
 
+/* ----------------------------- failed writes ------------------------------ */
+/**
+ * A PostgREST error, as supabase-js hands it back.
+ *
+ * The shape is declared here rather than imported so the helper below can be
+ * used against the loose `Db` type the handlers share.
+ */
+export interface WriteError { message?: string; code?: string; details?: string; hint?: string }
+
+/**
+ * Report a write that did not happen. Returns true when the write FAILED.
+ *
+ * supabase-js does not throw on a PostgREST error: `.upsert()` resolves with
+ * `{ data: null, error }` and execution carries on. A call site that awaits the
+ * builder without destructuring `error` — or destructures only `data` — therefore
+ * treats an unapplied migration, a missing grant, an RLS refusal and a
+ * constraint violation as success, and nothing anywhere records that the row is
+ * gone.
+ *
+ * That is the failure mode this codebase already treats as a defect everywhere
+ * else: degrading silently. The audience snapshot was the live example.
+ * Migration 0015 adds `dimensions` to `audience_snapshots`, and until it is
+ * applied PostgREST rejects every snapshot carrying that column — so the
+ * demographics were fetched at the cost of four platform calls, discarded, and
+ * reported as stored. On screen it is an empty Audience page, which is
+ * indistinguishable from a platform that reported nothing.
+ *
+ * A log line is the minimum. Where losing the write changes what the caller may
+ * then CLAIM — a stored token, an acknowledged deletion — use `requireWrite`.
+ */
+export function writeFailed(
+  event: string, error: WriteError | null | undefined, fields: Record<string, unknown> = {},
+): boolean {
+  if (!error) return false;
+  log(event, {
+    ...fields,
+    detail: error.message ?? String(error),
+    pg_code: error.code ?? null,
+    pg_details: error.details ?? error.hint ?? null,
+  });
+  return true;
+}
+
+/** `writeFailed`, for a write the caller must not continue without. */
+export function requireWrite(
+  event: string, error: WriteError | null | undefined, fields: Record<string, unknown> = {},
+): void {
+  if (writeFailed(event, error, fields)) throw new Error(`${event}: ${error?.message ?? "write failed"}`);
+}
+
+/**
+ * What a deletion request row may CLAIM, given what actually happened.
+ *
+ * A count of accounts reached cannot answer this on its own: the loop runs to
+ * the end whether every delete succeeded or every one was refused, because
+ * supabase-js resolves on a PostgREST error rather than throwing. So the rule
+ * both deletion endpoints follow is written once, here — a failure outranks
+ * everything. There is no "partly deleted" for a data subject: either their
+ * data is gone or it is not.
+ *
+ * `found` is false only where we held nothing for the subject at all, which is
+ * a truthful 'not_found' and not a refusal. `failed` is the number of writes the
+ * database refused. 'failed' requires migration 0016.
+ */
+export function deletionStatus(found: boolean, failed: number): "completed" | "not_found" | "failed" {
+  if (failed > 0) return "failed";
+  return found ? "completed" : "not_found";
+}
+
 /* --------------------------- token encryption ---------------------------- */
 const ENC_PREFIX = "v1:";
 

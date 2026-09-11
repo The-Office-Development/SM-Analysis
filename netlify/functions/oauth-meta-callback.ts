@@ -1,7 +1,7 @@
 import type { Handler } from "./_lib";
 import {
   env, verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
-  backToApp, graphGet, encryptToken, log, GRAPH, AccountOwnedByAnotherTenant,
+  backToApp, graphGet, encryptToken, log, writeFailed, GRAPH, AccountOwnedByAnotherTenant,
 } from "./_lib";
 
 /** Meta OAuth redirect target — exchanges the code and stores Pages + IG accounts. */
@@ -90,14 +90,18 @@ export const handler: Handler = async (event) => {
         const fbId = await saveAccount(db, state.uid,
           { platform: "facebook", external_id: page.id, username: page.name, display_name: page.name },
           { access_token: page.access_token, expires_at: expiresAt, extra: { kind: "page" } });
-        await db.from("social_accounts").update({ identity_id: identity.id }).eq("id", fbId);
+        // The link to the identity is what the refresh cron follows. Lost, this
+        // Page connects, reports success, and then expires with nothing renewing it.
+        const { error: fbLinkErr } = await db.from("social_accounts").update({ identity_id: identity.id }).eq("id", fbId);
+        writeFailed("oauth.account_link_write_failed", fbLinkErr, { uid: state.uid, account: fbId, provider: "meta" });
 
         const ig = page.instagram_business_account;
         if (ig?.id) {
           const igId = await saveAccount(db, state.uid,
             { platform: "instagram", external_id: ig.id, username: ig.username ?? page.name, avatar_url: ig.profile_picture_url ?? null },
             { access_token: page.access_token, expires_at: expiresAt, extra: { kind: "ig_business", page_id: page.id } });
-          await db.from("social_accounts").update({ identity_id: identity.id }).eq("id", igId);
+          const { error: igLinkErr } = await db.from("social_accounts").update({ identity_id: identity.id }).eq("id", igId);
+          writeFailed("oauth.account_link_write_failed", igLinkErr, { uid: state.uid, account: igId, provider: "meta" });
           igConnected = true;
         }
       } catch (e) {

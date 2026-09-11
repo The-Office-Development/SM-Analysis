@@ -2,7 +2,7 @@ import type { Handler } from "./_lib";
 import { createHash } from "node:crypto";
 import {
   verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
-  backToApp, encryptToken, log, AccountOwnedByAnotherTenant,
+  backToApp, encryptToken, log, writeFailed, AccountOwnedByAnotherTenant,
 } from "./_lib";
 import { exchangeCode, igGet, IG, auditTokenScopes } from "./_instagram";
 
@@ -119,7 +119,13 @@ export const handler: Handler = async (event) => {
       }
     } catch { /* an audit that could not run proves nothing and blocks nothing */ }
 
-    await db.from("social_accounts")
+    /*
+     * Checked, because the browser is about to be sent back to a page that says
+     * "connected". Without `identity_id` the refresh cron never finds this
+     * account and the token lapses; without `write_scopes` the Connections page
+     * shows a clean account that may not be one.
+     */
+    const { error: linkErr } = await db.from("social_accounts")
       .update({
         identity_id: identity.id,
         auth_mode: "instagram_login",
@@ -129,6 +135,9 @@ export const handler: Handler = async (event) => {
         scopes_checked_at: writeScopes ? new Date().toISOString() : null,
       })
       .eq("id", accountId);
+    writeFailed("oauth.account_link_write_failed", linkErr, {
+      uid: state.uid, account: accountId, provider: "instagram",
+    });
 
     log("oauth.connected", {
       provider: "instagram", uid: state.uid, mode: "instagram_login",
