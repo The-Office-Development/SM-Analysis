@@ -1,6 +1,10 @@
 import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log } from "./_lib";
 import { igGet, IG } from "./_instagram";
-import { LI, liGet, liNum, liLikes, liTime, liDayKey, type LiShareStats } from "./_linkedin";
+import {
+  LI, liGet, liNum, liLikes, liTime, liDayKey, type LiShareStats,
+  LI_FACETS, liDemographicCount, urnTail, liEnumLabel,
+  liResolveGeo, liResolveIndustries, liResolveTaxonomy,
+} from "./_linkedin";
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
@@ -161,6 +165,18 @@ interface Audience {
   countries: Record<string, number>;
   devices: Record<string, number>;
   active_hours: number[][]; // [7][24]
+  /*
+   * Breakdowns that are not age, gender or country.
+   *
+   * LinkedIn's facets are PROFESSIONAL — industry, seniority, job function,
+   * company size — and there is no honest way to fold them into the four
+   * Instagram-shaped columns above. Forcing them in would mean either throwing
+   * away LinkedIn's best dimensions or inventing Instagram-shaped ones, so they
+   * go in an open map keyed by dimension name and the UI renders whatever is
+   * there. Country is the one facet both platforms genuinely share, and it stays
+   * in `countries` so the existing panel keeps working.
+   */
+  dimensions: Record<string, Record<string, number>>;
 }
 
 /** A daily series, and whether the platform made it available at all. */
@@ -401,7 +417,8 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     }
     const snap = acc.platform === "instagram"
       ? (igLogin ? await audienceInstagramLogin(acc, token, counter) : await audienceInstagram(acc, token, counter))
-      : acc.platform === "facebook" ? await audienceFacebook(acc, token, counter) : null;
+      : acc.platform === "facebook" ? await audienceFacebook(acc, token, counter)
+      : acc.platform === "linkedin" ? await audienceLinkedIn(acc, token, counter) : null;
     if (snap && hasAudience(snap)) {
       await db.from("audience_snapshots").upsert(
         { account_id: acc.id, platform: acc.platform, captured_on: today(), ...snap },
@@ -914,6 +931,7 @@ async function audienceInstagramLogin(acc: AccountRow, token: string, c: { calls
   return {
     age: toShares(ageRaw), gender: normalizeGender(genderRaw),
     countries: toShares(mapCountryNames(countryRaw)), devices: {}, active_hours: online,
+    dimensions: {},
   };
 }
 
@@ -936,6 +954,7 @@ async function audienceInstagram(acc: AccountRow, token: string, c: { calls: num
     countries: toShares(mapCountryNames(countryRaw)),
     devices: {},
     active_hours: online,
+    dimensions: {},
   };
 }
 
@@ -1016,6 +1035,7 @@ async function audienceFacebook(acc: AccountRow, token: string, c: { calls: numb
     age: toShares(age), gender: toShares(gender),
     countries: toShares(mapCountryNames(country)),
     devices: {}, active_hours: emptyHeat(),
+    dimensions: {},
   };
 }
 
@@ -1775,7 +1795,9 @@ function mapCountryNames(raw: Record<string, number>): Record<string, number> {
 }
 function hasAudience(a: Audience): boolean {
   return Object.keys(a.age).length > 0 || Object.keys(a.gender).length > 0 ||
-    Object.keys(a.countries).length > 0 || a.active_hours.some((r) => r.some((v) => v > 0));
+    Object.keys(a.countries).length > 0 || a.active_hours.some((r) => r.some((v) => v > 0)) ||
+    // A LinkedIn page reports none of the four above and is not therefore empty.
+    Object.values(a.dimensions ?? {}).some((d) => Object.keys(d).length > 0);
 }
 
 /* ===========================================================================
@@ -1798,6 +1820,124 @@ function hasAudience(a: Audience): boolean {
  *  - Twelve months of history, hard. Nothing older is an error; it is simply
  *    absent, and absence must not become zero.
  * ======================================================================== */
+/**
+ * LinkedIn follower demographics — the professional facets.
+ *
+ * Four things here came from reading LinkedIn's own documentation on 2026-09-12
+ * rather than from the plan, and each is a way to be confidently wrong:
+ *
+ *  1. Demographics and a time range are MUTUALLY EXCLUSIVE on this endpoint.
+ *     "Time-bound follower counts are aggregated and not segmented by facet."
+ *     So this call passes no `timeIntervals` at all. Passing one returns 200
+ *     with the facets simply absent, which is indistinguishable from a page
+ *     whose followers have no recorded industry.
+ *  2. The count to read is `organicFollowerCount`, which holds organic AND paid.
+ *     See `liDemographicCount`.
+ *  3. Each facet is capped at its top 100 values, and this endpoint no longer
+ *     returns a follower total to measure that against. What is stored is a
+ *     distribution of what came back.
+ *  4. The values are URNs. They are resolved to words HERE, at write time, so a
+ *     dashboard can never render `urn:li:industry:4` at a client.
+ *
+ * None of it has been checked against a live response.
+ */
+async function audienceLinkedIn(acc: AccountRow, token: string, c: { calls: number }): Promise<Audience> {
+  const urn = `urn:li:organization:${acc.external_id}`;
+
+  spend(c);
+  const data = await liGet<{ elements?: Record<string, unknown>[] }>(
+    LI.FOLLOWER_STATS,
+    // No timeIntervals. See (1) above — this is the whole reason the facets come back.
+    { q: "organizationalEntity", organizationalEntity: urn },
+    { token },
+  );
+  const el = (data.elements ?? [])[0] ?? {};
+
+  /* ---- what LinkedIn actually sent, before any naming ------------------- */
+  type Bucket = { id: string | null; value: string; count: number };
+  const raw: Record<string, Bucket[]> = {};
+  const ids: Record<string, Set<string>> = {
+    geo: new Set(), industry: new Set(), seniority: new Set(), function: new Set(),
+  };
+
+  for (const f of LI_FACETS) {
+    const rows = el[f.field];
+    if (!Array.isArray(rows)) continue;
+    const buckets: Bucket[] = [];
+    for (const row of rows as Record<string, unknown>[]) {
+      const value = row?.[f.value];
+      const count = liDemographicCount(row?.followerCounts as never);
+      // A bucket LinkedIn did not put a number on is unknown, not zero.
+      if (typeof value !== "string" || count === null) continue;
+      const id = f.kind === "enum" ? null : urnTail(value);
+      if (id) ids[f.kind].add(id);
+      buckets.push({ id, value, count });
+    }
+    if (buckets.length) raw[f.into] = buckets;
+    if (buckets.length >= LI.FACET_LIMIT) {
+      log("sync.linkedin_facet_capped", {
+        account: acc.id, facet: f.field, returned: buckets.length,
+        detail: "LinkedIn caps a facet at its top 100 values; this distribution omits the tail",
+      });
+    }
+  }
+
+  /* ---- URNs into words -------------------------------------------------- */
+  const labels = new Map<string, string>();
+  const learn = async (
+    kind: string, fn: () => Promise<Map<string, string>>,
+  ): Promise<void> => {
+    if (!ids[kind]?.size) return;
+    spend(c);
+    const m = await optional(fn, new Map<string, string>(), { taxonomy: kind, platform: "linkedin" });
+    for (const [id, name] of m) labels.set(`${kind}:${id}`, name);
+  };
+
+  // One call per taxonomy, not one per value. Development Tier allows 500 calls
+  // per app per day, and this runs once a day per account (see the snapshot
+  // check in syncAccount), so the cost is four calls rather than four hundred.
+  await learn("geo", () => liResolveGeo([...ids.geo], token));
+  await learn("industry", () => liResolveIndustries([...ids.industry], token));
+  await learn("seniority", () => liResolveTaxonomy(LI.SENIORITIES, token));
+  await learn("function", () => liResolveTaxonomy(LI.FUNCTIONS, token));
+
+  /* ---- distributions, keyed by something a person can read -------------- */
+  const countries: Record<string, number> = {};
+  const dimensions: Record<string, Record<string, number>> = {};
+
+  for (const f of LI_FACETS) {
+    const buckets = raw[f.into];
+    if (!buckets) continue;
+    const dist: Record<string, number> = {};
+    for (const b of buckets) {
+      /*
+       * An unresolved URN is folded into "Unknown" rather than printed.
+       *
+       * Printing `urn:li:seniority:3` on a client's dashboard is worse than
+       * saying nothing, and DROPPING it would be worse still: the count is real,
+       * and removing it silently shrinks the denominator so every other bar
+       * grows. Unknown keeps the arithmetic honest about what we could not name.
+       */
+      const label = f.kind === "enum"
+        ? liEnumLabel(b.value)
+        : (b.id ? labels.get(`${f.kind}:${b.id}`) : null) ?? "Unknown";
+      dist[label] = (dist[label] ?? 0) + b.count;
+    }
+    if (f.into === "countries") Object.assign(countries, dist);
+    else dimensions[f.into] = toShares(dist);
+  }
+
+  return {
+    // LinkedIn reports neither for a Company Page. Empty because it was never
+    // offered, which the Audience page says out loud rather than drawing a
+    // flat bar that looks like a measurement.
+    age: {}, gender: {},
+    countries: toShares(countries),
+    devices: {}, active_hours: emptyHeat(),
+    dimensions,
+  };
+}
+
 async function syncLinkedIn(
   acc: AccountRow, token: string, start: string, c: { calls: number }, end: string,
 ): Promise<{ days: DayRow[]; posts: Post[] }> {
@@ -1848,9 +1988,21 @@ async function syncLinkedIn(
       // it in both would double-count it in any total.
       views: null,
       engagements: sumIfAny([liNum(s.likeCount), liNum(s.commentCount), liNum(s.shareCount)]),
-      // No follower movement or discovery split exists for a page. Null, not
-      // zero: the churn and discovery panels must stay silent rather than
-      // reporting that nobody left and nobody new was reached.
+      /*
+       * Null, not zero, so the churn and discovery panels stay silent rather
+       * than reporting that nobody left and nobody new was reached.
+       *
+       * CORRECTED 2026-09-12, and only half of what was written here is true.
+       * The discovery split genuinely does not exist for a page. Follower
+       * MOVEMENT partly does: `organizationalEntityFollowerStatistics` with a
+       * timeIntervals parameter returns a per-day `followerGains` of
+       * `organicFollowerGain` and `paidFollowerGain`, which the earlier comment
+       * denied outright. It is not stored here because the documentation does
+       * not say whether a "gain" is gross follows or net of unfollows, and
+       * LinkedIn reports no unfollows either way. Writing a net figure into a
+       * gross column would make the funnel wrong in a way no test can see.
+       * First item on the Phase 3 list; see docs/LINKEDIN-PLAN.md.
+       */
       follows: null, unfollows: null,
       reach_followers: null, reach_non_followers: null,
       provisional: isProvisional(date, today()),

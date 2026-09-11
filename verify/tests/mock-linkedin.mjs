@@ -47,6 +47,66 @@ export const trueValue = (metric, iso) => {
 export const trueEngagements = (iso) =>
   trueValue("likeCount", iso) + trueValue("commentCount", iso) + trueValue("shareCount", iso);
 
+/**
+ * Follower demographics, and the trap they carry.
+ *
+ * `organicFollowerCount` holds organic AND paid rolled together — LinkedIn says
+ * so in terms, and says not to read `paidFollowerCount` for these facets. Every
+ * bucket below therefore carries a NON-ZERO paid figure that must not appear in
+ * any stored share: if the sync adds the two, every percentage moves, and this
+ * data is chosen so that it moves detectably rather than by a rounding error.
+ *
+ * `urn:li:industry:777` is deliberately missing from the taxonomy the mock
+ * serves, so the "unresolved" path is exercised on every run rather than only
+ * when LinkedIn happens to add an industry.
+ */
+export const DEMOGRAPHICS = {
+  followerCountsByIndustry: { key: "industry", rows: [
+    { value: "urn:li:industry:4", organic: 120, paid: 30 },
+    { value: "urn:li:industry:96", organic: 60, paid: 9 },
+    { value: "urn:li:industry:777", organic: 20, paid: 4 },
+  ] },
+  followerCountsBySeniority: { key: "seniority", rows: [
+    { value: "urn:li:seniority:2", organic: 40, paid: 7 },
+    { value: "urn:li:seniority:9", organic: 60, paid: 3 },
+  ] },
+  followerCountsByFunction: { key: "function", rows: [
+    { value: "urn:li:function:22", organic: 30, paid: 5 },
+    { value: "urn:li:function:21", organic: 70, paid: 11 },
+  ] },
+  followerCountsByStaffCountRange: { key: "staffCountRange", rows: [
+    { value: "SIZE_1", organic: 25, paid: 2 },
+    { value: "SIZE_2_TO_10", organic: 75, paid: 8 },
+  ] },
+  followerCountsByAssociationType: { key: "associationType", rows: [
+    { value: "EMPLOYEE", organic: 100, paid: 6 },
+  ] },
+  followerCountsByGeoCountry: { key: "geo", rows: [
+    { value: "urn:li:geo:102713980", organic: 66, paid: 12 },
+    { value: "urn:li:geo:103644278", organic: 34, paid: 4 },
+  ] },
+  followerCountsByGeo: { key: "geo", rows: [
+    { value: "urn:li:geo:90009626", organic: 84, paid: 9 },
+    { value: "urn:li:geo:90009633", organic: 16, paid: 1 },
+  ] },
+};
+
+/** What each URN resolves to. The taxonomy endpoints serve exactly this. */
+export const URN_NAMES = {
+  geo: { "102713980": "Jordan", "103644278": "United States",
+         "90009626": "Amman Governorate, Jordan", "90009633": "Greater London" },
+  industry: { "4": "Software Development", "96": "Retail Groceries" },  // 777 absent, on purpose
+  seniority: { "2": "Training", "9": "Partner" },
+  function: { "22": "Quality Assurance", "21": "Purchasing" },
+};
+
+/** The share a facet value should end up with, computed from ORGANIC ONLY. */
+export const trueShare = (facet, value) => {
+  const rows = DEMOGRAPHICS[facet].rows;
+  const total = rows.reduce((s, r) => s + r.organic, 0);
+  return rows.find((r) => r.value === value).organic / total;
+};
+
 export const ORG_ID = "5515715";
 export const ORG_URN = `urn:li:organization:${ORG_ID}`;
 export const FOLLOWERS = 8421;
@@ -101,6 +161,67 @@ export function installLinkedInMock(opts = {}) {
         content: i === 1 ? { media: { id: "urn:li:video:abc" } } : {},
       }));
       return json({ elements, paging: { start: 0, count: elements.length } });
+    }
+
+    /*
+     * Follower statistics. The endpoint answers TWO different questions and the
+     * mock refuses to blur them, because the blur is the defect:
+     *
+     *   - no `timeIntervals`  -> lifetime, segmented by facet
+     *   - with `timeIntervals` -> aggregate gains, NO facets at all
+     *
+     * LinkedIn: "Time-bound follower counts are aggregated and not segmented by
+     * facet." A sync that asks for a range and expects demographics gets a 200
+     * and an empty page, which is indistinguishable from a page whose followers
+     * have no recorded industry — so the mock reproduces exactly that.
+     */
+    if (path === "/organizationalEntityFollowerStatistics") {
+      if (u.searchParams.has("timeIntervals")) {
+        return json({ elements: [{
+          organizationalEntity: ORG_URN,
+          timeRange: { start: Date.parse(`${from}T00:00:00Z`), end: Date.parse(`${addDays(from, 1)}T00:00:00Z`) },
+          followerGains: { organicFollowerGain: 12, paidFollowerGain: 3 },
+        }] });
+      }
+      const element = { organizationalEntity: ORG_URN };
+      for (const [field, { key, rows }] of Object.entries(DEMOGRAPHICS)) {
+        element[field] = rows.map((r) => ({
+          [key]: r.value,
+          followerCounts: { organicFollowerCount: r.organic, paidFollowerCount: r.paid },
+        }));
+      }
+      return json({ elements: [element], paging: { count: 1, start: 0 } });
+    }
+
+    /* ---- the standardized-data taxonomies, on the legacy /v2 base -------- */
+    if (path === "/v2/geo") {
+      const ids = /List\(([^)]*)\)/.exec(u.searchParams.get("ids") ?? "")?.[1]?.split(",") ?? [];
+      const results = {};
+      for (const id of ids) {
+        const name = URN_NAMES.geo[id];
+        if (name) results[id] = { defaultLocalizedName: { locale: { country: "US", language: "en" }, value: name } };
+      }
+      return json({ statuses: {}, results, errors: {} });
+    }
+
+    if (path.startsWith("/v2/industryTaxonomyVersions/")) {
+      const results = {};
+      for (const id of u.searchParams.getAll("ids")) {
+        const name = URN_NAMES.industry[id];
+        // An id the taxonomy does not know is simply absent from `results`,
+        // which is how a real BATCH_GET reports one.
+        if (name) results[id] = { id: Number(id), name: { localized: { en_US: name } }, childrenIndustries: [] };
+      }
+      return json({ results, statuses: {}, errors: {} });
+    }
+
+    if (path === "/v2/seniorities" || path === "/v2/functions") {
+      const which = path === "/v2/seniorities" ? URN_NAMES.seniority : URN_NAMES.function;
+      const elements = Object.entries(which).map(([id, name]) => ({
+        id: Number(id), $URN: `urn:li:${path === "/v2/seniorities" ? "seniority" : "function"}:${id}`,
+        name: { localized: { en_US: name } },
+      }));
+      return json({ elements, paging: { count: elements.length, start: 0, links: [] } });
     }
 
     if (path === "/organizationalEntityShareStatistics") {

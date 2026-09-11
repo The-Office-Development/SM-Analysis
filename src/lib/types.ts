@@ -83,6 +83,15 @@ export interface AudienceSnapshot {
   countries: Record<string, number>;
   devices: Record<string, number>;
   active_hours: number[][];       // [7][24] activity intensity
+  /**
+   * Breakdowns that are not age, gender or country, keyed by dimension name —
+   * `industry`, `seniority`, `function`, `company_size`, `association`,
+   * `regions`. LinkedIn reports professional facets instead of demographic
+   * ones, and they do not fit the four columns above (migration 0015).
+   *
+   * Optional because every snapshot written before 0015 lacks it.
+   */
+  dimensions?: Record<string, Record<string, number>>;
 }
 
 export type GoalMetric = "followers" | "reach" | "views" | "engagements";

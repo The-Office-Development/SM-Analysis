@@ -96,6 +96,49 @@ export const LI = {
   /** Daily and lifetime page statistics. */
   SHARE_STATS: "/organizationalEntityShareStatistics",
   FOLLOWER_STATS: "/organizationalEntityFollowerStatistics",
+
+  /**
+   * The legacy base the standardized-data taxonomies live on.
+   *
+   * NOT `/rest`. The follower facets come back as URNs — `urn:li:industry:4` —
+   * and every endpoint that turns one into a word is published under `/v2`,
+   * which predates versioned APIs and takes no `LinkedIn-Version` header. Read
+   * from learn.microsoft.com on 2026-09-12; sending the version header at a
+   * legacy path is the kind of thing that fails with a message about something
+   * else entirely, so the two bases are kept apart here rather than guessed at
+   * the call site.
+   */
+  V2: "https://api.linkedin.com/v2",
+  /** Resolves urn:li:geo — both the country facet and the market-area facet. */
+  GEO: "/geo",
+  /** Resolves urn:li:industry. Hierarchical, 400+ nodes, so BATCH_GET by id. */
+  INDUSTRIES: "/industryTaxonomyVersions",
+  /**
+   * Pinned, deliberately, exactly as `VERSION` is.
+   *
+   * `DEFAULT` is documented as pointing at the latest taxonomy, which means the
+   * NAME behind an id can move under us without a deploy. A stored snapshot
+   * keyed by label would then silently disagree with an older one, and nothing
+   * would report it. Supported: V1_0, V2_5, V2_6, V2_7, DEFAULT.
+   */
+  INDUSTRY_TAXONOMY: process.env.LINKEDIN_INDUSTRY_TAXONOMY ?? "V2_7",
+  /** Small, enumerable taxonomies — one GET_ALL each rather than a call per id. */
+  SENIORITIES: "/seniorities",
+  FUNCTIONS: "/functions",
+  /** GET_ALL defaults to ten rows; both taxonomies fit comfortably under this. */
+  TAXONOMY_PAGE: 100,
+
+  /**
+   * Each facet is capped at its top 100 values.
+   *
+   * "The results for any individual facet are limited to the top 100 results."
+   * A distribution built from the response is therefore a share OF WHAT CAME
+   * BACK, not of the page's followers, and this endpoint no longer returns
+   * `totalFollowerCounts` to check it against. Recorded here because the
+   * difference is invisible in the data and only shows up as a client asking
+   * why the percentages do not match their own page.
+   */
+  FACET_LIMIT: 100,
   /** Listing the page's posts. */
   POSTS: "/posts",
   /** Max the finder accepts per page. */
@@ -174,6 +217,12 @@ interface LiGetOptions {
   token: string;
   /** Retries once on a throttle, as igGet does. */
   retry?: boolean;
+  /**
+   * Which API to talk to. Defaults to the versioned `/rest`; the standardized
+   * data taxonomies that turn a URN into a word live on `LI.V2`, which takes no
+   * version header. Carried through the throttle retry below.
+   */
+  base?: string;
 }
 
 /**
@@ -201,13 +250,19 @@ export async function liGet<T = any>(
    * list stays as documentation of what a mutation would look like, and the real
    * guarantee is the test asserting this function issues nothing but GETs.
    */
-  const url = new URL(LI.REST + path);
+  const base = opts.base ?? LI.REST;
+  const url = new URL(base + path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
   const res = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${opts.token}`,
-      "LinkedIn-Version": LI.VERSION,
+      /*
+       * The version header belongs to /rest only. /v2 predates versioning, and
+       * sending it there is at best ignored and at worst answered with an error
+       * about the version rather than about the request.
+       */
+      ...(base === LI.REST ? { "LinkedIn-Version": LI.VERSION } : {}),
       "X-Restli-Protocol-Version": LI.PROTOCOL,
       "Content-Type": "application/json",
     },
@@ -265,4 +320,160 @@ export async function administeredOrganizations(
   return (data.elements ?? [])
     .filter((e) => e.organizationalTarget && e.role === LI.ADMIN_ROLE)
     .map((e) => ({ urn: e.organizationalTarget as string, role: e.role as string }));
+}
+
+/* ===========================================================================
+ * Follower demographics — the professional facets.
+ *
+ * Read from learn.microsoft.com on 2026-09-12, directly rather than through a
+ * summary, and the reading corrected the plan in four places. They are recorded
+ * as comments here because each one is a way to produce a confidently wrong
+ * number, which is the failure mode this project fears most.
+ * ======================================================================== */
+
+/** One facet bucket's counts. Both fields are present; only one may be used. */
+export interface LiFollowerCounts {
+  organicFollowerCount?: number;
+  paidFollowerCount?: number;
+}
+
+/**
+ * The seven facets, and which field of each row carries its value.
+ *
+ * The plan this was built from named five. There are seven: it omitted
+ * `followerCountsByAssociationType` and, more importantly, treated geography as
+ * one facet when LinkedIn returns TWO at different granularities —
+ * `followerCountsByGeoCountry` (countries) and `followerCountsByGeo` (market
+ * areas, e.g. "San Francisco Bay Area"). Merging them would double-count every
+ * follower, since a follower appears in both.
+ *
+ * The value field is NOT uniformly named. It is `industry`, `seniority`,
+ * `function`, `staffCountRange`, `associationType` or `geo` depending on the
+ * facet, which is exactly the sort of detail that is wrong when written from
+ * memory — so it lives in one table beside the field it belongs to.
+ */
+export const LI_FACETS = [
+  { field: "followerCountsByIndustry", value: "industry", kind: "industry", into: "industry" },
+  { field: "followerCountsBySeniority", value: "seniority", kind: "seniority", into: "seniority" },
+  { field: "followerCountsByFunction", value: "function", kind: "function", into: "function" },
+  { field: "followerCountsByStaffCountRange", value: "staffCountRange", kind: "enum", into: "company_size" },
+  { field: "followerCountsByAssociationType", value: "associationType", kind: "enum", into: "association" },
+  { field: "followerCountsByGeoCountry", value: "geo", kind: "geo", into: "countries" },
+  { field: "followerCountsByGeo", value: "geo", kind: "geo", into: "regions" },
+] as const;
+
+export type LiFacetKind = (typeof LI_FACETS)[number]["kind"];
+
+/**
+ * How many followers a facet bucket holds.
+ *
+ * **`organicFollowerCount` alone, and this is not an oversight.** LinkedIn:
+ * "Professional Demographic results are rolled up as a total of both organic and
+ * paid followers in the `organicFollowerCount` field. Do not refer to the
+ * `paidFollowerCount` field for professional demographic statistics."
+ *
+ * The field is named for one thing and holds another. Adding the two — which is
+ * what the names invite, and what any reviewer would assume is a fix — counts
+ * every paid follower twice. There is a mutation for this.
+ */
+export const liDemographicCount = (fc: LiFollowerCounts | undefined): number | null =>
+  liNum(fc?.organicFollowerCount);
+
+/** The numeric tail of a URN: `urn:li:industry:4` -> `"4"`. */
+export const urnTail = (urn: string): string | null => {
+  const tail = String(urn).split(":").pop();
+  return tail && /^\d+$/.test(tail) ? tail : null;
+};
+
+/**
+ * A LinkedIn SCREAMING_SNAKE enum as something a client can read.
+ *
+ * Presentation only — it renames what LinkedIn sent, it never invents a value
+ * it did not send. `SIZE_2_TO_10` is documented; the `_OR_MORE` form is the
+ * obvious counterpart and falls through harmlessly to the raw token if LinkedIn
+ * spells it differently, which is the point of the final return.
+ */
+export function liEnumLabel(raw: string): string {
+  const m = /^SIZE_(\d+)(?:_TO_(\d+)|_OR_MORE)?$/.exec(raw);
+  if (m) {
+    if (m[2]) return `${m[1]}–${m[2]} employees`;
+    if (raw.endsWith("_OR_MORE")) return `${m[1]}+ employees`;
+    return m[1] === "1" ? "1 employee" : `${m[1]} employees`;
+  }
+  // EMPLOYEE -> Employee. Title case, nothing more.
+  return raw.charAt(0) + raw.slice(1).toLowerCase().replace(/_/g, " ");
+}
+
+/** `{ localized: { en_US: "Finance" } }`, the MultiLocaleString shape. */
+const localized = (name: unknown): string | null => {
+  const loc = (name as { localized?: Record<string, string> } | undefined)?.localized;
+  if (!loc) return null;
+  return loc.en_US ?? Object.values(loc)[0] ?? null;
+};
+
+/**
+ * Resolve `urn:li:geo:*`, in one BATCH_GET.
+ *
+ * `GET /v2/geo?ids=List(1,2)` -> `results: { "1": { defaultLocalizedName: { value } } }`.
+ * Note this is Bing Maps data under Microsoft's terms, which is a licensing fact
+ * to carry rather than a technical one.
+ */
+export async function liResolveGeo(
+  ids: string[], token: string,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!ids.length) return out;
+  const data = await liGet<{ results?: Record<string, { defaultLocalizedName?: { value?: string } }> }>(
+    LI.GEO, { ids: `List(${ids.join(",")})` }, { token, base: LI.V2 },
+  );
+  for (const [id, row] of Object.entries(data.results ?? {})) {
+    const v = row?.defaultLocalizedName?.value;
+    if (typeof v === "string" && v) out.set(id, v);
+  }
+  return out;
+}
+
+/** Resolve `urn:li:industry:*` against the PINNED taxonomy version. */
+export async function liResolveIndustries(
+  ids: string[], token: string,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!ids.length) return out;
+  /*
+   * BATCH_GET takes repeated `ids` parameters rather than List(...) — a
+   * different convention from /v2/geo on the same API, which is why both are
+   * written out here instead of sharing one helper that would have to be right
+   * about which is which.
+   */
+  const url = `${LI.INDUSTRIES}/${LI.INDUSTRY_TAXONOMY}/industries?${ids.map((i) => `ids=${i}`).join("&")}`;
+  const data = await liGet<{ results?: Record<string, { name?: unknown }> }>(
+    url, { "locale.language": "en", "locale.country": "US" }, { token, base: LI.V2 },
+  );
+  for (const [id, row] of Object.entries(data.results ?? {})) {
+    const v = localized(row?.name);
+    if (v) out.set(id, v);
+  }
+  return out;
+}
+
+/**
+ * Resolve a small enumerable taxonomy — seniorities or functions — in one call.
+ *
+ * GET_ALL pages at ten by default, which would quietly truncate `functions` and
+ * leave two thirds of a client's chart labelled Unknown. `count` is asked for
+ * explicitly; anything still missing stays unresolved rather than guessed.
+ */
+export async function liResolveTaxonomy(
+  path: string, token: string,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const data = await liGet<{ elements?: { id?: number; name?: unknown }[] }>(
+    path, { count: String(LI.TAXONOMY_PAGE), "locale.language": "en", "locale.country": "US" },
+    { token, base: LI.V2 },
+  );
+  for (const el of data.elements ?? []) {
+    const v = localized(el?.name);
+    if (v && el?.id !== undefined) out.set(String(el.id), v);
+  }
+  return out;
 }

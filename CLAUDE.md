@@ -216,6 +216,16 @@ P0 finding. There is a test and a mutation guarding every one.
   dashboard snapshot goes in a user turn; captions are data, not instructions.
 - **Never swallow a throttle or auth error** in the sync. Degrading silently is
   what turned platform rate limiting into data loss.
+- **Never add `paidFollowerCount` to `organicFollowerCount`** in LinkedIn's
+  follower demographics. The field is named for one thing and documented to hold
+  another: "results are rolled up as a total of both organic and paid followers
+  in the `organicFollowerCount` field. Do not refer to the `paidFollowerCount`
+  field for professional demographic statistics." Summing them counts every paid
+  follower twice, and it looks exactly like a fix. Guarded by a mutation.
+- **Never ask for LinkedIn demographics with a `timeIntervals` parameter.** A
+  date range makes the endpoint return aggregates with every facet absent, at
+  HTTP 200 — indistinguishable from a page whose followers have no recorded
+  industry. Demographics are lifetime-only. Guarded by a mutation.
 
 ### Things that look wrong but are not
 - `metrics_daily` columns are nullable *on purpose*.
@@ -246,6 +256,14 @@ audit environment, so **every claim about platform API behaviour and platform
 policy rests on secondary sources**, as does the Jordanian law analysis. Each
 document flags what a human must confirm. Verify before acting on any of it, and
 say so when you are relying on it.
+
+**Updated 2026-09-12: from a local session the platform docs ARE reachable.**
+`learn.microsoft.com/en-us/linkedin` opens, and reading it directly found four
+defects in a LinkedIn plan that had been written from a summary — including two
+that would have produced confidently wrong percentages on a client's dashboard.
+Check reachability before assuming the sandbox limit still applies, and prefer
+the primary page over anything in this repository that paraphrases it, including
+this file. Documentation agreement is still not a live call.
 
 ### Working style that fits this project
 - Prefer proving a claim numerically over asserting it. `verify/proofs/` exists

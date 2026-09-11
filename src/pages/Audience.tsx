@@ -9,6 +9,23 @@ import RequireData from "../components/RequireData";
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const agePrefix = (k: string) => parseInt(k, 10) || 0;
 
+/*
+ * Breakdowns beyond age, gender and country (migration 0015).
+ *
+ * Rendered from whatever the snapshot happens to carry rather than from a fixed
+ * list of panels, so a platform adding a facet does not need a release here. The
+ * order is editorial: what a sponsor asks about first.
+ */
+const DIM_TITLES: Record<string, string> = {
+  industry: "Industry",
+  seniority: "Seniority",
+  function: "Job function",
+  company_size: "Company size",
+  regions: "Top regions",
+  association: "Association with the page",
+};
+const DIM_ORDER = ["industry", "seniority", "function", "company_size", "regions", "association"];
+
 export default function Audience() {
   return <RequireData><AudienceInner /></RequireData>;
 }
@@ -29,7 +46,7 @@ function AudienceInner() {
   if (parts.length === 0) {
     return (
       <div className="panel"><div className="panel__body muted" style={{ textAlign: "center", padding: 34 }}>
-        Nothing here yet. Instagram and Facebook report who your followers are, and it appears on its own within about fifteen minutes of connecting. Instagram needs roughly 100 followers before it will report this at all.
+        Nothing here yet. Instagram, Facebook and LinkedIn each report who your followers are, and it appears on its own within about fifteen minutes of connecting. Instagram needs roughly 100 followers before it will report this at all.
       </div></div>
     );
   }
@@ -47,6 +64,14 @@ function AudienceInner() {
   const age = mergeDist((s) => s.age);
   const gender = mergeDist((s) => s.gender);
   const countries = mergeDist((s) => s.countries);
+
+  /*
+   * A LinkedIn Company Page reports no age and no gender at all. Saying "not
+   * available yet" there would be a lie of omission — it is not coming later.
+   */
+  const onlyLinkedIn = parts.every(({ snap }) => snap.platform === "linkedin");
+  const dimKeys = DIM_ORDER.filter((k) =>
+    parts.some(({ snap }) => Object.keys(snap.dimensions?.[k] ?? {}).length > 0));
 
   const heat: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
   for (const { snap, weight } of parts) {
@@ -73,7 +98,8 @@ function AudienceInner() {
       <section className="panel">
         <div className="panel__head"><h3>Age distribution</h3></div>
         <div className="panel__body">
-          {ageRows.length ? <BarList keyWidth={64} rows={ageRows} /> : <Unavailable />}
+          {ageRows.length ? <BarList keyWidth={64} rows={ageRows} />
+            : <Unavailable label={onlyLinkedIn ? NOT_ON_LINKEDIN : undefined} />}
         </div>
       </section>
 
@@ -93,7 +119,7 @@ function AudienceInner() {
                 ...(other > 0.001 ? [{ key: "o", label: "Other", value: other, display: pctPlain(other * 100, 0), color: "var(--muted)" }] : []),
               ]} />
             </>
-          ) : <Unavailable />}
+          ) : <Unavailable label={onlyLinkedIn ? NOT_ON_LINKEDIN : undefined} />}
         </div>
       </section>
 
@@ -103,6 +129,34 @@ function AudienceInner() {
           {countryRows.length ? <BarList keyWidth={130} rows={countryRows} /> : <Unavailable />}
         </div>
       </section>
+
+      {dimKeys.map((k) => {
+        const dist = mergeDist((s) => s.dimensions?.[k] ?? {});
+        const rows = Object.entries(dist)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([label, v]) => ({
+            key: label, label, value: v,
+            display: pctPlain(v * 100, 0), color: "var(--li)",
+          }));
+        if (!rows.length) return null;
+        return (
+          <section className="panel" key={k}>
+            <div className="panel__head">
+              <h3>{DIM_TITLES[k] ?? k}</h3>
+              {/*
+                * Not "share of your followers", which is what a reader assumes
+                * and what would be wrong. LinkedIn returns only the top 100
+                * values of each facet, counts only followers it can classify,
+                * and no longer returns a follower total on that endpoint to
+                * check it against — so this is a share of what it answered.
+                */}
+              <span className="sub">share of followers it could classify</span>
+            </div>
+            <div className="panel__body"><BarList keyWidth={150} rows={rows} /></div>
+          </section>
+        );
+      })}
 
       <section className="panel col-3">
         <div className="panel__head"><h3>Best time to post</h3><span className="sub">follower activity by weekday &amp; hour · UTC</span></div>
@@ -128,12 +182,17 @@ function AudienceInner() {
               </div>
               <div className="heatscale">Less<i style={{ opacity: 0.2 }} /><i style={{ opacity: 0.5 }} /><i style={{ opacity: 0.75 }} /><i style={{ opacity: 1 }} />More</div>
             </>
-          ) : <Unavailable label="Instagram only reports when your followers are online after a full day of data has built up. This fills in on its own." />}
+          ) : <Unavailable label={onlyLinkedIn
+            ? "LinkedIn does not report when a page's followers are online, so there is no hourly pattern to show."
+            : "Instagram only reports when your followers are online after a full day of data has built up. This fills in on its own."} />}
         </div>
       </section>
     </div>
   );
 }
+
+const NOT_ON_LINKEDIN =
+  "LinkedIn does not report age or gender for a Company Page. It reports industry, seniority and job function instead, below.";
 
 function Unavailable({ label }: { label?: string }) {
   return <div className="muted" style={{ fontSize: 12.5, padding: "12px 2px" }}>{label ?? "Not available for the connected platform(s) yet."}</div>;

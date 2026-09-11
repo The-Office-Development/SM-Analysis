@@ -208,7 +208,7 @@ address and phone only, so both are needed.
 
 ---
 
-## 10. LinkedIn — building, 2026-09-11
+## 10. LinkedIn — building, 2026-09-12
 
 Researched, built, and phased in `docs/LINKEDIN-PLAN.md`. Short version: the
 Company Page path gives everything (daily statistics, per-post statistics, post
@@ -222,16 +222,40 @@ connection.
   gained a "Renew soon" state. Revocation does not exist either, so disconnect
   says where the client withdraws it themselves. Migration **0014**
   (`needs_reauth`) is **not yet applied**.
-- **Phase 2, audience demographics — next.** Without it the Audience page is
-  empty for a LinkedIn account. Two real decisions first: LinkedIn's buckets are
-  professional (industry, seniority, function) and do not fit the Instagram-shaped
-  `audience_snapshots`, and its values are URNs that need resolving to words.
+- **Phase 2, audience demographics — DONE 2026-09-12.** Migration **0015**
+  (`dimensions` on `audience_snapshots`) is **not yet applied**; until it is, a
+  LinkedIn snapshot write will fail on the missing column, so apply 0014 and 0015
+  together. The Audience page renders industry, seniority, job function, company
+  size, market areas and association, and says plainly that age and gender are
+  not reported for a Company Page rather than showing an empty panel.
 - **Phase 3, live verification — blocked** on Community Management API access,
   which needs a brand-new developer application holding no other API product.
 
-**Nothing LinkedIn has ever been verified against a live response.** 146
-assertions and 54 mutations cover what the documentation says; a real call is
-what turns that into "works".
+### Phase 2 was the first session that could read LinkedIn's own docs
+
+Every LinkedIn claim in this repo before 2026-09-12 came from secondary sources,
+because the sandbox blocked `learn.microsoft.com`. Running locally, it opens. The
+plan written from the summary was **wrong in four places**, none of which would
+have raised an error — full detail in `docs/LINKEDIN-PLAN.md`:
+
+- geography is **two** facets, not one, and merging them double-counts followers
+- `organicFollowerCount` already includes paid; adding `paidFollowerCount` — the
+  obvious "fix" — counts every paid follower twice
+- asking for demographics **with** a date range returns them silently empty
+- each facet is capped at its top 100 values and there is no total to check it
+  against, so a share is a share of what was answered, not of the followers
+
+**And one claim in shipped code was simply false:** both this file and a comment
+in `syncLinkedIn` said no follower movement exists for a Company Page. It does —
+`followerGains` per day. It is still not stored, because the docs do not say
+whether a gain is gross or net and a net figure in a gross column is a wrong
+number no test can see. First thing to settle on the first live call.
+
+**Nothing LinkedIn has ever been verified against a live response.** 155
+assertions and 58 mutations cover what the documentation says; a real call is
+what turns that into "works". Unlike Instagram, there **is** a visible oracle —
+the page's own Analytics tab shows these same breakdowns — so the reconciliation
+should be run before a client sees the Audience page.
 
 ## 11. Connecting a client — written 2026-09-11
 

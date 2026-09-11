@@ -236,6 +236,22 @@ const mutations = [
    */
   { name: "a LinkedIn token claimed as refreshed when it cannot be", file: TOKENS_LI,
     find: '    return "skipped";\n}', replace: '    return "refreshed";\n}' },
+  /*
+   * Phase 2 — follower demographics. Four defects that all produce a plausible
+   * chart, which is why they are here rather than trusted to review.
+   */
+  { name: "paid followers counted twice in every demographic", file: LINKEDIN,
+    find: "export const liDemographicCount = (fc) => liNum(fc?.organicFollowerCount);",
+    replace: "export const liDemographicCount = (fc) => liNum((fc?.organicFollowerCount ?? 0) + (fc?.paidFollowerCount ?? 0));" },
+  { name: "demographics asked for with a time range, which silently returns none", file: SYNC,
+    find: '{ q: "organizationalEntity", organizationalEntity: urn }, { token });',
+    replace: '{ q: "organizationalEntity", organizationalEntity: urn, timeIntervals: `(timeRange:(start:${liTime(today())},end:${liTime(today())}),timeGranularityType:DAY)` }, { token });' },
+  { name: "an unnameable URN dropped, inflating every other share", file: SYNC,
+    find: '                : (b.id ? labels.get(`${f.kind}:${b.id}`) : null) ?? "Unknown";',
+    replace: '                : (b.id ? labels.get(`${f.kind}:${b.id}`) : null);\n            if (!label) continue;' },
+  { name: "market areas merged into countries, counting a follower twice", file: SYNC,
+    find: 'if (f.into === "countries")',
+    replace: 'if (f.kind === "geo")' },
   { name: "a LinkedIn post's reach faked from its impressions", file: SYNC,
     find: "                reach: null,\n                avg_watch_seconds: null, retention_pct: null,",
     replace: "                reach: liNum(s.impressionCount),\n                avg_watch_seconds: null, retention_pct: null," },
