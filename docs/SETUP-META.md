@@ -182,6 +182,43 @@ Keep the existing Facebook Login app configuration, and add the redirect URI
 `instagram_manage_insights`. This path is retained and works, but Instagram
 accounts should be connected through section 2.
 
+## 3b. Verified against Meta's own documentation, 2026-09-11
+
+Two facts govern the order of everything below, and both are now quoted from
+Meta rather than inferred.
+
+**Business Verification gates Advanced Access, and nothing else does.**
+
+> "Advanced Access now requires Business Verification." … "Apps that request
+> advanced access for permissions and apps that allow other Businesses to access
+> their own data must be connected to a Business that has completed Business
+> Verification."
+
+**But it is not required for a pilot run through roles.**
+
+> "If your app will only be used by app users who have a role on the app itself
+> you do not need to complete verification."
+
+That sentence is the whole reason drinkat can start before any of this finishes.
+A client added as a Tester is an app user with a role, so the pilot is legitimate
+on Standard Access with no verification and no review. Verification and review
+are what turn a pilot into a product anyone can sign up for.
+
+**A reviewer who cannot use the app fails the whole submission.**
+
+> "if reviewers cannot access your app to test it, your entire submission will be
+> rejected."
+
+This is the most common self-inflicted rejection and it is worth planning for
+rather than discovering. The submission must carry working credentials, and the
+reviewer must be able to get all the way to real numbers on screen — which for
+this product means they need an Instagram professional account to connect, not
+just a login to the dashboard. Demo mode helps them understand the interface but
+does not exercise the permissions being requested, so it cannot be the whole
+answer.
+
+---
+
 ## 4. App Review
 
 **Where:** App dashboard → App Review → Permissions and Features.
