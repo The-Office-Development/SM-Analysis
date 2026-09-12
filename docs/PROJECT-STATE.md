@@ -369,10 +369,18 @@ the intended route, then drinkat's.
 
 ### Organisational, needs people not code
 - [ ] DPO question under Jordan's PDPL
-- [ ] Cross-border transfer file (Supabase, Netlify, Anthropic all outside Jordan)
+- [ ] Cross-border transfer file — the sub-processors are **Supabase (Frankfurt),
+      Cloudflare and Anthropic**, all outside Jordan. Corrected 2026-09-12: this
+      line named Netlify, which has not hosted anything since `927f228` ported the
+      deploy to Cloudflare Pages. The same stale name is still in `JORDAN-CONTEXT.md`,
+      `AUDIT-SUMMARY.md`, `DEPLOY-RUNBOOK.md` and `CLAUDE.md` — fix it there before
+      any of them is copied into the Data Protection Assessment or the privacy policy,
+      because naming a processor that processes nothing and omitting the one that does
+      is exactly what that assessment asks about.
 - [x] ~~Supabase region choice~~ — **decided 2026-09-03: `eu-central-1`
-      (Frankfurt).** Reason recorded in §2. Netlify's function region is still
-      open and matters less; its default `us-east-1` is ~90ms from Frankfurt.
+      (Frankfurt).** Reason recorded in §2. The function region question moved with
+      the host: Cloudflare Pages Functions run at the edge nearest the visitor, so
+      there is no single region to choose and no `us-east-1` default to argue with.
 - [ ] Alerting and an on-call rota — the 24-hour PDPL breach deadline is
       unmeetable without someone watching
 - [ ] Counsel sign-off on the PDPL analysis and the bracketed legal pages

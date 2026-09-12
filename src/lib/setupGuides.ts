@@ -19,7 +19,7 @@ export interface SetupGuide {
   steps: SetupStep[];
   /** Appended to the site origin to form the OAuth redirect URI. */
   redirectPath: string;
-  /** Backend env vars this platform needs (Netlify + .env.local). */
+  /** Backend env vars this platform needs (Cloudflare secrets + .env.local). */
   env: string[];
   /** Things that look like failures but are platform limits. */
   notes: string[];
@@ -49,6 +49,15 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
     notes: [
       "Permissions requested: pages_show_list, pages_read_engagement, read_insights. Submit these for App Review only if you need Pages you don't administer.",
       "Brand-new Meta business accounts are sometimes auto-flagged, which blocks asset linking with errors like “not allowed to advertise”. Check business.facebook.com/accountquality. These holds usually clear within 24 to 48 hours.",
+      /*
+       * Not a limitation of this code, and the Audience page looks broken
+       * without it being said. It is also what caused two defects found on
+       * 2026-09-12: an empty gender breakdown was rendering "Other 100%", and an
+       * empty activity grid was producing a "best time to post" of Sunday
+       * midnight. Both reached real Pages, not just LinkedIn.
+       */
+      "A Page connected after 14 March 2024 gets NO audience demographics from Meta at all — no age, no gender, no countries, and no follower-activity hours. The Audience page will be empty for it and that is Meta's limit, not a failed sync.",
+      "page_impressions, page_fans and post_impressions were removed in November 2025. The replacements are already in use here; an older guide naming them is out of date.",
     ],
   },
 
@@ -77,7 +86,7 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
       { text: "Business login settings → add the callback URL below as a redirect URI, exactly as shown." },
       { text: "Copy the Instagram app ID and secret into the environment variables below. These are NOT the Facebook app's App ID and secret." },
       { text: "Set the app's display name. That is the name people see on the Instagram permission screen." },
-      { text: "App roles → Roles: add the account as a Tester, and accept the invitation from that account's own Instagram settings. Real data flows with no App Review." },
+      { text: "App roles → Roles: add the account as a Tester. The invitation is accepted in that account's own Instagram settings — ON A DESKTOP BROWSER. It does not appear in the mobile app, which is where everyone looks first." },
       { text: "Come back here, press Connect on this row, and approve the permission prompt." },
     ],
     redirectPath: "/api/oauth-instagram-callback",
@@ -88,6 +97,22 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
       "A new account has no history for Meta to backfill, so trends build up from your first sync onward.",
       "History arrives in chunks over several syncs rather than all at once. Instagram will only answer about one day at a time for most figures, so a month of history is hundreds of separate questions. Recent days are refreshed on every run; older history fills in behind them.",
       "Connecting a Facebook Page is a separate row above, and still uses the Facebook app's credentials.",
+      /*
+       * The correction that came from the operator rather than from any
+       * documentation, and the most valuable line here. The runbook said "they
+       * accept from their own Instagram settings" without saying WHERE, which is
+       * exactly how a guide fails in front of a client.
+       */
+      "The Tester invitation is only visible on a DESKTOP browser. A client looking in the Instagram mobile app will not find it, will say the invitation never arrived, and both of you will spend the meeting on it.",
+      "Tester roles cap at about five accounts. That is a pilot, not a roster.",
+      /*
+       * The tester route is a way to run a pilot WHILE App Review is queued, not
+       * a way to postpone it. PROJECT-STATE.md §0 records this qualification
+       * because the temptation to read it the other way has already come up once,
+       * and the consequence lands on the client's account rather than ours.
+       */
+      "Real data flows with no App Review, but Meta describes Development Mode as internal testing only. Running a paying client on it is a Platform Terms problem, so treat this as a way to pilot WHILE review is queued, not instead of it.",
+      "Stories have never once been captured by this product. The /stories edge returns an empty list even with a story live, and reshared posts appear to be excluded outright. Do not promise story analytics.",
     ],
   },
 
@@ -116,6 +141,16 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
       "Statistics reach back twelve months on a rolling window. Anything older is not an error, it is simply absent.",
       "Development Tier allows 500 API calls per app per day and 100 per member. The sync is built around one call for the whole daily series and one for all posts, but this is a real ceiling on how many pages one app can carry.",
       "LinkedIn sunsets an API version roughly every year, against Meta's two. The version is pinned in one place, LI.VERSION, and moving it is a deliberate act.",
+      /*
+       * The single most operationally important fact about LinkedIn, and it was
+       * missing: Phase 1 established that a connection has a hard 60-day life
+       * and that nothing on the server can extend it.
+       */
+      "A LinkedIn token lasts 60 DAYS and cannot be refreshed from a server — LinkedIn issues programmatic refresh to selected partners only. The account is flagged ten days out and Connections shows \"Renew soon\". Clicking Reconnect inside that window is silent; after it lapses it is a full consent screen, which for a Company Page means finding an administrator.",
+      "Disconnect deletes our copy of the token but cannot revoke it — LinkedIn documents no revoke endpoint for this flow. The client withdraws it themselves at Settings and Privacy → Data privacy → Permitted services.",
+      "A Company Page reports NO age and NO gender, and never reports when followers are online. What it reports instead is professional — industry, seniority, job function, company size and market area — and it is richer than Instagram's. Each facet returns only its top 100 values, and the endpoint gives no follower total to check them against, so a share is a share of what was answered.",
+      "Day-by-day figures stop TWO days before today, not yesterday. A gap at the trailing edge is the API's window, not a failed sync.",
+      "Follower gains per day exist but are not stored: the documentation does not say whether a gain is gross or net of unfollows, and LinkedIn reports no unfollows at all. Settling that is the first thing to check on the first live call.",
       "Nothing here has been verified against a live response yet. See docs/LINKEDIN.md.",
     ],
   },

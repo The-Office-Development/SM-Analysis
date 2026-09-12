@@ -152,8 +152,10 @@ pack, and change one thing at a time so you learn what mattered.
 1. **Products → Instagram → API setup with Instagram login.**
    This is the path this codebase uses. It does not require your clients to have
    a Facebook Page linked, which is why it was chosen.
-2. Copy the **Instagram app ID** and **Instagram app secret** into Netlify as
-   `INSTAGRAM_APP_ID` and `INSTAGRAM_APP_SECRET`. These are *not* the same as
+2. Copy the **Instagram app ID** and **Instagram app secret** into
+   **Cloudflare Pages → Settings → Variables and Secrets** (as secrets, not
+   plaintext vars) as `INSTAGRAM_APP_ID` and `INSTAGRAM_APP_SECRET`. The host
+   moved off Netlify — see `wrangler.toml` for why. These are *not* the same as
    `META_APP_ID` / `META_APP_SECRET`, which belong to the Facebook Login path
    still used for Facebook Pages.
 3. **Business login settings** → add the redirect URI, exactly:
@@ -245,7 +247,14 @@ friction of a role invitation, so it does not scale to a roster.
   your own servers. It asks directly about encryption at rest, access logging,
   deletion, retention, and onward transfer to third parties. This codebase now
   answers the first four; the transfer question needs your sub-processor list
-  (Supabase, Netlify, Anthropic) and the Jordan cross-border position.
+  and the Jordan cross-border position.
+
+  **The sub-processor list is Supabase (Frankfurt), Cloudflare and Anthropic.**
+  Corrected 2026-09-12: this line said *Netlify* until now, and `JORDAN-CONTEXT.md`,
+  `AUDIT-SUMMARY.md` and `DEPLOY-RUNBOOK.md` still do. Hosting and function logs
+  are Cloudflare Pages. Naming a sub-processor that does not process anything, and
+  omitting the one that does, is the kind of answer a DPA is designed to catch, so
+  fix it here before it is copied into the assessment or the privacy policy.
 
 ## 6. Order of operations
 

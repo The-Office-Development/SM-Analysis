@@ -199,7 +199,7 @@ export async function deleteMyAccount(): Promise<string> {
   return body.confirmation_code as string;
 }
 
-/** Kicks off a server-side sync (Netlify function) for the signed-in user. */
+/** Kicks off a server-side sync (the deployed function) for the signed-in user. */
 export async function triggerSync(): Promise<{ ok: boolean; message: string }> {
   if (isDemoMode()) return { ok: false, message: "Preview mode: connect a real account after setup to sync live data." };
   const { data: { session } } = await supabase.auth.getSession();

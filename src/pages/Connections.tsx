@@ -216,7 +216,7 @@ function SetupPanel({ platform, origin }: { platform: Platform; origin: string }
             ))}
           </div>
           <span className="muted" style={{ fontSize: 11.5 }}>
-            Set these in <code>.env.local</code> for local dev and in Netlify → Site configuration → Environment variables for production.
+            Set these in <code>.env.local</code> for local dev and, for production, as Cloudflare secrets — Workers &amp; Pages → the project → Settings → Variables and Secrets.
           </span>
         </div>
 

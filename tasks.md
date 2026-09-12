@@ -389,6 +389,36 @@ come out blank rather than zero, because `num()` was written for exactly this.
 
 167 assertions, 63/63 mutations.
 
+### The setup guides, and a privacy policy naming the wrong company
+
+The in-app setup guides are what the OPERATOR follows to configure each platform,
+and `CLAUDE.md` had flagged them for optimistic claims. Corrected from evidence
+already in this repo rather than from memory:
+
+- **Instagram.** The Tester invitation is only visible on a **desktop browser** —
+  the operator's own first-hand correction, and the single line most likely to
+  save a client meeting. The guide previously said "accept the invitation from
+  that account's own Instagram settings" without saying where, which is exactly
+  how a guide fails in front of somebody. Added with it: the ~5 tester cap, that
+  Development Mode is *internal testing only* so the tester route runs a pilot
+  **while** review is queued rather than instead of it, and that stories have
+  never once been captured so they must not be promised.
+- **Facebook.** A Page connected after **14 March 2024 gets no demographics at
+  all** — no age, gender, countries or activity hours. `audienceFacebook` has said
+  so in a code comment for weeks while the guide did not, and it is the cause of
+  two defects found on 2026-09-12. Without it the Audience page simply looks broken.
+- **LinkedIn.** The guide predated Phases 1 and 2 and omitted the whole token
+  lifecycle: 60 days, no server-side refresh, the ten-day "Renew soon" window,
+  and that Disconnect cannot revoke. Plus no age/gender for a Company Page, the
+  two-day trailing edge, and why follower gains are not stored yet.
+
+**And the privacy policy named Netlify as a sub-processor.** The app moved to
+Cloudflare in September and the published list did not move with it, so it named
+a company that holds none of this data and omitted the one that does. That is the
+page a Meta reviewer opens during App Review and the list the Data Protection
+Assessment asks for by name. Also corrected: the Connections page told the
+operator to set production secrets in Netlify.
+
 ## 11. Connecting a client — written 2026-09-11
 
 `docs/CLIENT-CONNECT-INSTAGRAM.md`. There was no guide for this: the in-app

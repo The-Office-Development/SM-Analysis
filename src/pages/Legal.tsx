@@ -118,10 +118,17 @@ export function Privacy() {
       <h3>Who else processes it</h3>
       <ul>
         <li><b>Supabase</b>: database and authentication, including the encrypted tokens.</li>
-        <li><b>Netlify</b>: hosting and server logs.</li>
+        {/*
+          * Cloudflare, not Netlify. The app was ported in September 2026 and this
+          * list was not moved with it, so the published privacy policy named a
+          * processor that no longer holds any of this data and omitted the one
+          * that does. This is the page a Meta reviewer reads during App Review
+          * and the list the Data Protection Assessment asks for by name.
+          */}
+        <li><b>Cloudflare</b>: hosting, the scheduled sync, and server logs.</li>
         <li><b>Anthropic</b>: powers the optional AI assistant. When you use it, a compact summary of your dashboard figures and the titles of your top posts is sent to produce an answer. Your access tokens and raw records are never sent. If you do not use the assistant, nothing is sent.</li>
       </ul>
-      <p>All three operate outside Jordan, so using this service involves transferring your personal data abroad. [REGIONS CONFIGURED FOR SUPABASE AND NETLIFY, AND THE TRANSFER BASIS RELIED ON UNDER THE PDPL, COUNSEL TO COMPLETE.]</p>
+      <p>All three operate outside Jordan, so using this service involves transferring your personal data abroad. [REGIONS CONFIGURED FOR SUPABASE AND CLOUDFLARE, AND THE TRANSFER BASIS RELIED ON UNDER THE PDPL, COUNSEL TO COMPLETE.]</p>
 
       <h3>How long we keep it</h3>
       <p>We keep what you connect for as long as you keep it connected, and no longer. <b>Disconnecting an account deletes it immediately</b>: the access token, every daily metric, every post record, the audience breakdowns and that account's sync history are removed at once, not after a delay. There is no retention window afterwards because there is nothing left to retain. Deleting your whole account removes everything above along with your goals, your recorded consents and any report links you created.</p>
