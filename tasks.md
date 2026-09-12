@@ -301,6 +301,19 @@ drops it; mutating either guard alone survives. That says the two are redundant,
 not that the test is weak, and the mutation now injects the unguarded shape the
 page actually had.
 
+### Phase 1's UI had never been looked at either
+
+Same lesson, same day. The "Renew soon" row — the one that decides whether
+renewing a LinkedIn token is a silent click or a support call — was rendering as
+a cramped vertical column: the badge wrapped onto two lines, the handle wrapped,
+"synced about 4 hours ago" broke over four.
+
+`.conn .meta .st` is `display:flex` with **no `flex-wrap`** at desktop width; the
+wrap was only inside the mobile media query. The note sets `flex-basis:100%` to
+claim its own line, which does nothing in a flex row that cannot wrap — so it
+became a narrow sibling and squeezed everything else. A **desktop-only** defect,
+invisible to a phone-first check, in the most important message on the page.
+
 ## 11. Connecting a client — written 2026-09-11
 
 `docs/CLIENT-CONNECT-INSTAGRAM.md`. There was no guide for this: the in-app

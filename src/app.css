@@ -186,7 +186,14 @@
 .conn .pf svg{width:20px;height:20px;fill:#fff}
 .conn .meta{flex:1;min-width:0}
 .conn .meta .nm{font-weight:600;font-size:14px}
-.conn .meta .st{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:2px}
+.conn .meta .st{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:2px;
+  /* Wrap at EVERY width, not just on a phone. A row can carry a full
+     sentence — the LinkedIn "Renew soon" note — and that child sets
+     flex-basis:100% to take its own line. Without wrap it cannot, so it
+     became a narrow column that squeezed the badge, the handle and the
+     synced time into vertical slivers. The mobile block had the wrap, so
+     the defect was desktop-only and invisible to a phone-first check. */
+  flex-wrap:wrap;row-gap:4px}
 
 /* status chips */
 .chip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:20px;font-size:11.5px;font-weight:600}
@@ -371,7 +378,6 @@
      Stack the actions under the account instead of crushing them. */
   .conn{flex-wrap:wrap;gap:12px;padding:14px}
   .conn .meta{flex:1 1 calc(100% - 52px);min-width:0}
-  .conn .meta .st{flex-wrap:wrap;row-gap:4px}
   .conn>.btn{flex:1 1 auto}
   .conn .meta .st .btn{margin-left:0}
 
