@@ -340,6 +340,44 @@ client. That is where the scope bug above lived, and it is the remaining place
 this class of defect can hide. Worth the same extraction treatment `bestTimes`
 got, when there is a reason to touch it.
 
+### The assistant and the exports — 2026-09-12
+
+**The AI grounding was telling the model things that were not true.**
+`summarizeForAI` used `sum()` for the headline totals, so a LinkedIn Company Page
+— which has no page-level views at all — was grounded with "Video views: 0
+(+0.0%)", and the assistant repeats its grounding as fact. The rule was already
+written down thirty lines below, for per-post figures: *a fabricated 0 is one the
+model states confidently*. It simply had not been applied to the totals. It also
+had the same scope bug as `buildSnapshot` — posting windows computed from every
+connected platform — and told a LinkedIn client "Instagram has never reported
+unfollows for this account".
+
+**The exports named Instagram in nineteen places.** They were written when
+Instagram was the only platform that mattered: "Not reported by Instagram",
+"When these numbers were last taken from Instagram", "Source: Instagram's
+official API", and at the foot of every sheet "Prepared by PulseBoard from
+Instagram's official API". In a workbook scoped to a LinkedIn Company Page every
+one of them is false, and this is the document that goes to a sponsor. They now
+resolve through `reportSource` / `provenanceNote`, and a test asserts a scoped
+export never names a platform it is not about — that test is what found the
+nineteenth, in `reportIdentity`, which the eighteen greps had missed.
+
+**Two claims stay Instagram-specific on purpose.** The "our daily figure can
+differ from the Instagram app" caveat is the reconciliation finding written down;
+asserting the same of LinkedIn would invent a reconciliation nobody has run.
+Likewise the churn explanation's "people leave because of a story, a comment, a
+collaboration, and Instagram removes inactive accounts in batches".
+
+**Also found: a scoped report was headed with every connected handle.** A file
+saying "Scope: LinkedIn" was also headed "northwind.co / northwind /
+northwind-co" — three accounts, two of which the document says nothing about.
+The identity line is what a sponsor reads to know whose numbers these are.
+
+The CSV's daily rows were already right: views, gained, lost and the reach split
+come out blank rather than zero, because `num()` was written for exactly this.
+
+167 assertions, 63/63 mutations.
+
 ## 11. Connecting a client — written 2026-09-11
 
 `docs/CLIENT-CONNECT-INSTAGRAM.md`. There was no guide for this: the in-app

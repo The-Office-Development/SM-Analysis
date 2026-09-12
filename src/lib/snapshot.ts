@@ -5,7 +5,7 @@ import {
   publishTiming, followerCost, reachMultiples, reachConcentration, totalReported,
 } from "./insights";
 import { PLATFORMS } from "./platforms";
-import { accountLabel } from "./reportMeta";
+import { accountLabel, provenanceNote, reportSourcePossessive } from "./reportMeta";
 import type { Platform } from "./types";
 
 type Dash = ReturnType<typeof useDash>;
@@ -33,6 +33,17 @@ export interface ReportSnapshot {
   platforms: { name: string; followers: number; reach: number | null; views: number | null; engagements: number | null }[];
   top: { title: string; platform: string; views: number | null; likes: number | null; comments: number | null }[];
   windows: string[];
+  /*
+   * The provenance note, carried rather than recomputed.
+   *
+   * A SHARED report renders from this object alone — no dashboard, no scope, no
+   * platform list — so a note built at render time could only ever name
+   * Instagram. Optional because links shared before this existed must still
+   * render; ReportSheet falls back to the old wording.
+   */
+  provenance?: string;
+  /** Same reason as `provenance`: a shared link has no scope to derive it from. */
+  source?: string;
   alerts: { label: string; kind: "spike" | "drop"; deltaPct: number; date: string }[];
   /*
    * The analysis Instagram does not do.
@@ -100,7 +111,7 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
   return {
     v: 1,
     generatedAt: new Date().toISOString(),
-    account: accountLabel(dash.accounts),
+    account: accountLabel(dash.accounts, dash.scope),
     scopeLabel,
     range: dash.range,
     headline,
@@ -118,6 +129,8 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
      * leaves the building.
      */
     windows: bestTimes(dash.audience, scopedPlatforms, 3).map((w) => w.label),
+    provenance: provenanceNote(dash.scope, (p) => PLATFORMS[p].name),
+    source: `${reportSourcePossessive(dash.scope, (p) => PLATFORMS[p].name)}, read only`,
     alerts: anomalies(dash.metrics, dash.scope).slice(0, 6)
       .map((a) => ({ label: a.label, kind: a.kind, deltaPct: a.deltaPct, date: a.date })),
     analysis: buildAnalysis(dash),

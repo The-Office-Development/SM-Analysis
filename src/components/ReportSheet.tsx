@@ -1,6 +1,6 @@
 import { compact, metric, full } from "../lib/format";
 import type { ReportSnapshot } from "../lib/snapshot";
-import { reportIdentity, footerLine, PROVENANCE_NOTE, TZ_LABEL } from "../lib/reportMeta";
+import { reportIdentity, footerLine, TZ_LABEL } from "../lib/reportMeta";
 
 const delta = (n: number | null) => {
   if (n === null) return <span className="delta --flat muted">n/a</span>;
@@ -19,6 +19,9 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
   const id = reportIdentity({
     account: snap.account ?? "", scopeLabel: snap.scopeLabel,
     range: snap.range, generatedAt: snap.generatedAt,
+    // Carried on the snapshot so a SHARED link, which has no scope object,
+    // still names the right platform. Absent on links shared before this.
+    source: snap.source,
   });
   return (
     <div className="sheet">
@@ -225,7 +228,10 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
         * at evidence of what it does, and have no other way to find it.
         */}
       <footer className="sheet__foot">
-        <p style={{ margin: "0 0 6px" }}>{PROVENANCE_NOTE}</p>
+        <p style={{ margin: "0 0 6px" }}>{snap.provenance
+          /* Links shared before the note was scoped still render; they were all
+             Instagram reports, so the old wording is the right fallback. */
+          ?? "Figures come from Instagram's official API. The Instagram app computes its own daily numbers a slightly different way, so a single day can differ between the two; over a month the totals agree closely. Anything left blank was not reported by Instagram, which is not the same as zero."}</p>
         <p style={{ margin: 0 }}>{footerLine(id)}</p>
       </footer>
     </div>

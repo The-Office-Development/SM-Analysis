@@ -2,7 +2,7 @@ import type { MetricPoint, AudienceSnapshot, ContentItem, Platform, Range, Scope
 import { seriesByDay, followersByDay, sum, latest, engagementRate, type MetricKey } from "./api";
 import { PLATFORMS } from "./platforms";
 import {
-  publishTiming, followerCost, reachMultiples, reachConcentration, bestTimes,
+  publishTiming, followerCost, reachMultiples, reachConcentration, bestTimes, totalReported,
 } from "./insights";
 
 export const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -114,8 +114,22 @@ export function summarizeForAI(d: AISummaryInput): string {
   const cmp = periodCompare(d.metrics, d.scope);
   lines.push("Totals over the window (with trend vs the previous half):");
   for (const c of cmp) {
-    const total = c.key === "followers" ? latest(followersByDay(d.metrics, d.scope)) : sum(seriesByDay(d.metrics, d.scope, c.key as MetricKey));
-    lines.push(`- ${c.label}: ${total.toLocaleString()} (${pct(c.deltaPct)})`);
+    /*
+     * "not reported", never 0.
+     *
+     * This line used sum(), which is 0 for a metric the platform never reports —
+     * so a LinkedIn Company Page, which has no page-level views at all, told the
+     * assistant "Video views: 0 (+0.0%)" and the assistant repeated it to the
+     * client as a measurement. The rule was already written down thirty lines
+     * below, for per-post figures: a fabricated 0 is one the model states
+     * confidently. It just was not applied here.
+     */
+    const total = c.key === "followers"
+      ? latest(followersByDay(d.metrics, d.scope))
+      : totalReported(seriesByDay(d.metrics, d.scope, c.key as MetricKey));
+    lines.push(total === null
+      ? `- ${c.label}: not reported by this platform`
+      : `- ${c.label}: ${total.toLocaleString()} (${pct(c.deltaPct)})`);
   }
   lines.push(`- Engagement rate: ${engagementRate(d.metrics, d.scope).toFixed(1)}%`);
 
@@ -135,7 +149,12 @@ export function summarizeForAI(d: AISummaryInput): string {
     }
   }
 
-  const windows = bestTimes(d.audience, d.connectedPlatforms, 3);
+  /*
+   * Scoped, for the same reason buildSnapshot is: handing the assistant
+   * Instagram's posting windows while the client is asking about their LinkedIn
+   * page produces advice about a different audience, stated with full confidence.
+   */
+  const windows = bestTimes(d.audience, d.scope === "all" ? d.connectedPlatforms : [d.scope as Platform], 3);
   if (windows.length) lines.push(`Best posting windows: ${windows.map((w) => w.label).join("; ")}.`);
 
   const al = anomalies(d.metrics, d.scope);
@@ -172,7 +191,18 @@ export function summarizeForAI(d: AISummaryInput): string {
 
   const cost = followerCost(d.metrics, content, d.scope);
   if (!cost.reported) {
-    lines.push("Follower losses: Instagram has never reported unfollows for this account. Say this cannot be seen rather than that nobody left.");
+    /*
+     * Named from the scope. This said "Instagram has never reported unfollows"
+     * whatever the client was actually asking about, and the assistant repeats
+     * its grounding as fact — so a LinkedIn client got told something about
+     * Instagram, in an answer they would read. For LinkedIn it is also a
+     * PLATFORM-WIDE absence rather than a gap on their account, and saying so
+     * is the difference between "your data is missing" and "this cannot be
+     * measured here".
+     */
+    lines.push(d.scope === "linkedin"
+      ? "Follower losses: LinkedIn does not report unfollows for a Company Page at all. Say this cannot be seen on LinkedIn rather than that nobody left."
+      : `Follower losses: ${d.scope === "all" ? "the platform has" : PLATFORMS[d.scope as Platform].name + " has"} never reported unfollows for this account. Say this cannot be seen rather than that nobody left.`);
   } else if (cost.days.length) {
     lines.push(`Days that lost unusually many followers (usual is ${cost.typical} a day). CORRELATION ONLY: posts listed went out that day, which is not evidence they caused it.`);
     for (const day of cost.days.slice(0, 3))

@@ -2,7 +2,7 @@ import { escapeCsvField as esc } from "./csv";
 import { sumKnown } from "./format";
 import { publishTiming, followerCost, reachConcentration, reachMultiples } from "./insights";
 import type { MetricPoint, ContentItem, Platform, Range, Scope } from "./types";
-import { reportIdentity, footerLine, PROVENANCE_NOTE, ammanStamp, accountLabel } from "./reportMeta";
+import { reportIdentity, footerLine, provenanceNote, ammanStamp, accountLabel, reportSource, reportSourcePossessive } from "./reportMeta";
 
 /**
  * Everything the export needs, and nothing that needs a browser.
@@ -61,6 +61,8 @@ const localStamp = ammanStamp;
 /** Build a CSV of the current dashboard scope and window from real synced data. */
 export function buildCsv(dash: CsvInput): string {
   const scopeLabel = dash.scope === "all" ? "All platforms" : dash.platformName(dash.scope);
+  // The platform this file is about, for the prose in it. See reportSource.
+  const src = reportSource(dash.scope, dash.platformName);
   const inScope = (p: Platform) => dash.scope === "all" || dash.scope === p;
   const metrics = dash.metrics.filter((m) => inScope(m.platform));
   const content = dash.content.filter((c) => inScope(c.platform));
@@ -72,8 +74,9 @@ export function buildCsv(dash: CsvInput): string {
 
   /* ---- what this file is ------------------------------------------------ */
   const id = reportIdentity({
-    account: accountLabel(dash.accounts),
+    account: accountLabel(dash.accounts, dash.scope),
     scopeLabel, range: dash.range,
+    source: `${reportSourcePossessive(dash.scope, dash.platformName)}, read only`,
   });
   line(esc("PulseBoard report"));
   line(esc("Account"), esc(id.account));
@@ -84,7 +87,7 @@ export function buildCsv(dash: CsvInput): string {
   line(esc("Source"), esc(id.source));
   // Said here as well as in the interface, because this file is read on its own
   // and the person reading it may be the sponsor, comparing against a screenshot.
-  line(esc("Note"), esc(PROVENANCE_NOTE));
+  line(esc("Note"), esc(provenanceNote(dash.scope, dash.platformName)));
 
   /* ---- the headline ----------------------------------------------------- */
   const sumOf = (k: "reach" | "views" | "engagements" | "follows" | "unfollows"
@@ -114,8 +117,8 @@ export function buildCsv(dash: CsvInput): string {
   s("Followers now", num(followersNow));
   s("Followers at the start of the window", num(followersThen));
   s("Net change", num(followersNow !== null && followersThen !== null ? followersNow - followersThen : null));
-  s("Followers gained", num(gained), gained === null ? "Not reported by Instagram" : "");
-  s("Followers lost", num(lost), lost === null ? "Not reported by Instagram" : "");
+  s("Followers gained", num(gained), gained === null ? `Not reported by ${src}` : "");
+  s("Followers lost", num(lost), lost === null ? `Not reported by ${src}` : "");
   s("Reach", num(reach), "Distinct accounts reached, summed over the window");
   s("Views", num(views));
   s("Engagements", num(eng), "Likes, comments, shares and saves");
@@ -123,11 +126,11 @@ export function buildCsv(dash: CsvInput): string {
     "Engagements as a share of reach");
   s("Reach from people who already follow", num(followerReach));
   s("Reach from people who do not", num(nonFollowerReach),
-    nonFollowerReach === null ? "Not reported by Instagram" : "The share a sponsor is buying");
+    nonFollowerReach === null ? `Not reported by ${src}` : "The share a sponsor is buying");
   s("New-audience share %",
     rate(followerReach !== null && nonFollowerReach !== null && followerReach + nonFollowerReach > 0
       ? (nonFollowerReach / (followerReach + nonFollowerReach)) * 100 : null),
-    "Of the reach Instagram could attribute");
+    `Of the reach ${src} could attribute`);
   s("Posts published in the window", String(content.filter(
     (c) => c.published_at.slice(0, 10) >= (metrics[0]?.date ?? "")).length));
   s("Posts carrying half of all reach", num(conc.postsForHalf),
@@ -167,7 +170,9 @@ export function buildCsv(dash: CsvInput): string {
   blank();
   line(esc("Days that cost followers"));
   if (!cost.reported) {
-    line(esc("Instagram has never reported follower losses for this account."));
+    line(esc(dash.scope === "linkedin"
+      ? "LinkedIn does not report follower losses for a Company Page at all."
+      : `${src} has never reported follower losses for this account.`));
   } else if (!cost.days.length) {
     line(esc(`No day stands out. Losses stayed close to the usual ${cost.typical} a day.`));
   } else {
@@ -220,15 +225,15 @@ export function buildCsv(dash: CsvInput): string {
   section("WHAT THESE MEAN");
   line(esc("Term"), esc("Definition"));
   const d = (t: string, meaning: string) => line(esc(t), esc(meaning));
-  d("Blank cell", "Instagram did not report that figure. It does not mean zero.");
+  d("Blank cell", `${src} did not report that figure. It does not mean zero.`);
   d("Reach", "Distinct accounts that saw the post or the account that day.");
   d("Views", "Times a post was played or displayed. One account can view more than once.");
   d("Engagements", "Likes, comments, shares and saves added together.");
   d("Engagement rate", "Engagements divided by reach, as a percentage.");
   d("Times over following", "Reach divided by the follower count on the day it was published. 3.0 means it reached three times as many accounts as the page had followers at the time.");
   d("Reach from non-followers", "People reached who did not already follow the account. This is the part a sponsor is paying for.");
-  d("Still settling", "Instagram was still counting that day when it was read, so the figure will rise.");
-  d("Figures read", "When these numbers were last taken from Instagram.");
+  d("Still settling", `${src} was still counting that day when it was read, so the figure will rise.`);
+  d("Figures read", `When these numbers were last taken from ${src}.`);
 
   /*
    * The same footer the workbook and the printed page carry.

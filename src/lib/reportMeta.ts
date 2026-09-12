@@ -1,3 +1,4 @@
+import type { Platform, Scope } from "./types";
 /**
  * One identity for every exported report.
  *
@@ -52,6 +53,15 @@ export interface ReportIdentity {
 
 export function reportIdentity(o: {
   account: string; scopeLabel: string; range: number; generatedAt?: string;
+  /*
+   * Where the figures came from. Optional so a caller that has no scope to hand
+   * still produces a valid identity; it defaults to the platform-neutral form
+   * rather than to Instagram, which is what it used to be hard-coded to — and
+   * which put "Source: Instagram's official API" at the top of a LinkedIn
+   * report. A test asserts a scoped export never names another platform, and
+   * that test is what found this one.
+   */
+  source?: string;
 }): ReportIdentity {
   return {
     account: o.account || "Not named",
@@ -59,7 +69,7 @@ export function reportIdentity(o: {
     rangeLabel: `Last ${o.range} days`,
     generated: ammanStamp(o.generatedAt ?? new Date().toISOString()),
     timezone: TZ_LABEL,
-    source: "Instagram's official API, read only",
+    source: o.source ?? "the platform's official API, read only",
   };
 }
 
@@ -84,11 +94,24 @@ export function footerLine(id: ReportIdentity): string {
  * day against a screenshot concludes somebody is lying unless this is stated
  * first. See API-VERIFICATION.md 6.8.
  */
-export const PROVENANCE_NOTE =
-  "Figures come from Instagram's official API. The Instagram app computes its own daily "
-  + "numbers a slightly different way, so a single day can differ between the two; over a "
-  + "month the totals agree closely. Anything left blank was not reported by Instagram, "
-  + "which is not the same as zero.";
+export function provenanceNote(scope: Scope, platformName: (p: Platform) => string): string {
+  const src = reportSource(scope, platformName);
+  /*
+   * The "differs from the app" half is an INSTAGRAM claim and stays one.
+   *
+   * It is the reconciliation finding written down — Instagram's own app computes
+   * daily numbers differently, which is the argument this product would
+   * otherwise lose in front of a client. Asserting the same of LinkedIn would be
+   * inventing a reconciliation nobody has run: nothing LinkedIn has ever been
+   * checked against a live response, let alone against its own analytics tab.
+   */
+  const appCaveat = scope === "instagram" || scope === "all"
+    ? "The Instagram app computes its own daily numbers a slightly different way, so a "
+      + "single day can differ between the two; over a month the totals agree closely. "
+    : "";
+  return `Figures come from ${reportSourcePossessive(scope, platformName)}. ${appCaveat}`
+    + `Anything left blank was not reported by ${src}, which is not the same as zero.`;
+}
 
 /**
  * The account line, with duplicates removed.
@@ -99,12 +122,47 @@ export const PROVENANCE_NOTE =
  * line somebody sees.
  */
 export function accountLabel(
-  accounts: { username?: string | null; display_name?: string | null }[],
+  accounts: { username?: string | null; display_name?: string | null; platform?: string | null }[],
+  scope: string = "all",
 ): string {
   const seen = new Set<string>();
   for (const a of accounts) {
+    /*
+     * Only the accounts the report is ABOUT.
+     *
+     * Every caller passed all of them, so a report headed "Scope: LinkedIn" was
+     * also headed "northwind.co / northwind / northwind-co" — three handles, two
+     * of which the document says nothing about. This line is the report's
+     * identity, the thing a sponsor reads to know whose numbers these are, and
+     * `reportIdentity` below exists because a report that cannot say whose it is
+     * is not usable evidence. Naming accounts it does not cover is the same
+     * failure wearing the opposite face.
+     */
+    if (scope !== "all" && a.platform && a.platform !== scope) continue;
     const name = (a.username || a.display_name || "").trim();
     if (name) seen.add(name);
   }
   return [...seen].join(" / ");
+}
+
+/**
+ * The platform a report is ABOUT, for prose inside it.
+ *
+ * The exports were written when Instagram was the only platform that mattered
+ * and say "Instagram" in eighteen places — "Not reported by Instagram", "Figures
+ * read: when these numbers were last taken from Instagram", and at the foot of
+ * every sheet "Prepared by PulseBoard from Instagram's official API". In a
+ * workbook scoped to a LinkedIn Company Page every one of those is false, and
+ * this is the document that goes to a sponsor.
+ *
+ * "the platform" for an all-platforms report, because naming four of them in
+ * running prose reads worse than not naming any.
+ */
+export function reportSource(scope: Scope, platformName: (p: Platform) => string): string {
+  return scope === "all" ? "the platform" : platformName(scope as Platform);
+}
+
+/** The same, possessive, for "...from X's official API". */
+export function reportSourcePossessive(scope: Scope, platformName: (p: Platform) => string): string {
+  return scope === "all" ? "the platforms' official APIs" : `${platformName(scope as Platform)}'s official API`;
 }

@@ -5,7 +5,7 @@ import {
   publishTiming, followerCost, reachMultiples, reachConcentration,
 } from "./insights";
 import type { CsvInput } from "./csvReport";
-import { reportIdentity, footerLine, PROVENANCE_NOTE, ammanStamp, BRAND, accountLabel } from "./reportMeta";
+import { reportIdentity, footerLine, provenanceNote, ammanStamp, BRAND, accountLabel, reportSource, reportSourcePossessive } from "./reportMeta";
 
 /**
  * The export as a real workbook.
@@ -116,7 +116,9 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
   const metrics = input.metrics.filter((m) => inScope(m.platform));
   const content = input.content.filter((c) => inScope(c.platform));
 
-  const account = accountLabel(input.accounts);
+  const account = accountLabel(input.accounts, input.scope);
+  // The platform this workbook is about, for the prose in it. See reportSource.
+  const src = reportSource(input.scope, input.platformName);
 
   const sumOf = (k: "reach" | "views" | "engagements" | "follows" | "unfollows"
                     | "reach_followers" | "reach_non_followers") => {
@@ -145,7 +147,8 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
   const conc = reachConcentration(content);
   const multipleById = new Map(multiples.map((m) => [m.id, m]));
 
-  const id = reportIdentity({ account, scopeLabel, range: input.range });
+  const id = reportIdentity({ account, scopeLabel, range: input.range,
+    source: `${reportSourcePossessive(input.scope, input.platformName)}, read only` });
 
   /* ---- 1. Summary ------------------------------------------------------- */
   const summary: Row[] = [
@@ -159,7 +162,7 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
     [],
     // Stated in the file itself, because this page is read without the app
     // around it and often by the sponsor, holding a screenshot for comparison.
-    note(PROVENANCE_NOTE),
+    note(provenanceNote(input.scope, input.platformName)),
     [],
     section("Headline"),
     header("Metric", "Value", "Notes"),
@@ -170,18 +173,18 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
       s: S.NUMBER,
     }, ""],
     ["Followers gained", { v: n(sumOf("follows")), s: S.NUMBER },
-      sumOf("follows") === null ? "Not reported by Instagram" : ""],
+      sumOf("follows") === null ? `Not reported by ${src}` : ""],
     ["Followers lost", { v: n(sumOf("unfollows")), s: S.NUMBER },
-      sumOf("unfollows") === null ? "Not reported by Instagram" : ""],
+      sumOf("unfollows") === null ? `Not reported by ${src}` : ""],
     ["Reach", { v: n(reach), s: S.NUMBER }, "Distinct accounts reached, summed over the window"],
     ["Views", { v: n(views), s: S.NUMBER }, ""],
     ["Engagements", { v: n(eng), s: S.NUMBER }, "Likes, comments, shares and saves"],
     ["Engagement rate", { v: ratio(eng, reach), s: S.PERCENT }, "Engagements as a share of reach"],
     ["Reach from existing followers", { v: n(followerReach), s: S.NUMBER }, ""],
     ["Reach from people who do not follow", { v: n(nonFollowerReach), s: S.NUMBER },
-      nonFollowerReach === null ? "Not reported by Instagram" : "The share a sponsor is buying"],
+      nonFollowerReach === null ? `Not reported by ${src}` : "The share a sponsor is buying"],
     ["New-audience share", { v: ratio(nonFollowerReach, attributed), s: S.PERCENT },
-      "Of the reach Instagram could attribute"],
+      `Of the reach ${src} could attribute`],
     ["Posts with a reach figure", { v: conc.posts, s: S.NUMBER }, ""],
   ];
 
@@ -223,7 +226,9 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
 
   analysis.push([], section("Days that cost followers"));
   if (!cost.reported) {
-    analysis.push(note("Instagram has never reported follower losses for this account, so this "
+    analysis.push(note((input.scope === "linkedin"
+      ? "LinkedIn does not report follower losses for a Company Page at all, so this "
+      : `${src} has never reported follower losses for this account, so this `)
       + "could not be looked at. It does not mean nobody left."));
   } else if (!cost.days.length) {
     analysis.push(note(`No day in this window stands out. Losses stayed close to the usual `
@@ -239,9 +244,18 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
         d.posts.map((p) => p.title).join(" | "),
       ]),
       [],
+      /*
+       * The "story, comment, collaboration" list and the batch-removal of
+       * inactive accounts are INSTAGRAM behaviours, not universal ones, so the
+       * examples go with the platform rather than being restated about a
+       * Company Page where they would simply be wrong.
+       */
       note("These posts went out on those days. That does not mean they caused it. People also "
-        + "leave because of a story, a comment, a collaboration or nothing at all, and Instagram "
-        + "removes inactive accounts in batches. This narrows the search from a month to a few days."),
+        + (input.scope === "instagram" || input.scope === "all"
+          ? "leave because of a story, a comment, a collaboration or nothing at all, and Instagram "
+            + "removes inactive accounts in batches. "
+          : `leave for reasons nothing here records, and ${src} removes inactive accounts on its own schedule. `)
+        + "This narrows the search from a month to a few days."),
     );
   }
 
@@ -329,7 +343,7 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
   /* ---- 5. Notes --------------------------------------------------------- */
   const notes: Row[] = [
     header("Term", "Definition"),
-    ["Empty cell", "Instagram did not report that figure. It does not mean zero."],
+    ["Empty cell", `${src} did not report that figure. It does not mean zero.`],
     ["Reach", "Distinct accounts that saw the post, or saw the account that day."],
     ["Views", "Times a post was played or displayed. One account can view more than once."],
     ["Engagements", "Likes, comments, shares and saves added together."],
@@ -337,11 +351,12 @@ export function buildWorkbook(input: CsvInput): Uint8Array {
     ["Times over following", "Reach divided by the follower count on the day the post went out. 3.0x means it reached three times as many accounts as the page had followers at the time."],
     ["Reach from non-followers", "People reached who did not already follow the account. This is the part a sponsor is paying for."],
     ["Compared with typical", "A post measured against the median post of the same format on this account. 1.0x is typical, 1.4x is forty per cent better."],
-    ["Still settling", "Instagram was still counting that day when it was read, so the figure will rise."],
-    ["Figures read", "When these numbers were last taken from Instagram."],
+    ["Still settling", `${src} was still counting that day when it was read, so the figure will rise.`],
+    ["Figures read", `When these numbers were last taken from ${src}.`],
     [],
-    note("Prepared by PulseBoard from Instagram's official API. Read-only access; no posting, "
-      + "messaging or account changes are possible with the permissions this uses."),
+    note(`Prepared by PulseBoard from ${reportSourcePossessive(input.scope, input.platformName)}. `
+      + "Read-only access; no posting, messaging or account changes are possible with the "
+      + "permissions this uses."),
   ];
 
   const sheets: Sheet[] = [

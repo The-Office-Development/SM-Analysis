@@ -70,7 +70,14 @@ test("the file states where the numbers came from and what a blank means", () =>
   // Read without the app around it, the file has to carry its own context, or a
   // sponsor comparing against a screenshot concludes somebody is lying.
   const csv = buildCsv(input());
-  assert.ok(/Instagram's official API/.test(csv));
+  /*
+   * This asserted the literal string "Instagram's official API". The claim it
+   * was really making is that the file names its source, and it does — but an
+   * all-platforms export now says "the platforms' official APIs", because
+   * attributing a four-platform report to Instagram alone was false. The scoped
+   * wording is covered by its own test below.
+   */
+  assert.ok(/official API/.test(csv), "the file must name where the figures came from");
   assert.ok(/does not mean zero/.test(csv), "a blank must be explained inside the file itself");
   assert.ok(/Asia\/Amman/.test(csv), "and the calendar the dates are on must be stated");
 });
@@ -147,4 +154,72 @@ test("a rate is not invented from a denominator that does not exist", () => {
   const col = header.split(",").findIndex((h) => h.includes("Engagement rate"));
   assert.equal(row.split(",")[col], "",
     `an unmeasurable rate must be blank, got "${row.split(",")[col]}"`);
+});
+
+/* ---- whose report is this? ----------------------------------------------- */
+
+test("a scoped export names only the account it is about", async () => {
+  /*
+   * The identity line is what a sponsor reads to know whose numbers these are,
+   * and it listed every connected handle regardless of scope — so a report
+   * headed "Scope: LinkedIn" was also headed with the Instagram and TikTok
+   * handles, two accounts the document says nothing about.
+   */
+  const accounts = [
+    { username: "northwind.co", platform: "facebook" },
+    { username: "northwind", platform: "instagram" },
+    { username: "northwind-co", platform: "linkedin" },
+  ];
+  const base = {
+    range: 30, accounts, connectedPlatforms: ["facebook", "instagram", "linkedin"],
+    content: [], audience: [], platformName: (p) => p,
+    metrics: [day(1, { platform: "linkedin" }), day(2, { platform: "linkedin" })],
+  };
+
+  const scoped = buildCsv({ ...base, scope: "linkedin" });
+  assert.ok(scoped.includes("northwind-co"), "the LinkedIn handle must be named");
+  assert.ok(!scoped.includes('"northwind.co /'), "the Facebook handle must not be");
+  assert.ok(!/northwind"/.test(scoped.split("\n").find((l) => l.startsWith('"Account"')) ?? ""),
+    "nor the Instagram one");
+
+  // Unscoped still names them all: that report really is about all of them.
+  const all = buildCsv({ ...base, scope: "all" });
+  const line = all.split("\n").find((l) => l.startsWith('"Account"')) ?? "";
+  for (const h of ["northwind.co", "northwind", "northwind-co"]) {
+    assert.ok(line.includes(h), `all-platforms report names ${h}`);
+  }
+});
+
+test("a scoped export never names a platform it is not about", async () => {
+  /*
+   * The exports were written when Instagram was the only platform that mattered
+   * and said "Instagram" in eighteen places — "Not reported by Instagram",
+   * "When these numbers were last taken from Instagram", and at the foot of
+   * every sheet "Prepared by PulseBoard from Instagram's official API". In a
+   * file scoped to a LinkedIn Company Page every one of those is false, and this
+   * is the document that goes to a sponsor.
+   */
+  const csv = buildCsv({
+    range: 30, scope: "linkedin", connectedPlatforms: ["instagram", "linkedin"],
+    accounts: [{ username: "northwind-co", platform: "linkedin" }],
+    metrics: [day(1, { platform: "linkedin", views: null, follows: null, unfollows: null }),
+              day(2, { platform: "linkedin", views: null, follows: null, unfollows: null })],
+    content: [], audience: [], platformName: (p) => (p === "linkedin" ? "LinkedIn" : "Instagram"),
+  });
+
+  assert.ok(!csv.includes("Instagram"),
+    `a LinkedIn export must not mention Instagram:\n${csv.split("\n").filter((l) => l.includes("Instagram")).join("\n")}`);
+  assert.ok(csv.includes("LinkedIn"), "and it must name the platform it IS about");
+});
+
+test("an all-platforms export does not claim to come from one platform", async () => {
+  const csv = buildCsv({
+    range: 30, scope: "all", connectedPlatforms: ["instagram", "linkedin"],
+    accounts: [{ username: "a", platform: "instagram" }],
+    metrics: [day(1), day(2)], content: [], audience: [],
+    platformName: (p) => (p === "linkedin" ? "LinkedIn" : "Instagram"),
+  });
+  // "the platforms' official APIs", not one named platform's.
+  assert.ok(!/from Instagram's official API/.test(csv),
+    "an all-platforms report must not attribute itself to a single platform");
 });

@@ -20,6 +20,7 @@ const INSIGHTS = "verify/build-lib/insights.js";
 const FORMAT = "verify/build-lib/format.js";
 const CSVREPORT = "verify/build-lib/csvReport.js";
 const XLSX = "verify/build-lib/xlsx.js";
+const REPORTMETA = "verify/build-lib/reportMeta.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -257,6 +258,20 @@ const mutations = [
   { name: "a posting window invented from a heatmap of zeros", file: INSIGHTS,
     find: "    if (max <= 0)\n        return [];",
     replace: "    if (false)\n        return [];\n    if (!(max > 0))\n        return [{ day: 0, hour: 0, score: 0, label: `Sunday · 12am` }];" },
+  /*
+   * A report naming accounts it says nothing about. The identity line is what a
+   * sponsor reads to know whose numbers these are.
+   */
+  /*
+   * The export prose going back to naming Instagram whatever the report is
+   * about. This is the document that reaches a sponsor.
+   */
+  { name: "a LinkedIn export that says it came from Instagram", file: REPORTMETA,
+    find: "export function reportSource(scope, platformName) {",
+    replace: "export function reportSource(scope, platformName) {\n    return \"Instagram\";" },
+  { name: "a scoped report headed with every connected account", file: REPORTMETA,
+    find: "        if (scope !== \"all\" && a.platform && a.platform !== scope)\n            continue;",
+    replace: "        if (false)\n            continue;" },
   { name: "a metric nobody reported totalled as a confident zero", file: INSIGHTS,
     find: "    return series.length ? series.reduce((s, x) => s + x.value, 0) : null;",
     replace: "    return series.reduce((s, x) => s + x.value, 0);" },
