@@ -155,7 +155,7 @@ pack, and change one thing at a time so you learn what mattered.
 2. Copy the **Instagram app ID** and **Instagram app secret** into
    **Cloudflare Pages → Settings → Variables and Secrets** (as secrets, not
    plaintext vars) as `INSTAGRAM_APP_ID` and `INSTAGRAM_APP_SECRET`. The host
-   moved off Netlify — see `wrangler.toml` for why. These are *not* the same as
+   moved off Netlify; see `wrangler.toml` for why. These are *not* the same as
    `META_APP_ID` / `META_APP_SECRET`, which belong to the Facebook Login path
    still used for Facebook Pages.
 3. **Business login settings** → add the redirect URI, exactly:

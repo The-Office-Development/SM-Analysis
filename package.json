@@ -12,7 +12,8 @@
     "typecheck:functions": "tsc -p tsconfig.functions.json",
     "test": "bash verify/run-tests.sh",
     "test:mutation": "node verify/mutation-check.mjs",
-    "verify:schema": "node verify/check-schema.mjs"
+    "verify:schema": "node verify/check-schema.mjs",
+    "db:apply": "node verify/apply-migration.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.5",

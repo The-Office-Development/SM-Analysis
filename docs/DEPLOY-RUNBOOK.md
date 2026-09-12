@@ -150,6 +150,27 @@ argument instead — `printf ... 'PASTE_HERE'` — is worse again: it puts the k
 shell history, and if the placeholder is run verbatim the word itself lands in
 `.env`.
 
+### Applying one from here
+
+```bash
+npm run db:apply 0017_deletion_status_failed
+```
+
+It prints the SQL, runs it, and then re-runs the schema check rather than
+reporting success on the strength of an HTTP 200.
+
+**It needs a different credential from everything else, and the distinction is
+the point.** `SUPABASE_SERVICE_ROLE_KEY` is a *data-plane* credential: it
+authenticates to PostgREST, which speaks tables, views and RPCs. There is no way
+to express `alter table` through it and no SQL-executing function is exposed
+(`rpc/exec_sql`, `execute_sql`, `exec`, `query` and `sql` all return 404). DDL is
+the *control* plane — a personal access token at
+[supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens),
+set as `SUPABASE_ACCESS_TOKEN` in `.env`.
+
+The Supabase CLI holds such a token but seals it: the keychain entry is an
+encrypted blob only the CLI itself can read, so it cannot be reused from a script.
+
 **Every migration from 0016 onward records itself.** End the file with:
 
 ```sql

@@ -369,11 +369,11 @@ the intended route, then drinkat's.
 
 ### Organisational, needs people not code
 - [ ] DPO question under Jordan's PDPL
-- [ ] Cross-border transfer file — the sub-processors are **Supabase (Frankfurt),
+- [ ] Cross-border transfer file: the sub-processors are **Supabase (Frankfurt),
       Cloudflare and Anthropic**, all outside Jordan. Corrected 2026-09-12: this
       line named Netlify, which has not hosted anything since `927f228` ported the
       deploy to Cloudflare Pages. The same stale name is still in `JORDAN-CONTEXT.md`,
-      `AUDIT-SUMMARY.md`, `DEPLOY-RUNBOOK.md` and `CLAUDE.md` — fix it there before
+      `AUDIT-SUMMARY.md`, `DEPLOY-RUNBOOK.md` and `CLAUDE.md`. Fix it there before
       any of them is copied into the Data Protection Assessment or the privacy policy,
       because naming a processor that processes nothing and omitting the one that does
       is exactly what that assessment asks about.
