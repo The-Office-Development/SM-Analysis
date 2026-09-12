@@ -51,6 +51,7 @@ const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
  * the behaviour they change instead.
  */
 const EXPECTED = [
+  { version: "0001_audit_fixes", table: null, column: null, note: "checked by the nullability section below" },
   { version: "0002_token_refresh", table: "provider_identities", column: "refresh_lock_at" },
   { version: "0003_deletion_and_consent", table: "deletion_requests", column: "status" },
   { version: "0004_ai_usage", table: "ai_usage", column: "user_id" },
@@ -58,6 +59,7 @@ const EXPECTED = [
   { version: "0006_revoke_anon_grants", table: null, column: null, note: "checked by the anon lockout above" },
   { version: "0007_account_timezone", table: "social_accounts", column: "tz_offset_minutes" },
   { version: "0008_advanced_metrics", table: "metrics_daily", column: "reach_non_followers" },
+  { version: "0009_content_nullable", table: null, column: null, note: "checked by the nullability section below" },
   { version: "0010_stories", table: "content", column: "expires_at" },
   { version: "0011_token_scope_audit", table: "social_accounts", column: "write_scopes" },
   { version: "0012_content_refreshed_at", table: "content", column: "refreshed_at" },
@@ -261,6 +263,48 @@ if (SERVICE !== undefined && String(SERVICE).trim() === "") {
     const missing = onDisk.filter((v) => !recorded.has(v));
     if (missing.length) bad(`on disk but never recorded as applied: ${missing.join(", ")}`);
     else ok(`all ${onDisk.length} migration files are recorded as applied`);
+  }
+}
+
+/* ---- 3. the invariant the whole product rests on -------------------------
+ *
+ * Migrations 0001 and 0009 add no column — they DROP `not null` and DROP the
+ * zero defaults on every metric column, which is the single most important
+ * schema fact in this repo: `null` means the platform did not report a figure,
+ * and a default of 0 is how one rate-limited response once overwrote 30 days of
+ * a client's real history.
+ *
+ * Neither can be checked by asking for a column, so they were the two migrations
+ * with nothing behind them but a ledger row. PostgREST publishes each table's
+ * NOT NULL columns as the `required` array of its OpenAPI schema, which settles
+ * it without writing anything: a metric column appearing there means a NOT NULL
+ * has come back, and the sync will start fabricating zeros again.
+ */
+const MUST_BE_NULLABLE = {
+  metrics_daily: ["followers", "reach", "impressions", "views", "engagements",
+                  "follows", "unfollows", "reach_followers", "reach_non_followers"],
+  content: ["views", "likes", "comments", "shares", "saves", "reach",
+            "avg_watch_seconds", "retention_pct"],
+};
+
+if (SERVICE && classifyKey(SERVICE) === "plausible") {
+  console.log("\nnullability — null means unreported, and must stay that way (0001, 0009)");
+  const spec = await rest("", SERVICE);
+  if (!spec.ok) {
+    unk(`OpenAPI schema unreadable: ${spec.status}`);
+  } else {
+    const defs = (await spec.json()).definitions ?? {};
+    for (const [table, cols] of Object.entries(MUST_BE_NULLABLE)) {
+      const def = defs[table];
+      if (!def) { unk(`${table} is absent from the schema`); continue; }
+      const required = new Set(def.required ?? []);
+      const wrong = cols.filter((c) => required.has(c));
+      if (wrong.length) {
+        bad(`${table}: NOT NULL is back on ${wrong.join(", ")} — the sync will write zeros over real history`);
+      } else {
+        ok(`${table} — all ${cols.length} metric columns still nullable`);
+      }
+    }
   }
 }
 
