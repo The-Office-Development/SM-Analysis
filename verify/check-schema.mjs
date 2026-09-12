@@ -55,7 +55,7 @@ const EXPECTED = [
   { version: "0003_deletion_and_consent", table: "deletion_requests", column: "status" },
   { version: "0004_ai_usage", table: "ai_usage", column: "user_id" },
   { version: "0005_instagram_login", table: "social_accounts", column: "auth_mode" },
-  { version: "0006_revoke_anon_grants", table: null, column: null, note: "checked by the anon lockout below" },
+  { version: "0006_revoke_anon_grants", table: null, column: null, note: "checked by the anon lockout above" },
   { version: "0007_account_timezone", table: "social_accounts", column: "tz_offset_minutes" },
   { version: "0008_advanced_metrics", table: "metrics_daily", column: "reach_non_followers" },
   { version: "0010_stories", table: "content", column: "expires_at" },
@@ -76,6 +76,43 @@ const rest = (path, key) => fetch(`${URL_BASE}/rest/v1/${path}`, {
     "Accept-Profile": "pulseboard", Accept: "application/json",
   },
 });
+
+/**
+ * What kind of thing is in SUPABASE_SERVICE_ROLE_KEY?
+ *
+ * Three outcomes, because they need three different things done about them and
+ * a single "invalid key" lumps them together. This project uses Supabase's
+ * NEWER key format — `sb_publishable_...` for the browser and `sb_secret_...`
+ * for the server — not the legacy `eyJ...` JWTs, which is worth encoding here
+ * because it sends you to a different page of the dashboard.
+ */
+function classifyKey(v) {
+  const t = String(v).trim();
+  if (!t || /^(paste|paste_here|paste_it_here|changeme|your[-_ ]?key|xxx+|<.*>)$/i.test(t)) {
+    return "placeholder";
+  }
+  // The browser key, pasted where the server key belongs. Easy to do: they sit
+  // next to each other in the dashboard and only the prefix differs.
+  if (/^sb_publishable_/.test(t)) return "publishable";
+  if (/^sb_secret_/.test(t)) return "plausible";
+  const jwt = /^(eyJ[\w-]*)\.([\w-]+)\.([\w-]+)$/.exec(t);
+  if (jwt) {
+    // A legacy JWT carries its own role, so the wrong one can be named exactly
+    // rather than left to a 401 the reader has to interpret.
+    try {
+      const role = JSON.parse(Buffer.from(jwt[2], "base64url").toString()).role;
+      if (role && role !== "service_role") return "publishable";
+    } catch { /* unreadable payload; let the server judge it */ }
+    return "plausible";
+  }
+  return "placeholder";
+}
+
+/** One cheap authenticated call, to tell a bad credential from a bad schema. */
+async function serviceKeyWorks() {
+  const res = await rest("social_accounts?select=id&limit=1", SERVICE);
+  return !(res.status === 401 || res.status === 403);
+}
 
 let failures = 0, unverified = 0;
 const ok = (m) => console.log(`  ok        ${m}`);
@@ -121,6 +158,50 @@ if (!SERVICE) {
   resolves a column, so a missing column and a healthy refusal are the same
   42501. Add SUPABASE_SERVICE_ROLE_KEY to .env (gitignored; already listed in
   .env.example) and run again.
+`);
+} else if (classifyKey(SERVICE) === "publishable") {
+  /*
+   * A real key, of the wrong kind. Named specifically because the symptom is an
+   * indistinguishable 401 and the fix is "copy the other one on the same page".
+   */
+  unk("SUPABASE_SERVICE_ROLE_KEY holds the PUBLISHABLE (browser) key, not the secret one");
+  console.log(`
+  That is the same key as VITE_SUPABASE_ANON_KEY, which is public by design and
+  is denied by RLS exactly as it should be — so it can never answer this question.
+  The one needed here sits beside it and begins "sb_secret_".
+`);
+} else if (classifyKey(SERVICE) === "placeholder") {
+  /*
+   * The placeholder case, which is not hypothetical: the docs said to run
+   *   printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' 'PASTE_HERE' >> .env
+   * and it was run verbatim, so .env held the literal word. Worth naming
+   * exactly, because the symptom — 401 Invalid API key — reads like a revoked
+   * or wrong key and sends you looking in the wrong place.
+   */
+  unk(`SUPABASE_SERVICE_ROLE_KEY is set to a placeholder, not a key`);
+  console.log(`
+  The value in .env begins "${SERVICE.trim().slice(0, 12)}${SERVICE.trim().length > 12 ? "..." : ""}", which is not a key.
+  This project uses Supabase's newer format, so the one needed here begins
+  "sb_secret_". (Older projects use a JWT beginning "eyJ".) Replace the line in
+  .env and run again.
+`);
+} else if (!(await serviceKeyWorks())) {
+  /*
+   * Fail ONCE, not once per probe.
+   *
+   * The first version of this script reported the same 401 fourteen times —
+   * every column probe restating a single fact about the credential. Fourteen
+   * lines of identical failure is noise that buries the one thing that needs
+   * doing, so the key is checked once before any probe runs.
+   */
+  unk("SUPABASE_SERVICE_ROLE_KEY is set but the server rejects it (401)");
+  console.log(`
+  Nothing below this point can be checked with a key the server will not accept,
+  so the column probes were skipped rather than repeated fourteen times.
+
+  It has the right shape, so most likely it belongs to a different project or it
+  has been rotated. Take the current one from
+  Project settings -> API Keys -> secret ("sb_secret_...").
 `);
 } else {
   const led = await rest("schema_migrations?select=version,source&order=version", SERVICE);

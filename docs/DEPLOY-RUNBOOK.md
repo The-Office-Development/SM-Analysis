@@ -120,6 +120,24 @@ It needs `SUPABASE_SERVICE_ROLE_KEY` in `.env` (gitignored, already in
 UNVERIFIED and fails. The anon half needs no secret and checks the opposite
 thing — that anon is still locked out of every table.
 
+**This project uses Supabase's newer key format.** The browser key is
+`sb_publishable_...` and the one needed here is `sb_secret_...`, from
+**Project settings → API Keys → secret**. They sit next to each other, and the
+checker names it specifically if the publishable one ends up in the secret slot,
+because a 401 alone does not tell you which mistake you made.
+
+Add it without the key appearing on screen or in your shell history — `read -rs`
+echoes nothing, so do not paste it onto the command line:
+
+```bash
+cd ~/SM-Analysis && read -rs SB_KEY && printf '\nSUPABASE_SERVICE_ROLE_KEY=%s\n' "$SB_KEY" >> .env && unset SB_KEY && npm run verify:schema
+```
+
+Press Enter, paste, press Enter again. Writing the key as a literal argument
+instead — `printf ... 'PASTE_HERE'` — puts it in the shell history, and if the
+placeholder is run verbatim it lands in `.env` as the word itself. The checker
+now says so in as many words rather than reporting fourteen identical 401s.
+
 **Every migration from 0016 onward records itself.** End the file with:
 
 ```sql
