@@ -145,7 +145,27 @@ for (const t of LOCKED) {
 
 /* ---- 2. the schema itself, which needs the service role ------------------ */
 console.log("\napplied migrations and the columns they add");
-if (!SERVICE) {
+if (SERVICE !== undefined && String(SERVICE).trim() === "") {
+  /*
+   * The line is there and the value is not. This is what an interrupted paste
+   * leaves behind, and it happened: `read -rs` prints no prompt, so there is
+   * nothing on screen to say the shell is waiting, and Enter on an empty buffer
+   * appends `SUPABASE_SERVICE_ROLE_KEY=` and moves on without complaint.
+   *
+   * Reporting that as "not set" is true and unhelpful — it sends you to add a
+   * line that is already there.
+   */
+  unk("SUPABASE_SERVICE_ROLE_KEY is present in .env but empty");
+  console.log(`
+  The line exists with nothing after the "=", which is what an interrupted paste
+  leaves. Delete that line and add it again, with a visible prompt so you can see
+  the shell waiting:
+
+    sed -i '' '/^SUPABASE_SERVICE_ROLE_KEY=$/d' .env
+    printf 'Paste sb_secret_ key, then Enter: '; read -rs SB_KEY; echo
+    [ -n "$SB_KEY" ] && printf 'SUPABASE_SERVICE_ROLE_KEY=%s\\n' "$SB_KEY" >> .env; unset SB_KEY
+`);
+} else if (!SERVICE) {
   /*
    * The important branch. Without the key this script knows NOTHING about the
    * schema, and it says so and exits non-zero rather than printing a tidy
