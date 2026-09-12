@@ -11,3 +11,6 @@ dist
 verify/build*/
 verify/out-*.txt
 verify/full-log.txt
+
+# Supabase CLI link state: machine-local, and pooler-url carries connection detail
+supabase/.temp/

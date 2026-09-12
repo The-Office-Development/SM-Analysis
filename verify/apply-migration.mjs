@@ -9,19 +9,24 @@
  * written at all. This closes the other half: the same session that writes a
  * migration can apply it and then prove it landed.
  *
- * WHY IT NEEDS A DIFFERENT CREDENTIAL FROM EVERYTHING ELSE
+ * WHY IT DOES NOT USE THE SERVICE ROLE KEY
  *
  * `SUPABASE_SERVICE_ROLE_KEY` is a DATA-plane credential. It authenticates to
  * PostgREST, which speaks tables, views and RPCs — there is no way to express
  * `alter table` through it, and no SQL-executing function is exposed (checked:
- * rpc/exec_sql, execute_sql, exec, query and sql all 404). DDL needs the
- * CONTROL plane: a personal access token against api.supabase.com.
+ * rpc/exec_sql, execute_sql, exec, query and sql all 404). DDL is the CONTROL
+ * plane.
  *
- * The Supabase CLI holds such a token, but seals it — the keychain entry is an
- * encrypted blob only the CLI can read — so it cannot be borrowed from here.
+ * HOW IT GETS THERE
  *
- *   SUPABASE_ACCESS_TOKEN=sbp_...   in .env (gitignored)
- *   node verify/apply-migration.mjs 0017_deletion_status_failed
+ * `supabase db query --linked`, which runs SQL through the Management API using
+ * the CLI's own stored login. That needs no extra secret: the CLI is already
+ * logged in and `supabase link --project-ref <ref>` records which project.
+ *
+ * This file was first written to demand a personal access token, on the belief
+ * that the CLI could not execute SQL. It can — `supabase db query` — and the
+ * belief was never checked. The token path is kept as a fallback for a machine
+ * where the CLI is not logged in.
  *
  * It refuses to run anything it was not asked for by name, prints the statements
  * first, and re-checks the schema afterwards rather than reporting success on
@@ -47,21 +52,32 @@ const env = loadEnv();
 const TOKEN = env.SUPABASE_ACCESS_TOKEN;
 const name = process.argv[2];
 
+/** Is the Supabase CLI installed and linked to a project? */
+function cliLinked() {
+  try {
+    execFileSync("supabase", ["--version"], { stdio: "pipe" });
+    return readFileSync(new URL("../supabase/.temp/project-ref", import.meta.url), "utf8").trim();
+  } catch { return null; }
+}
+
 if (!name) {
   console.error("usage: node verify/apply-migration.mjs <migration name without .sql>");
   process.exit(2);
 }
-if (!TOKEN || !/^sbp_/.test(TOKEN.trim())) {
+const linkedRef = cliLinked();
+if (!TOKEN && !linkedRef) {
   console.error(`
-SUPABASE_ACCESS_TOKEN is not set (or is not a personal access token).
+No way to reach the control plane.
 
-  The service role key CANNOT do this. It authenticates to PostgREST, which has
-  no way to express DDL; this needs a control-plane token.
+  The service role key CANNOT do this: it authenticates to PostgREST, which has
+  no way to express DDL. Either link the Supabase CLI, which is the simpler path
+  and needs no new secret:
 
-  Create one at https://supabase.com/dashboard/account/tokens, then:
+    supabase login          # only if not already logged in
+    supabase link --project-ref ${PROJECT}
 
-    printf 'Paste sbp_ token, then Enter: '; read -rs T; echo
-    [ -n "$T" ] && printf 'SUPABASE_ACCESS_TOKEN=%s\\n' "$T" >> .env; unset T
+  or set a personal access token from
+  https://supabase.com/dashboard/account/tokens as SUPABASE_ACCESS_TOKEN in .env.
 `);
   process.exit(1);
 }
@@ -76,17 +92,32 @@ console.log(`\napplying ${name} to ${PROJECT}\n`);
 // repo that cannot be undone by editing a file, so it is shown, not summarised.
 console.log(sql.split("\n").filter((l) => l.trim() && !l.trim().startsWith("--")).join("\n"));
 
-const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT}/database/query`, {
-  method: "POST",
-  headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-  body: JSON.stringify({ query: sql }),
-});
-const body = await res.text();
-if (!res.ok) {
-  console.error(`\nFAILED ${res.status}: ${body.slice(0, 500)}\n`);
-  process.exit(1);
+if (linkedRef) {
+  if (linkedRef !== PROJECT) {
+    console.error(`\nThe CLI is linked to ${linkedRef}, not ${PROJECT}. Refusing to guess which you meant.\n`);
+    process.exit(1);
+  }
+  try {
+    execFileSync("supabase", ["db", "query", "--linked", "-f", `supabase/migrations/${name}.sql`],
+      { stdio: "pipe", cwd: new URL("..", import.meta.url).pathname });
+  } catch (e) {
+    console.error(`\nFAILED: ${String(e.stderr ?? e.message).slice(0, 600)}\n`);
+    process.exit(1);
+  }
+  console.log("\nthe database accepted it.");
+} else {
+  const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT}/database/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ query: sql }),
+  });
+  const body = await res.text();
+  if (!res.ok) {
+    console.error(`\nFAILED ${res.status}: ${body.slice(0, 500)}\n`);
+    process.exit(1);
+  }
+  console.log(`\nserver accepted it (${res.status}).`);
 }
-console.log(`\nserver accepted it (${res.status}).`);
 
 /*
  * A 200 is not proof. The whole point of check-schema.mjs is that the database

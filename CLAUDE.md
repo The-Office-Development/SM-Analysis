@@ -328,6 +328,11 @@ what they compute; an import that breaks the test build takes all of it away.
 it after an edit does nothing**. Every change goes in a new numbered file in
 `supabase/migrations/`, applied in order.
 
+**Applying one:** `npm run db:apply <name>` — it prints the SQL, runs it through
+`supabase db query --linked`, and then re-runs the schema check rather than
+trusting the response. The service role key cannot do this; DDL needs the control
+plane, which the linked CLI reaches with no extra secret.
+
 **Do not claim a migration is applied without running `npm run verify:schema`.**
 It probes for the columns each migration adds, cross-checks the
 `pulseboard.schema_migrations` ledger and the files on disk, and exits non-zero
