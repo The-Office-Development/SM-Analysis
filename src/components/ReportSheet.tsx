@@ -179,8 +179,15 @@ export default function ReportSheet({ snap }: { snap: ReportSnapshot }) {
               <b style={{ fontSize: 12.5 }}>Days that cost followers</b>
               {!analysis.costReported ? (
                 <p className="muted" style={{ fontSize: 12.5, margin: "4px 0 0" }}>
-                  Instagram did not report follower losses for this account, so
-                  this could not be looked at.
+                  {/*
+                    * Named from the report's own scope. "Instagram did not
+                    * report" in a LinkedIn report is wrong twice: wrong platform,
+                    * and it implies an account-specific gap when LinkedIn does
+                    * not report follower losses for ANY Company Page.
+                    */}
+                  {snap.scopeLabel === "LinkedIn"
+                    ? "LinkedIn does not report follower losses for a Company Page, so this could not be looked at."
+                    : `${snap.scopeLabel === "All platforms" ? "The platform" : snap.scopeLabel} did not report follower losses for this account, so this could not be looked at.`}
                 </p>
               ) : analysis.costDays.length === 0 ? (
                 <p style={{ fontSize: 12.5, margin: "4px 0 0" }}>

@@ -67,8 +67,17 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
     total: c.key === "followers"
       ? latest(followersByDay(dash.metrics, dash.scope))
       : totalReported(seriesByDay(dash.metrics, dash.scope, c.key)),
-    deltaPct: c.deltaPct,
+    /*
+     * No total, no trend. periodCompare returns deltaPct 0 for a metric with no
+     * days to compare, and the report printed "n/a  0%" beside each other — a
+     * movement reported for a figure that does not exist. `delta()` already
+     * renders null as n/a; it was simply never given one.
+     */
+    deltaPct: c.reported ? c.deltaPct : null,
   }));
+
+  const scopedPlatforms: Platform[] =
+    dash.scope === "all" ? dash.connectedPlatforms : [dash.scope as Platform];
 
   const platforms = dash.connectedPlatforms.map((p) => ({
     name: PLATFORMS[p].name,
@@ -98,7 +107,17 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
     engagementRate: engagementRate(dash.metrics, dash.scope),
     platforms,
     top,
-    windows: bestTimes(dash.audience, dash.connectedPlatforms, 3).map((w) => w.label),
+    /*
+     * SCOPED, not every connected platform.
+     *
+     * This passed dash.connectedPlatforms, so a report scoped to LinkedIn —
+     * which reports no hourly activity whatever — printed "Best times to post:
+     * Saturday 7pm, Sunday 8pm" derived from the INSTAGRAM audience. A sponsor-
+     * facing document recommending posting times for the wrong account is the
+     * worst version of this defect, because the report is the artefact that
+     * leaves the building.
+     */
+    windows: bestTimes(dash.audience, scopedPlatforms, 3).map((w) => w.label),
     alerts: anomalies(dash.metrics, dash.scope).slice(0, 6)
       .map((a) => ({ label: a.label, kind: a.kind, deltaPct: a.deltaPct, date: a.date })),
     analysis: buildAnalysis(dash),

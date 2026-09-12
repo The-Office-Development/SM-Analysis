@@ -18,6 +18,19 @@ const METRICS: { key: GoalMetric; label: string }[] = [
   { key: "engagements", label: "Engagements" },
 ];
 
+/**
+ * Why there is no hourly activity, in terms of the platform actually selected.
+ *
+ * Two platforms never report it — LinkedIn for a Company Page and TikTok — and
+ * for those the honest word is "does not", not "not yet".
+ */
+const ONLINE_UNAVAILABLE = (scope: Scope): string => {
+  if (scope === "linkedin") return "LinkedIn does not report when a Company Page's followers are online, so there is no hourly pattern to show.";
+  if (scope === "tiktok") return "TikTok does not report when your followers are online, so there is no hourly pattern to show.";
+  if (scope === "all") return "Nothing here yet. Instagram and Facebook report when your followers are online; TikTok and LinkedIn do not report it at all.";
+  return "Nothing here yet. This fills in on its own once the platform has reported a full day of follower activity.";
+};
+
 export default function Planner() {
   const dash = useDash();
   const toast = useToast();
@@ -89,7 +102,15 @@ export default function Planner() {
               <div className="heatscale"><span>Quieter</span><i style={{ opacity: .15 }} /><i style={{ opacity: .45 }} /><i style={{ opacity: .8 }} /><i /><span>Peak</span></div>
             </>
           ) : (
-            <p className="muted" style={{ fontSize: 13 }}>Nothing here yet. Instagram and Facebook report when your followers are online; TikTok does not report it at all.</p>
+            /*
+              * Named by what is SELECTED, not by a fixed list.
+              *
+              * This read "Instagram and Facebook report this; TikTok does not" —
+              * three platforms, none of them the one in scope, to a client
+              * looking at LinkedIn. Worse, it implies the data is on its way
+              * ("Nothing here YET") when for a Company Page it is never coming.
+              */
+            <p className="muted" style={{ fontSize: 13 }}>{ONLINE_UNAVAILABLE(dash.scope)}</p>
           )}
         </div>
       </section>
@@ -97,7 +118,13 @@ export default function Planner() {
       <section className="panel">
         <div className="panel__head"><IcSpark style={{ width: 16, height: 16, color: "var(--text-2)" }} /><h3>Top windows</h3></div>
         <div className="panel__body stack" style={{ gap: 12 }}>
-          {windows.length === 0 && <p className="muted" style={{ fontSize: 13 }}>Connect Instagram or Facebook to see when your followers are online.</p>}
+          {windows.length === 0 && <p className="muted" style={{ fontSize: 13 }}>{
+            dash.scope === "linkedin" || dash.scope === "tiktok"
+              // Telling someone to connect a platform they are not looking at is
+              // advice about a different account.
+              ? "This platform does not report when followers are online, so there are no windows to rank."
+              : "Connect Instagram or Facebook to see when your followers are online."
+          }</p>}
           {windows.map((w, i) => (
             <div key={i} className="stack" style={{ gap: 5 }}>
               <div className="row" style={{ justifyContent: "space-between", fontSize: 13, fontWeight: 550 }}>

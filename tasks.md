@@ -314,6 +314,32 @@ claim its own line, which does nothing in a flex row that cannot wrap — so it
 became a narrow sibling and squeezed everything else. A **desktop-only** defect,
 invisible to a phone-first check, in the most important message on the page.
 
+### Planner and Reports, same method, four more
+
+Continuing the walk with a LinkedIn account selected:
+
+- **A sponsor-facing report recommended posting times for the wrong account.**
+  `buildSnapshot` passed `connectedPlatforms` to `bestTimes` instead of the
+  scope, so a report scoped to LinkedIn — which reports no hourly activity at
+  all — printed "Best times to post: Saturday 7pm, Sunday 8pm" derived from the
+  **Instagram** audience. `bestTimes` itself was right and has a test for exactly
+  this; the caller handed it the wrong argument. The report is the artefact that
+  leaves the building, which makes this the worst placement of the defect.
+- **"Video views: n/a" beside a trend of "0%"** in the same report — a movement
+  reported for a figure that does not exist. `periodCompare` returns `deltaPct: 0`
+  for a metric with no days to compare, and `delta()` already renders null as
+  n/a; it was simply never given one.
+- **Two more empty states naming the wrong platform**: the Planner offering
+  "Instagram and Facebook report this; TikTok does not" to a LinkedIn client and
+  telling them to "connect Instagram or Facebook", and the report sheet's
+  "Instagram did not report follower losses".
+
+**Structural note.** `snapshot.ts` cannot be compiled for a test for the same
+reason `analytics.ts` could not — it imports `api.ts` and therefore the Supabase
+client. That is where the scope bug above lived, and it is the remaining place
+this class of defect can hide. Worth the same extraction treatment `bestTimes`
+got, when there is a reason to touch it.
+
 ## 11. Connecting a client — written 2026-09-11
 
 `docs/CLIENT-CONNECT-INSTAGRAM.md`. There was no guide for this: the in-app
