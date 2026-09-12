@@ -126,17 +126,29 @@ thing — that anon is still locked out of every table.
 checker names it specifically if the publishable one ends up in the secret slot,
 because a 401 alone does not tell you which mistake you made.
 
-Add it without the key appearing on screen or in your shell history — `read -rs`
-echoes nothing, so do not paste it onto the command line:
+Add it without the key appearing on screen or in your shell history:
 
 ```bash
-cd ~/SM-Analysis && read -rs SB_KEY && printf '\nSUPABASE_SERVICE_ROLE_KEY=%s\n' "$SB_KEY" >> .env && unset SB_KEY && npm run verify:schema
+cd ~/SM-Analysis
+printf 'Paste sb_secret_ key, then Enter: '; read -rs SB_KEY; echo
+[ -n "$SB_KEY" ] && printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SB_KEY" >> .env; unset SB_KEY
+npm run verify:schema
 ```
 
-Press Enter, paste, press Enter again. Writing the key as a literal argument
-instead — `printf ... 'PASTE_HERE'` — puts it in the shell history, and if the
-placeholder is run verbatim it lands in `.env` as the word itself. The checker
-now says so in as many words rather than reporting fourteen identical 401s.
+`read -rs` echoes nothing, so the key stays off screen and out of shell history.
+**The prompt and the `-n` guard are both load-bearing**, and both were missing
+when this was first written:
+
+- with no prompt, `-s` shows nothing whatever, so there is no sign the shell is
+  waiting and it is natural to press Enter into an empty buffer;
+- without the guard that empty buffer is appended as
+  `SUPABASE_SERVICE_ROLE_KEY=` — a line that exists and holds nothing, which then
+  reads as "not set" and sends you to add a line that is already there.
+
+The checker distinguishes that case by name. Writing the key as a literal
+argument instead — `printf ... 'PASTE_HERE'` — is worse again: it puts the key in
+shell history, and if the placeholder is run verbatim the word itself lands in
+`.env`.
 
 **Every migration from 0016 onward records itself.** End the file with:
 
