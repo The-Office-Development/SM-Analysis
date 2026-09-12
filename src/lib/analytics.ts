@@ -1,6 +1,13 @@
 import type { MetricPoint, AudienceSnapshot, ContentItem, Platform, Range, Scope } from "./types";
-import { seriesByDay, followersByDay, sum, latest, engagementRate, type MetricKey } from "./api";
-import { PLATFORMS } from "./platforms";
+/*
+ * From `series` and `platformNames`, not `api` and `platforms`.
+ *
+ * Both of those drag in the Supabase client and the React tree, which is what
+ * made this module impossible to compile for a test — and three defects lived
+ * here undetected because of it. Nothing below touches the network or the DOM.
+ */
+import { seriesByDay, followersByDay, sum, latest, engagementRate, type MetricKey } from "./series";
+import { platformName } from "./platformNames";
 import {
   publishTiming, followerCost, reachMultiples, reachConcentration, bestTimes, totalReported,
 } from "./insights";
@@ -106,10 +113,10 @@ function pct(n: number): string {
 }
 
 export function summarizeForAI(d: AISummaryInput): string {
-  const scopeName = d.scope === "all" ? "all connected platforms" : PLATFORMS[d.scope as Platform].name;
+  const scopeName = d.scope === "all" ? "all connected platforms" : platformName(d.scope as Platform);
   const lines: string[] = [];
   lines.push(`Window: last ${d.range} days. Scope: ${scopeName}.`);
-  lines.push(`Connected: ${d.connectedPlatforms.map((p) => PLATFORMS[p].name).join(", ") || "none"}.`);
+  lines.push(`Connected: ${d.connectedPlatforms.map((p) => platformName(p)).join(", ") || "none"}.`);
 
   const cmp = periodCompare(d.metrics, d.scope);
   lines.push("Totals over the window (with trend vs the previous half):");
@@ -145,7 +152,7 @@ export function summarizeForAI(d: AISummaryInput): string {
       // This text goes into the AI assistant's context. "not reported" is a fact
       // it can reason about; a fabricated 0 is one it would confidently repeat.
       const n = (v: number | null) => (v === null ? "not reported" : v.toLocaleString());
-      lines.push(`- "${(c.title || "Untitled").slice(0, 60)}" (${PLATFORMS[c.platform as Platform].name}, ${c.media_type}): ${n(c.views)} views, ${n(c.likes)} likes, ${n(c.comments)} comments`);
+      lines.push(`- "${(c.title || "Untitled").slice(0, 60)}" (${platformName(c.platform as Platform)}, ${c.media_type}): ${n(c.views)} views, ${n(c.likes)} likes, ${n(c.comments)} comments`);
     }
   }
 
@@ -202,7 +209,7 @@ export function summarizeForAI(d: AISummaryInput): string {
      */
     lines.push(d.scope === "linkedin"
       ? "Follower losses: LinkedIn does not report unfollows for a Company Page at all. Say this cannot be seen on LinkedIn rather than that nobody left."
-      : `Follower losses: ${d.scope === "all" ? "the platform has" : PLATFORMS[d.scope as Platform].name + " has"} never reported unfollows for this account. Say this cannot be seen rather than that nobody left.`);
+      : `Follower losses: ${d.scope === "all" ? "the platform has" : platformName(d.scope as Platform) + " has"} never reported unfollows for this account. Say this cannot be seen rather than that nobody left.`);
   } else if (cost.days.length) {
     lines.push(`Days that lost unusually many followers (usual is ${cost.typical} a day). CORRELATION ONLY: posts listed went out that day, which is not evidence they caused it.`);
     for (const day of cost.days.slice(0, 3))

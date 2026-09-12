@@ -294,6 +294,25 @@ shape and none LinkedIn-specific: a zero displayed where nothing was measured.
 Generating demo data for a platform with genuine gaps is the cheapest test of
 null handling this repo has, and it should be done for the next platform too.
 
+### Keep the arithmetic reachable from a test
+`analytics.ts` and `snapshot.ts` could not be compiled for a test until
+2026-09-12, because they imported `api.ts` (the Supabase client) and
+`platforms.tsx` (the React tree) for nothing but pure selectors and a platform's
+display name. **Three defects lived in them and all three were found by looking
+at a rendered page**, not by the suite: a posting window invented from a grid of
+zeros, a sponsor-facing report carrying another platform's posting times, and
+the AI assistant grounded on a "0" for a metric the platform does not report.
+
+The pure halves now live in `series.ts` (selectors over metric rows) and
+`platformNames.ts` (names and order, no JSX); `api.ts` and `platforms.tsx`
+re-export them so callers are unchanged. `snapshot.ts` declares its own
+`SnapshotInput` rather than borrowing `ReturnType<typeof useDash>` — a type-only
+import still has to resolve, and that one resolved to a `.tsx`.
+
+**Do not reintroduce an import of `api.ts`, `platforms.tsx` or a React context
+into these modules.** `verify/tests/grounding.test.mjs` and three mutations guard
+what they compute; an import that breaks the test build takes all of it away.
+
 ### Testing
 - `verify/tests/` is the suite that counts. `tests/mock-graph.mjs` knows each
   day's **true** value, so tests assert against an oracle rather than the absence

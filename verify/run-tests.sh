@@ -22,6 +22,14 @@ for(const f of fs.readdirSync(d).filter(f=>f.endsWith(".js"))){
 # is quoted, so it is tested like the sync is. Type-only imports are stripped by
 # the compiler, so analytics.ts builds without dragging in the React tree.
 ./node_modules/.bin/tsc src/lib/insights.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
+# analytics.ts and snapshot.ts became compilable on 2026-09-12, when the pure
+# selectors moved out of api.ts into series.ts and the platform names out of
+# platforms.tsx into platformNames.ts. Until then both imported the Supabase
+# client and the React tree, so neither could be tested — and three defects hid
+# in them: a posting window invented from a grid of zeros, a LinkedIn report
+# carrying Instagram's posting times, and the assistant grounded on a "0" for a
+# metric the platform does not report.
+./node_modules/.bin/tsc src/lib/analytics.ts src/lib/snapshot.ts --outDir verify/build-lib --target ES2022 --module ESNext --moduleResolution bundler
 # format.ts carries timeAgo, which is what tells a client WHEN a figure was read.
 # That line is the product's answer to "your number disagrees with Instagram", so
 # it is tested rather than trusted.

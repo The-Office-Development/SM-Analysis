@@ -1,14 +1,35 @@
-import type { useDash } from "../context/DashboardContext";
-import { seriesByDay, followersByDay, sum, latest, engagementRate } from "./api";
+import type {
+  MetricPoint, ContentItem, AudienceSnapshot, SocialAccount, Range, Scope,
+} from "./types";
+// See the note in analytics.ts: pure selectors, no network layer.
+import { seriesByDay, followersByDay, sum, latest, engagementRate } from "./series";
 import { periodCompare, bestTimes, anomalies } from "./analytics";
 import {
   publishTiming, followerCost, reachMultiples, reachConcentration, totalReported,
 } from "./insights";
-import { PLATFORMS } from "./platforms";
+import { platformName } from "./platformNames";
 import { accountLabel, provenanceNote, reportSourcePossessive } from "./reportMeta";
 import type { Platform } from "./types";
 
-type Dash = ReturnType<typeof useDash>;
+/**
+ * Exactly what a snapshot needs, declared rather than borrowed.
+ *
+ * This was `ReturnType<typeof useDash>`, which reads as convenient and tied the
+ * module to a React context: a type-only import still has to RESOLVE, so
+ * compiling this file for a test pulled in a .tsx and failed on --jsx. Seven
+ * fields, none of them React's. `buildCsv` has always taken its own input type
+ * for the same reason, and it has always been testable.
+ */
+export interface SnapshotInput {
+  scope: Scope;
+  range: Range;
+  connectedPlatforms: Platform[];
+  accounts: SocialAccount[];
+  metrics: MetricPoint[];
+  content: ContentItem[];
+  audience: AudienceSnapshot[];
+}
+type Dash = SnapshotInput;
 
 /**
  * A fully self-contained, serialisable report. Everything the sheet needs is
@@ -70,7 +91,7 @@ export interface ReportSnapshot {
 }
 
 export function buildSnapshot(dash: Dash): ReportSnapshot {
-  const scopeLabel = dash.scope === "all" ? "All platforms" : PLATFORMS[dash.scope as Platform].name;
+  const scopeLabel = dash.scope === "all" ? "All platforms" : platformName(dash.scope as Platform);
   const cmp = periodCompare(dash.metrics, dash.scope);
 
   const headline = cmp.map((c) => ({
@@ -91,7 +112,7 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
     dash.scope === "all" ? dash.connectedPlatforms : [dash.scope as Platform];
 
   const platforms = dash.connectedPlatforms.map((p) => ({
-    name: PLATFORMS[p].name,
+    name: platformName(p),
     followers: latest(followersByDay(dash.metrics, p)),
     reach: totalReported(seriesByDay(dash.metrics, p, "reach")),
     views: totalReported(seriesByDay(dash.metrics, p, "views")),
@@ -104,7 +125,7 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
     .slice(0, 10)
     .map((c) => ({
       title: c.title || "Untitled",
-      platform: PLATFORMS[c.platform as Platform].name,
+      platform: platformName(c.platform as Platform),
       views: c.views, likes: c.likes, comments: c.comments,
     }));
 
@@ -129,8 +150,8 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
      * leaves the building.
      */
     windows: bestTimes(dash.audience, scopedPlatforms, 3).map((w) => w.label),
-    provenance: provenanceNote(dash.scope, (p) => PLATFORMS[p].name),
-    source: `${reportSourcePossessive(dash.scope, (p) => PLATFORMS[p].name)}, read only`,
+    provenance: provenanceNote(dash.scope, platformName),
+    source: `${reportSourcePossessive(dash.scope, platformName)}, read only`,
     alerts: anomalies(dash.metrics, dash.scope).slice(0, 6)
       .map((a) => ({ label: a.label, kind: a.kind, deltaPct: a.deltaPct, date: a.date })),
     analysis: buildAnalysis(dash),

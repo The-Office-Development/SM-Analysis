@@ -1,6 +1,11 @@
 import type { Platform } from "./types";
+import { PLATFORM_NAMES } from "./platformNames";
 
-export const PLATFORM_ORDER: Platform[] = ["facebook", "instagram", "tiktok", "linkedin"];
+/*
+ * Names and order live in `platformNames.ts`, which has no JSX and therefore no
+ * React. Re-exported here because the app imports both from this module.
+ */
+export { PLATFORM_ORDER, PLATFORM_NAMES, platformName } from "./platformNames";
 
 interface PlatformMeta {
   key: Platform;
@@ -33,10 +38,10 @@ const linkedinIcon = (
 );
 
 export const PLATFORMS: Record<Platform, PlatformMeta> = {
-  facebook: { key: "facebook", name: "Facebook", color: "var(--fb)", weak: "var(--fb-weak)", icon: facebookIcon },
-  instagram: { key: "instagram", name: "Instagram", color: "var(--ig)", weak: "var(--ig-weak)", icon: instagramIcon },
-  tiktok: { key: "tiktok", name: "TikTok", color: "var(--tt)", weak: "var(--tt-weak)", icon: tiktokIcon },
-  linkedin: { key: "linkedin", name: "LinkedIn", color: "var(--li)", weak: "var(--li-weak)", icon: linkedinIcon },
+  facebook: { key: "facebook", name: PLATFORM_NAMES.facebook, color: "var(--fb)", weak: "var(--fb-weak)", icon: facebookIcon },
+  instagram: { key: "instagram", name: PLATFORM_NAMES.instagram, color: "var(--ig)", weak: "var(--ig-weak)", icon: instagramIcon },
+  tiktok: { key: "tiktok", name: PLATFORM_NAMES.tiktok, color: "var(--tt)", weak: "var(--tt-weak)", icon: tiktokIcon },
+  linkedin: { key: "linkedin", name: PLATFORM_NAMES.linkedin, color: "var(--li)", weak: "var(--li-weak)", icon: linkedinIcon },
 };
 
 /** Brand fill for the coloured platform tile in connect rows / badges. */

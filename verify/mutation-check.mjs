@@ -21,6 +21,8 @@ const FORMAT = "verify/build-lib/format.js";
 const CSVREPORT = "verify/build-lib/csvReport.js";
 const XLSX = "verify/build-lib/xlsx.js";
 const REPORTMETA = "verify/build-lib/reportMeta.js";
+const ANALYTICS = "verify/build-lib/analytics.js";
+const SNAPSHOT = "verify/build-lib/snapshot.js";
 
 const mutations = [
   { name: "reach inflated 10x", file: SYNC,
@@ -269,6 +271,19 @@ const mutations = [
   { name: "a LinkedIn export that says it came from Instagram", file: REPORTMETA,
     find: "export function reportSource(scope, platformName) {",
     replace: "export function reportSource(scope, platformName) {\n    return \"Instagram\";" },
+  /*
+   * The three defects that lived in analytics.ts and snapshot.ts while neither
+   * could be compiled for a test. Every one was found by looking at a rendered
+   * page; these are what would have found them here.
+   */
+  { name: "the assistant grounded on a fabricated zero", file: ANALYTICS,
+    find: "            : totalReported(seriesByDay(d.metrics, d.scope, c.key));",
+    replace: "            : (seriesByDay(d.metrics, d.scope, c.key).reduce((a, x) => a + x.value, 0));" },
+  { name: "a metric nobody reported marked as reported", file: ANALYTICS,
+    find: "reported: s.length > 0 };", replace: "reported: true };" },
+  { name: "a scoped report borrowing another platform's posting times", file: SNAPSHOT,
+    find: "        windows: bestTimes(dash.audience, scopedPlatforms, 3).map((w) => w.label),",
+    replace: "        windows: bestTimes(dash.audience, dash.connectedPlatforms, 3).map((w) => w.label)," },
   { name: "a scoped report headed with every connected account", file: REPORTMETA,
     find: "        if (scope !== \"all\" && a.platform && a.platform !== scope)\n            continue;",
     replace: "        if (false)\n            continue;" },
@@ -346,7 +361,7 @@ const mutations = [
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs", "verify/tests/linkedin.test.mjs", "verify/tests/linkedin-sync.test.mjs", "verify/tests/write-errors.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs", "verify/tests/linkedin.test.mjs", "verify/tests/linkedin-sync.test.mjs", "verify/tests/grounding.test.mjs", "verify/tests/write-errors.test.mjs"], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }
