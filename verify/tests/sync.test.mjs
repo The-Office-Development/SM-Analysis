@@ -237,6 +237,67 @@ test("an active story is captured, with the metrics it has and nulls for the res
   assert.ok(Date.parse(story.expires_at) > Date.parse(story.published_at));
 });
 
+test("a story Meta will not measure yet is still captured, not lost with the rest", async () => {
+  /*
+   * Meta: "Story media metrics with values less than 5 return an error code 10".
+   * A story in its first minutes has fewer than five of nearly everything, and
+   * insights requested by field expansion fail the WHOLE response. Before this,
+   * one fresh story emptied the capture for every live story on the account and
+   * the log said "no stories returned". A story's existence is the part that
+   * cannot be recovered after 24 hours, so it must survive without its figures.
+   */
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY], storyInsights: "refuse_all" }, 1);
+
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+  assert.ok(story, "a story Meta refused to measure must still be stored");
+  assert.equal(story.media_type, "Story");
+  for (const k of ["reach", "views", "replies", "navigation", "shares"]) {
+    assert.equal(story[k], null, `${k} is unknown, not zero, when Meta will not measure the story`);
+  }
+  assert.ok(story.expires_at, "its expiry is still recorded");
+});
+
+test("when batched story insights are refused, each story is measured on its own", async () => {
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY], storyInsights: "refuse_batch" }, 1);
+
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+  assert.ok(story, "captured");
+  assert.equal(story.reach, 320, "the per-story call recovers what the batch could not");
+  assert.equal(story.views, 410);
+});
+
+test("an insights row carrying no value is null, never a fabricated zero", async () => {
+  // normInsights ended in `?? 0`, so a row returned without a value was already a
+  // confident 0 before any caller's `?? null` could run.
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] }, 1);
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+  assert.equal(story.shares, null, "the mock returns `shares` with no value");
+});
+
+test("a later run that cannot measure a story does not erase what an earlier run measured", async () => {
+  /*
+   * A story is measured at 30 minutes and refused at 45. The content write was a
+   * plain upsert, so the refused run wrote null over the real figures — and a
+   * story's figures cannot be fetched again once it expires. Storing a story
+   * without its figures is only safe because this holds.
+   */
+  const from = addDays(TODAY, -29);
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY] }, 1);
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [from, TODAY], storyInsights: "refuse_all" }, 1);
+
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+  assert.equal(story.reach, 320, "the earlier run's reach must survive a refused later run");
+  assert.equal(story.views, 410);
+  assert.equal(story.replies, 4);
+});
+
 test("a run stops at its call budget, and still saves what it fetched", async () => {
   /*
    * The failure this guards against is not fetching less. A serverless host caps

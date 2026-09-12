@@ -77,9 +77,16 @@ export const IG = {
    * rather than whether they saw it.
    *
    * NOT yet verified against a live story, because none was active when this was
-   * written. Each metric is requested optionally, so one Meta refuses stores null
-   * instead of failing the capture — which matters more here than anywhere else
-   * in the codebase: a story missed is a story lost forever.
+   * written.
+   *
+   * CORRECTED 2026-09-12. This said each metric was requested optionally, so one
+   * Meta refused would store null instead of failing the capture. It was not:
+   * all six went in ONE field expansion on the stories call with no fallback, and
+   * Meta states "Story media metrics with values less than 5 return an error code
+   * 10". captureStories now fetches the list without insights, then asks for the
+   * figures batched and, failing that, one story at a time. Meta also documents
+   * that the edge excludes live-video stories and "new stories created when a
+   * user reshares a story".
    */
   STORIES_EDGE: "stories",
   STORY_FIELDS: "id,caption,media_type,media_product_type,permalink,timestamp",

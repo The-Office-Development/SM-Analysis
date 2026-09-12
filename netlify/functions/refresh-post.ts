@@ -112,10 +112,19 @@ export const handler: Handler = async (event) => {
     };
 
     const refreshedAt = new Date().toISOString();
+    /*
+     * Only the figures Instagram actually returned this time.
+     *
+     * `fresh` is null wherever this call got nothing back, and writing it whole
+     * put null over a real stored number — a client pressing "Check now" on a
+     * post whose insights were momentarily refused would watch its reach vanish.
+     * A lifetime counter never legitimately goes from a number back to unknown.
+     */
+    const known = Object.fromEntries(Object.entries(fresh).filter(([, v]) => v !== null));
     const { error: upErr } = await db.from("content")
       // Both: refreshed_at rate-limits this endpoint, checked_at is the freshness
       // the client is shown. A manual check updates both; a sync only the latter.
-      .update({ ...fresh, refreshed_at: refreshedAt, checked_at: refreshedAt }).eq("id", row.id);
+      .update({ ...known, refreshed_at: refreshedAt, checked_at: refreshedAt }).eq("id", row.id);
     if (upErr) return json(500, { message: `Fetched it, but could not save: ${upErr.message}` });
 
     log("refresh_post.ok", { uid, account: account.id, post: row.external_id });

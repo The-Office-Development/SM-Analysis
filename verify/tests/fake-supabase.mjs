@@ -43,6 +43,7 @@ export function makeDb(seed = {}, opts = {}) {
       neq(c, v) { preds.push((r) => r[c] !== v); return api; },
       gte(c, v) { preds.push((r) => r[c] >= v); return api; },
       lte(c, v) { preds.push((r) => r[c] <= v); return api; },
+      in(c, vals) { const set = new Set(vals); preds.push((r) => set.has(r[c])); return api; },
       order(c, o = {}) { api._order = { c, asc: o.ascending !== false }; return api; },
       /** Minimal PostgREST `or` support: "col.is.null,col.lt.value" (OR of terms). */
       or(expr) {

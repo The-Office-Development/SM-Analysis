@@ -78,6 +78,42 @@ as work. Migrations 0001-0012 are all applied.
    already logs `sync.stories_checked` with a count — so the evidence collects
    itself.
 
+   **CORRECTED 2026-09-12 — the evidence could not have collected itself.**
+   Found by reading the source and Meta's documentation, not by a live call:
+
+   - *The count could not tell the two failures apart.* `captureStories` asked
+     for the stories AND their insights in one field-expanded request, which is
+     all-or-nothing, and Meta states "Story media metrics with values less than
+     5 return an error code 10". One story in its first minutes could fail the
+     whole response; `optional()` turned the error into an empty list; the log
+     said "no stories returned" — the same line a reshare produces. Fixed: the
+     list comes first without insights, and the log counts `found`, `measured`
+     and `unmeasured` separately.
+   - *The logs were never kept.* `worker-cron/wrangler.toml` has no
+     `[observability]` block, so every `sync.stories_checked` line vanished as
+     it was written. Tailing the worker from this machine fails with
+     "Authentication error [code: 10000]" on the account it lives on.
+   - *The reshare hypothesis has primary support, but narrower than recorded.*
+     Meta's `/stories` reference: "New stories created when a user reshares a
+     story will not be returned", and "Responses will not include Live Video
+     stories." That covers resharing a STORY. The 2026-09-08 observation was a
+     reshared FEED POST, which the reference does not mention.
+
+   **drinkat is the control that has never been run** — a high-volume account
+   posting original stories. Under the old code it was also the account most
+   likely to lose every story, since it nearly always has one under five views.
+
+   **NOT LIVE YET.** The sync runs in `worker-cron`, deployed separately with
+   `cd worker-cron && npx wrangler deploy`, not by a git push. This machine's
+   `wrangler` cannot even tail that account, so deploying from here will very
+   likely fail the same way (not attempted). Until someone deploys from the
+   Cloudflare account that owns the worker, production still runs the old
+   capture. For evidence to accumulate once it is live, enable `[observability]`
+   on the worker in the same deploy.
+
+   `refresh-post.ts` ("Check now") had the same overwrite-with-null defect and is
+   fixed, but it has **no test**: no handler-level test rig exists here.
+
    **What to watch during the pilot, and what each outcome means:**
 
    - **A count above zero at any point** — capture works. Check what kind of

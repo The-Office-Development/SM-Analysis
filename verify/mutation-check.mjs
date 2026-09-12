@@ -115,6 +115,23 @@ const mutations = [
   { name: "media truncated at the first page", file: SYNC,
     find: "if (!after || !body.paging?.next)",
     replace: "if (true)" },
+  /*
+   * Story capture, 2026-09-12. One fresh story under Meta's five-view threshold
+   * used to empty the capture for every live story on the account, because the
+   * list and its insights were one all-or-nothing request.
+   */
+  { name: "a story's existence made to depend on Meta measuring it", file: SYNC,
+    find: "const list = await optional(() => get(`/${externalId}/${IG.STORIES_EDGE}`, { fields: IG.STORY_FIELDS }), { data: [] }, { ...ctx, call: \"stories\" });",
+    replace: "const list = await optional(() => get(`/${externalId}/${IG.STORIES_EDGE}`, { fields: `${IG.STORY_FIELDS},insights.metric(${IG.STORY_INSIGHT_METRICS})` }), { data: [] }, { ...ctx, call: \"stories\" });" },
+  { name: "a story the batch could not measure left unmeasured", file: SYNC,
+    find: "            if (!st?.id || insightsById.has(st.id))\n                continue;",
+    replace: "            if (true)\n                continue;" },
+  { name: "a valueless insight written as a confident zero", file: SYNC,
+    find: "        if (typeof v === \"number\" && Number.isFinite(v))\n            out[r.name] = v;",
+    replace: "        if (true)\n            out[r.name] = v ?? 0;" },
+  { name: "a refused run writing null over a story's measured figures", file: SYNC,
+    find: "        const merged = await mergeContentWithStored(db, acc, posts);",
+    replace: "        const merged = posts;" },
   { name: "stories not captured at all", file: SYNC,
     find: "return { days, posts: [...posts, ...stories] };",
     replace: "return { days, posts };" },

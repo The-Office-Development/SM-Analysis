@@ -482,8 +482,9 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
      * would make a recent sync refuse the client's own "Check now". See 0013.
      */
     const checkedAt = new Date().toISOString();
+    const merged = await mergeContentWithStored(db, acc, posts);
     const { error } = await db.from("content").upsert(
-      posts.map((p) => ({ account_id: acc.id, platform: acc.platform, ...p, checked_at: checkedAt })),
+      merged.map((p) => ({ account_id: acc.id, platform: acc.platform, ...p, checked_at: checkedAt })),
       { onConflict: "account_id,external_id" }
     );
     if (error) throw error;
@@ -532,6 +533,57 @@ async function storedFollowerAnchor(
  * Merge freshly fetched days over what is already stored. A null means "the
  * platform did not report this", and null NEVER overwrites a stored value.
  */
+/** Content columns that are figures, as opposed to what identifies the post. */
+const CONTENT_FIGURES = [
+  "views", "likes", "comments", "shares", "saves", "reach",
+  "avg_watch_seconds", "retention_pct", "replies", "navigation",
+] as const;
+
+/**
+ * Keep a stored figure when this run could not read it again.
+ *
+ * The content write was a plain upsert, so a post or story whose figures were
+ * unavailable THIS run had null written over the numbers an earlier run stored.
+ * Two paths produce exactly that: a media page whose insights expansion was
+ * refused keeps its posts without figures, and a story Meta will not measure is
+ * now stored rather than dropped. For a story that is unrecoverable — measured
+ * at 30 minutes, refused at 45, and the real numbers gone once it expires.
+ *
+ * The same rule as `mergeWithStored` for days, and for the same reason: every
+ * one of these is a lifetime counter, and a lifetime counter never legitimately
+ * goes from a number back to unknown.
+ *
+ * The cost, stated rather than hidden: a figure kept from an earlier run sits
+ * beside a `checked_at` stamped now. That is the same trade the day rows already
+ * make, and the alternative is erasing a real number.
+ */
+async function mergeContentWithStored(db: Db, acc: AccountRow, posts: Post[]): Promise<Post[]> {
+  const { data: stored, error } = await db
+    .from("content")
+    .select(`external_id,${CONTENT_FIGURES.join(",")}`)
+    .eq("account_id", acc.id)
+    .in("external_id", posts.map((p) => p.external_id));
+  if (error) {
+    // A failed read must not become a failed write. Without the stored figures
+    // this run writes exactly what it would have before this existed.
+    log("sync.content_merge_read_failed", { account: acc.id, detail: error.message });
+    return posts;
+  }
+
+  const prior = new Map<string, any>();
+  for (const r of stored ?? []) prior.set((r as any).external_id, r);
+
+  return posts.map((p) => {
+    const was = prior.get(p.external_id);
+    if (!was) return p;
+    const out: any = { ...p };
+    for (const k of CONTENT_FIGURES) {
+      if (out[k] === null || out[k] === undefined) out[k] = was[k] ?? null;
+    }
+    return out as Post;
+  });
+}
+
 async function mergeWithStored(db: Db, acc: AccountRow, days: DayRow[]) {
   const dates = days.map((d) => d.date).sort();
   const { data: existing } = await db
@@ -1463,13 +1515,59 @@ async function captureStories(
   externalId: string,
   ctx: Record<string, unknown>,
 ): Promise<Post[]> {
-  const res = await optional(
-    () => get(`/${externalId}/${IG.STORIES_EDGE}`, {
-      fields: `${IG.STORY_FIELDS},insights.metric(${IG.STORY_INSIGHT_METRICS})`,
-    }),
+  /*
+   * The LIST first, with no insights attached.
+   *
+   * This used to be one request: the stories edge with `insights.metric(...)`
+   * expanded inline. Field-expanded insights are all-or-nothing — measured live
+   * on 2026-09-06 for /media, where limit=5 answered and limit=10 errored because
+   * one post could not carry insights — and Meta states that "Story media
+   * metrics with values less than 5 return an error code 10". A story in its
+   * first minutes has fewer than five of almost everything. So one fresh story
+   * could fail the whole response, `optional()` turned that into an empty list,
+   * and every OTHER live story on the account was lost with it, logged as "no
+   * stories returned".
+   *
+   * An account that posts a lot of stories nearly always has a fresh one. That
+   * is the account most likely to lose all of them.
+   */
+  const list = await optional(
+    () => get(`/${externalId}/${IG.STORIES_EDGE}`, { fields: IG.STORY_FIELDS }),
     { data: [] as any[] },
     { ...ctx, call: "stories" },
   );
+  const stories: any[] = list.data ?? [];
+
+  /*
+   * Then the figures: batched when Meta allows it, one story at a time when it
+   * does not. A story Meta will not measure yet is still stored — its existence
+   * is the irreplaceable part, and its figures fill in on a later run once it
+   * has five views. Every call goes through the run's budget, and stories are
+   * fetched before the day metrics, so any shortfall lands on the days, which
+   * the trailing re-fetch recovers and a story's 24 hours do not.
+   */
+  const insightsById = new Map<string, any[]>();
+  if (stories.length) {
+    const batch = await optional(
+      () => get(`/${externalId}/${IG.STORIES_EDGE}`, {
+        fields: `id,insights.metric(${IG.STORY_INSIGHT_METRICS})`,
+      }),
+      null as any,
+      { ...ctx, call: "stories_insights" },
+    );
+    for (const m of batch?.data ?? []) {
+      if (m?.id && Array.isArray(m.insights?.data)) insightsById.set(m.id, m.insights.data);
+    }
+    for (const st of stories) {
+      if (!st?.id || insightsById.has(st.id)) continue;
+      const one = await optional(
+        () => get(`/${st.id}/insights`, { metric: IG.STORY_INSIGHT_METRICS }),
+        null as any,
+        { ...ctx, call: "story_insights", story: st.id },
+      );
+      if (Array.isArray(one?.data)) insightsById.set(st.id, one.data);
+    }
+  }
 
   /*
    * Log what the edge returned, every run, including nothing.
@@ -1486,16 +1584,26 @@ async function captureStories(
    * always zero on an account known to post stories says something a single
    * observation cannot.
    */
-  const found = (res.data ?? []).length;
+  /*
+   * The two failure modes, counted apart.
+   *
+   * They used to be one number. "Zero stories" meant either that the edge
+   * returned none or that insights failed and took the list down with them, and
+   * the drinkat pilot was going to settle the reshare question from this log —
+   * which it never could have, while both produced the same count.
+   */
+  const measured = stories.filter((st) => st?.id && insightsById.has(st.id)).length;
   log("sync.stories_checked", {
-    ...ctx, found,
-    detail: found === 0
-      ? "no stories returned. NOT proof none existed — a reshared post may not appear here"
-      : undefined,
+    ...ctx, found: stories.length, measured, unmeasured: stories.length - measured,
+    detail: stories.length === 0
+      ? "no stories returned. NOT proof none existed — Meta excludes live-video stories and stories created by resharing a story"
+      : measured < stories.length
+        ? "stories stored without figures. Meta refuses story insights below 5 (error #10), usual in a story's first minutes; a later run fills them in"
+        : undefined,
   });
 
-  return (res.data ?? []).map((m: any): Post => {
-    const ins = normInsights(m.insights?.data ?? []);
+  return stories.map((m: any): Post => {
+    const ins = normInsights(insightsById.get(m.id) ?? []);
     const published = m.timestamp ?? new Date().toISOString();
     return {
       external_id: m.id,
@@ -1761,8 +1869,21 @@ function pickInsight(insights: any, name: string): number {
   return typeof v === "number" ? v : 0;
 }
 function normInsights(rows: any[]): Record<string, number> {
+  /*
+   * A row with no numeric value is left OUT, never written as 0.
+   *
+   * This ended in `?? 0` — the first invariant in CLAUDE.md, broken in the one
+   * function every post and story passes through. Every caller writes
+   * `ins.x ?? null`, and that null could never fire: a row that came back
+   * without a value was already a confident zero by then. It also defeated the
+   * photo fallback `views ?? reach`, since a valueless views row stopped at 0
+   * and never reached the reach figure beside it.
+   */
   const out: Record<string, number> = {};
-  for (const r of rows) out[r.name] = r.values?.[0]?.value ?? r.total_value?.value ?? 0;
+  for (const r of rows) {
+    const v = r.values?.[0]?.value ?? r.total_value?.value;
+    if (typeof v === "number" && Number.isFinite(v)) out[r.name] = v;
+  }
   return out;
 }
 /** Newer IG follower_demographics: data[0].total_value.breakdowns[0].results[]. */

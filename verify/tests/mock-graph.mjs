@@ -68,9 +68,10 @@ const localDayStart = (dayIso, offsetHours) =>
  * @param opts.days        [startIso, endIso] the mock will report
  * @param opts.failMetric  a metric name that responds with a 429 throttle
  * @param opts.missing     metric names the account does not expose (code 100)
+ * @param opts.storyInsights "ok" | "refuse_batch" | "refuse_all" — see /stories
  */
 export function installGraphMock(opts) {
-  const { offset = 0, days, failMetric = null, missing = [], followers = 12345 } = opts;
+  const { offset = 0, days, failMetric = null, missing = [], followers = 12345, storyInsights = "ok" } = opts;
   const [from, to] = days;
   const original = globalThis.fetch;
   const calls = [];
@@ -139,6 +140,27 @@ export function installGraphMock(opts) {
     if (metric && missing.includes(metric)) return err("nonexisting metric");
     if (metric && REMOVED.includes(metric)) return err("(#100) metric is not supported");
 
+    // What Meta says for a story it will not measure yet: "Story media metrics
+    // with values less than 5 return an error code 10".
+    const tooFewViewers = () => new Response(JSON.stringify({
+      error: { message: "(#10) Not enough viewers for the media to show insights", code: 10 },
+    }), { status: 400 });
+    const STORY_INSIGHTS = [
+      { name: "reach", values: [{ value: 320 }] },
+      { name: "views", values: [{ value: 410 }] },
+      { name: "replies", values: [{ value: 4 }] },
+      { name: "navigation", values: [{ value: 88 }] },
+      // Present with no value. normInsights once turned this into 0.
+      { name: "shares", values: [{}] },
+    ];
+
+    // Per-story insights. Above the account /insights branch, which would
+    // otherwise swallow this URL.
+    if (u.includes("/story_live/insights")) {
+      if (storyInsights === "refuse_all") return tooFewViewers();
+      return ok({ data: STORY_INSIGHTS });
+    }
+
     if (u.includes("/insights")) {
       const metricType = q.get("metric_type") ?? "time_series";
       if (TOTAL_VALUE_ONLY.includes(metric) && metricType !== "total_value") {
@@ -161,20 +183,26 @@ export function installGraphMock(opts) {
        * capture stores what was reported and nulls the rest, rather than filling
        * likes and saves with zeros that would rank a story last in any sort.
        */
-      return ok({ data: [
-        {
-          id: "story_live", caption: "a story", media_type: "IMAGE",
-          media_product_type: "STORY",
-          permalink: "https://instagram.com/stories/x/1",
-          timestamp: `${to}T08:00:00+0000`,
-          insights: { data: [
-            { name: "reach", values: [{ value: 320 }] },
-            { name: "views", values: [{ value: 410 }] },
-            { name: "replies", values: [{ value: 4 }] },
-            { name: "navigation", values: [{ value: 88 }] },
-          ] },
-        },
-      ] });
+      /*
+       * `storyInsights` models a story Meta will not measure yet:
+       *   "ok"            insights answer, batched and per story
+       *   "refuse_batch"  the batched expansion fails the WHOLE response, as
+       *                   field-expanded insights do; per story still answers
+       *   "refuse_all"    no insights anywhere
+       * The list WITHOUT insights always answers, which is the point: a story's
+       * existence must never depend on whether Meta will measure it.
+       */
+      const story = {
+        id: "story_live", caption: "a story", media_type: "IMAGE",
+        media_product_type: "STORY",
+        permalink: "https://instagram.com/stories/x/1",
+        timestamp: `${to}T08:00:00+0000`,
+      };
+      if ((q.get("fields") ?? "").includes("insights")) {
+        if (storyInsights !== "ok") return tooFewViewers();
+        return ok({ data: [{ id: story.id, insights: { data: STORY_INSIGHTS } }] });
+      }
+      return ok({ data: [story] });
     }
     if (u.includes("/media")) {
       /*

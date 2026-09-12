@@ -29,10 +29,12 @@ compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
 [triggers]
-# Hourly, matching the Netlify schedule it replaces. The body stops early on a
-# time budget and the trailing re-fetch in _sync.ts heals any missed run, so the
-# cadence is a floor on freshness rather than a guarantee of completeness.
-# Every 15 minutes, not hourly.
+# Every 15 minutes. The body stops early on its budget and the trailing re-fetch
+# in _sync.ts heals any missed run, so the cadence is a floor on freshness rather
+# than a guarantee of completeness. (Until 2026-09-12 this paragraph began
+# "Hourly, matching the Netlify schedule it replaces", directly above a line
+# saying the opposite. sync_log that day recorded 39 runs per account in 24
+# hours, not the 96 this schedule implies — observed, not yet explained.)
 #
 # The per-run subrequest cap and the daily request budget are different limits,
 # and only the first has ever constrained us. A cron firing is ONE request

@@ -286,12 +286,32 @@ P0 finding. There is a test and a mutation guarding every one.
   date range makes the endpoint return aggregates with every facet absent, at
   HTTP 200 — indistinguishable from a page whose followers have no recorded
   industry. Demographics are lifetime-only. Guarded by a mutation.
+- **Never let a story's existence depend on Meta measuring it.** Insights
+  requested by field expansion are all-or-nothing (measured live for `/media`
+  on 2026-09-06), and Meta states "Story media metrics with values less than 5
+  return an error code 10" — true of nearly every story in its first minutes.
+  `captureStories` asked for the list and its insights in one request, so one
+  fresh story emptied the capture for every live story on the account, and the
+  log blamed reshares. The list is now fetched without insights; the figures are
+  asked for batched, then one story at a time; a story Meta will not measure is
+  stored with null figures, because its existence is the part gone in 24 hours.
+  Three mutations guard it.
+- **Never write a content row's figures without consulting the stored ones.**
+  The content write was a plain upsert, so a run that could not read a figure
+  wrote null over a real number — unrecoverable for a story once it expires.
+  `mergeContentWithStored` keeps the stored value, as `mergeWithStored` does for
+  days. Guarded by a mutation. `refresh-post.ts` follows the same rule by
+  updating only what it read, and has **no test at all**: no handler-level test
+  rig exists in this repo.
 
 ### Things that look wrong but are not
 - `metrics_daily` columns are nullable *on purpose*.
 - Days are re-fetched repeatedly *on purpose*; upserts are idempotent.
-- The cron is hourly and stops early *on purpose* — Netlify caps scheduled
-  functions at 30s and they cannot be background functions.
+- The sync cron is scheduled every 15 minutes (`worker-cron/wrangler.toml`) and
+  stops early *on purpose* — each Cloudflare invocation gets 50 subrequests, and
+  stories, which expire in 24 hours, are why it runs that often. `sync_log` on
+  2026-09-12 showed 39 runs per account in 24 hours rather than 96; that gap is
+  observed and not yet explained, so do not quote the schedule as the cadence.
 - `buildCsv` uses `seriesByDay(..., "followers")` while the dashboard uses
   `followersByDay()`. These agree: the primary key is `(account_id, date)`.
 
