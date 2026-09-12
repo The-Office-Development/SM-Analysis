@@ -83,9 +83,22 @@ valid oracle is an account that has been Business or Creator for **months**.
 
 It also found that the stored follower series contradicts its own deltas — one
 follower vanishes on a day whose recorded change is zero — and that `unfollows`
-and `reach_non_followers` have been null on every day ever stored, which means
-**churn and the discovery split have never held real data.** Both panels are
-unproven. Full record in `docs/DATA-INTEGRITY.md`.
+and `reach_non_followers` were null on every day stored at that point, which
+meant churn and the discovery split had never held real data. Full record in
+`docs/DATA-INTEGRITY.md`.
+
+**Superseded 2026-09-12, measured against the live database.** Two Instagram
+accounts are connected and syncing. `@malekismaiil` — the months-old
+professional account that is the only valid oracle — now has **36 of 36 days
+carrying `reach_non_followers` and 32 of 36 carrying `unfollows`.** The discovery
+split and the churn panel hold real client data for the first time, which is the
+thing the product is sold on. `@heath_ens21`, converted for testing, has 4 and 9:
+sparse, as expected for a recently converted account, and a reminder that a test
+account cannot validate these.
+
+**Still zero stories, on 12 stored posts.** The working conclusion in `tasks.md`
+— that `/stories` returns only the account's own media, so a reshared post never
+appears — remains the best explanation, and the control has still not been run.
 
 The mock is still the only oracle the tests have. Until a months-old
 professional account is connected, correctness of the day windows, the discovery
