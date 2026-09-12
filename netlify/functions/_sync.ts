@@ -600,7 +600,7 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
    * two years. So the irreplaceable and the cheap go first, and the
    * expensive-but-durable absorbs any shortfall.
    */
-  const media = await fetchMedia(get, `/${acc.external_id}/media`, "25", { account: acc.id });
+  const media = await fetchMedia(get, `/${acc.external_id}/media`, { account: acc.id });
   const stories = await captureStories(
     (path, params) => get(path, params ?? {}),
     acc.external_id,
@@ -782,7 +782,7 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
    * absorbs the shortfall. A day left for the next run costs nothing; a story
    * left for the next run may not exist by then.
    */
-  const media = await fetchMedia(get, "/me/media", "25", { account: acc.id });
+  const media = await fetchMedia(get, "/me/media", { account: acc.id });
   const stories = await captureStories(
     (path, params) => get(path, params ?? {}),
     acc.external_id,
@@ -1533,6 +1533,17 @@ async function captureStories(
  * cleanly if a run runs short, so this is a target rather than a promise.
  */
 const MEDIA_TARGET = Math.max(25, Number(process.env.IG_MEDIA_TARGET ?? 100));
+/*
+ * Posts per request, not the total. The total is MEDIA_TARGET above.
+ *
+ * Both call sites used to pass a literal "25" into a parameter fetchMedia had
+ * already stopped reading — it was named `_limit` and ignored — so the code read
+ * as though the ceiling were 25 posts when it is 100. That dead argument was
+ * removed on 2026-09-12 after it misled a reader into saying so out loud.
+ *
+ * Insights are expanded on the SAME request (`insights.metric(...)`), so 100
+ * posts cost four subrequests, not a hundred.
+ */
 const MEDIA_PAGE = 25;
 
 /**
@@ -1559,7 +1570,6 @@ const MEDIA_PAGE = 25;
 async function fetchMedia(
   get: (path: string, params: Record<string, string>) => Promise<any>,
   path: string,
-  _limit: string,
   ctx: Record<string, unknown>,
 ): Promise<{ data: any[]; withInsights: boolean }> {
   const fields = IG.MEDIA_FIELDS;
