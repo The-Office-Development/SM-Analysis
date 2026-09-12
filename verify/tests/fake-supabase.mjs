@@ -8,10 +8,31 @@
  */
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-export function makeDb(seed = {}) {
+/**
+ * `makeDb(seed, { failWrites: { audience_snapshots: "..." } })` makes every
+ * write to that table resolve as PostgREST does when it refuses one: no rows
+ * stored, no exception, `{ data: null, error }`.
+ *
+ * That resolve-don't-throw shape is the whole reason unchecked writes are
+ * invisible, so a fake that can only succeed cannot test for them. The message
+ * defaults to the real 42703 an unapplied migration produces — 0015 adds
+ * `dimensions` to audience_snapshots, and until it is applied this is verbatim
+ * what Supabase answers.
+ */
+const UNAPPLIED_MIGRATION = { code: "42703", message: 'column "dimensions" of relation "audience_snapshots" does not exist' };
+
+export function makeDb(seed = {}, opts = {}) {
   const tables = new Map();
   for (const [name, rows] of Object.entries(seed)) tables.set(name, rows.map((r) => ({ ...r })));
   const rowsOf = (t) => { if (!tables.has(t)) tables.set(t, []); return tables.get(t); };
+  const failWrites = opts.failWrites ?? {};
+  const writeError = (t) => {
+    if (!(t in failWrites)) return null;
+    const v = failWrites[t];
+    return v === true ? UNAPPLIED_MIGRATION
+      : typeof v === "string" ? { code: "42703", message: v }
+      : v;
+  };
 
   function query(table) {
     let rows = rowsOf(table).map((r) => ({ ...r }));
@@ -49,6 +70,9 @@ export function makeDb(seed = {}) {
         return out;
       },
       _run() {
+        // A refused write changes nothing and throws nothing — the only trace is
+        // the `error` a caller has to bother reading.
+        if (api._mutation && writeError(table)) return { data: null, error: writeError(table) };
         if (api._mutation?.type === "delete") {
           tables.set(table, rowsOf(table).filter((r) => !preds.every((p) => p(r))));
           return { data: null, error: null };
@@ -79,6 +103,15 @@ export function makeDb(seed = {}) {
   }
 
   function upsert(table, payload, opts = {}) {
+    const failed = writeError(table);
+    if (failed) {
+      const refused = {
+        select() { return refused; },
+        single() { return Promise.resolve({ data: null, error: failed }); },
+        then(res) { return Promise.resolve({ data: null, error: failed }).then(res); },
+      };
+      return refused;
+    }
     const list = Array.isArray(payload) ? payload : [payload];
     const keys = (opts.onConflict ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     const store = rowsOf(table);

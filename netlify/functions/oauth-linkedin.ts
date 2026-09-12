@@ -1,5 +1,5 @@
 import type { Handler } from "./_lib";
-import { userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin } from "./_lib";
+import { userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin, writeFailed } from "./_lib";
 import { LI } from "./_linkedin";
 
 /**
@@ -36,7 +36,9 @@ export const handler: Handler = async (event) => {
 
   const redirectUri = `${process.env.VITE_SITE_URL ?? process.env.URL ?? ""}/api/oauth-linkedin-callback`;
 
-  await admin().from("consents").insert({
+  // Checked, not fired and forgotten: this row is the evidence that consent was
+  // given, and under the PDPL an unrecorded consent is an absent one.
+  const { error: consentErr } = await admin().from("consents").insert({
     user_id: userId,
     purpose: "connect_linkedin",
     version: CONSENT_VERSION,
@@ -51,6 +53,7 @@ export const handler: Handler = async (event) => {
       grants_write_capable_scope: LI.SCOPES.some((s) => s.startsWith("rw_")),
     },
   });
+  writeFailed("oauth.consent_write_failed", consentErr, { uid: userId, provider: "linkedin" });
 
   const nonce = newNonce();
   const state = signState({ uid: userId, provider: "linkedin", n: nonce });

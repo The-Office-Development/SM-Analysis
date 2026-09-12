@@ -159,6 +159,18 @@ export function Terms() {
   );
 }
 
+/** What each recorded status means, in the words of the person it concerns. */
+const EXPLAIN: Record<string, string> = {
+  received: "We have your request and are working through it. This page updates when it finishes.",
+  completed: "Everything we held about you has been deleted. Nothing further is required from you.",
+  not_found: "We held nothing about you, so there was nothing to delete. This is not a refusal.",
+  failed:
+    "We tried and did not finish. Some of your data is still held, this is our fault and not a "
+    + "refusal, and it has been raised with us to complete by hand. Your sign-in has deliberately "
+    + "been left working so you can try again and so the remaining data stays traceable to you. "
+    + "Quote the code above if you contact us.",
+};
+
 export function DataDeletion() {
   const [params] = useSearchParams();
   const code = params.get("code");
@@ -179,11 +191,22 @@ export function DataDeletion() {
           <h3 style={{ marginTop: 0 }}>Request {code}</h3>
           {error && <p className="muted">{error}</p>}
           {status && (
-            <p>
-              Status: <b>{status.status}</b>
-              {status.completed_at && <> · completed {new Date(status.completed_at).toISOString().slice(0, 16).replace("T", " ")} UTC</>}
-              {typeof status.accounts_deleted === "number" && <> · {status.accounts_deleted} account(s) removed</>}
-            </p>
+            <>
+              <p>
+                Status: <b>{status.status}</b>
+                {status.completed_at && <> · {status.status === "failed" ? "attempted" : "completed"} {new Date(status.completed_at).toISOString().slice(0, 16).replace("T", " ")} UTC</>}
+                {typeof status.accounts_deleted === "number" && <> · {status.accounts_deleted} account(s) removed</>}
+              </p>
+              {/*
+                * A status word on its own is not an explanation, and for the Meta
+                * callback this page is the only place one can be given: the callback
+                * response carries a URL and a code and nothing else. Meta requires
+                * this page to give "a human-readable explanation of the status of
+                * their request, including a legitimate justification for any refusal
+                * to delete", so each status says what it means for the person reading.
+                */}
+              <p className="muted">{EXPLAIN[status.status as string] ?? "We could not interpret the status of this request. Please contact us and quote the code above."}</p>
+            </>
           )}
           {!status && !error && <p className="muted">Checking…</p>}
         </div>

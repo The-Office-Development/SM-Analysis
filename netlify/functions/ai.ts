@@ -1,6 +1,6 @@
 import type { Handler } from "./_lib";
 import Anthropic from "@anthropic-ai/sdk";
-import { userIdFromToken, json, admin, log } from "./_lib";
+import { userIdFromToken, json, admin, log, writeFailed } from "./_lib";
 
 /**
  * POST /api/ai   (Authorization: Bearer <supabase token>)
@@ -89,10 +89,16 @@ export const handler: Handler = async (event) => {
       .map((b) => b.text)
       .join("")
       .trim();
-    await db.from("ai_usage").insert({
+    // This row IS the rate limit: the two counts at the top of the handler read
+    // nothing else. An insert that fails silently does not just lose an audit
+    // line, it removes the cap, and the first sign of that is the invoice.
+    const { error: usageErr } = await db.from("ai_usage").insert({
       user_id: uid,
       input_tokens: resp.usage?.input_tokens ?? 0,
       output_tokens: resp.usage?.output_tokens ?? 0,
+    });
+    writeFailed("ai.usage_write_failed", usageErr, {
+      uid, note: "this row is what the per-hour and per-day caps count; unrecorded usage is uncapped usage",
     });
     return json(200, { answer: answer || "I couldn't produce an answer for that." });
   } catch (e) {

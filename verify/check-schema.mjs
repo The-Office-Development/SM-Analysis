@@ -67,6 +67,13 @@ const EXPECTED = [
   { version: "0014_needs_reauth", table: "social_accounts", column: "needs_reauth" },
   { version: "0015_audience_dimensions", table: "audience_snapshots", column: "dimensions" },
   { version: "0016_schema_migrations", table: "schema_migrations", column: "version" },
+  /*
+   * 0017 widens a CHECK constraint rather than adding a column, so like 0001 and
+   * 0009 there is nothing to probe for. Until it is applied, a deletion that
+   * genuinely failed cannot be recorded as failed — the row is refused and the
+   * only evidence is a log line.
+   */
+  { version: "0017_deletion_status_failed", table: null, column: null, note: "widens a check constraint; ledger row is the only evidence" },
 ];
 
 /** Every table anon must NOT be able to read. */
@@ -238,7 +245,17 @@ if (SERVICE !== undefined && String(SERVICE).trim() === "") {
   }
 
   for (const e of EXPECTED) {
-    if (!e.table) { ok(`${e.version} — ${e.note}`); continue; }
+    if (!e.table) {
+      /*
+       * Nothing to probe for, so the ledger is all there is — which means this
+       * branch must actually CONSULT it rather than printing the note and
+       * calling it ok. It did, briefly, and reported "ok" for a migration the
+       * drift check two lines below was simultaneously failing on.
+       */
+      if (recorded && !recorded.has(e.version)) bad(`${e.version} — not applied (${e.note})`);
+      else ok(`${e.version} — ${e.note}`);
+      continue;
+    }
     const res = await rest(`${e.table}?select=${e.column}&limit=1`, SERVICE);
     const body = await res.json().catch(() => ({}));
     const inLedger = recorded ? recorded.has(e.version) : null;

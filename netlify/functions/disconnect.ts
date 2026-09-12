@@ -1,6 +1,7 @@
 import type { Handler } from "./_lib";
 import {
-  admin, userIdFromToken, json, decryptToken, appsecretProof, log, GRAPH, type Db,
+  admin, userIdFromToken, json, decryptToken, appsecretProof, log, writeFailed, GRAPH,
+  type Db, type WriteError,
 } from "./_lib";
 
 /**
@@ -41,17 +42,24 @@ export const handler: Handler = async (event) => {
       .neq("id", acc.id);
     if (!siblings?.length) {
       revoked = await revokeIdentity(db, acc.identity_id, acc.platform);
-      await db.from("provider_identities").delete().eq("id", acc.identity_id);
+      const { error } = await db.from("provider_identities").delete().eq("id", acc.identity_id);
+      writeFailed("disconnect.delete_failed", error, { uid, identity: acc.identity_id, table: "provider_identities" });
     }
   }
 
   // Delete the credential first: if anything below fails, the worst outcome is
   // orphaned metrics, never a live token we no longer show the user.
-  await db.from("account_secrets").delete().eq("account_id", acc.id);
-  await db.from("metrics_daily").delete().eq("account_id", acc.id);
-  await db.from("content").delete().eq("account_id", acc.id);
-  await db.from("audience_snapshots").delete().eq("account_id", acc.id);
-  await db.from("social_accounts").delete().eq("id", acc.id);
+  //
+  // The response below tells the client their data has been deleted. A delete
+  // that quietly failed makes that sentence untrue, and the stored token is the
+  // row this comment was written to protect.
+  const gone = (table: string, res: { error?: WriteError | null }) =>
+    writeFailed("disconnect.delete_failed", res.error, { uid, account: acc.id, table });
+  gone("account_secrets", await db.from("account_secrets").delete().eq("account_id", acc.id));
+  gone("metrics_daily", await db.from("metrics_daily").delete().eq("account_id", acc.id));
+  gone("content", await db.from("content").delete().eq("account_id", acc.id));
+  gone("audience_snapshots", await db.from("audience_snapshots").delete().eq("account_id", acc.id));
+  gone("social_accounts", await db.from("social_accounts").delete().eq("id", acc.id));
 
   log("account.disconnected", { uid, account: acc.id, platform: acc.platform, revoked });
   return json(200, {

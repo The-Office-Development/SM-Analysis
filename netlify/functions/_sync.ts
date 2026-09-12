@@ -1,4 +1,4 @@
-import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log } from "./_lib";
+import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log, writeFailed } from "./_lib";
 import { igGet, IG } from "./_instagram";
 import {
   LI, liGet, liNum, liLikes, liTime, liDayKey, type LiShareStats,
@@ -420,10 +420,32 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
       : acc.platform === "facebook" ? await audienceFacebook(acc, token, counter)
       : acc.platform === "linkedin" ? await audienceLinkedIn(acc, token, counter) : null;
     if (snap && hasAudience(snap)) {
-      await db.from("audience_snapshots").upsert(
+      /*
+       * The error here is NOT discarded, for the same reason it is not discarded
+       * on the token read above: the symptom and the cause look nothing alike.
+       *
+       * supabase-js resolves rather than throws on a PostgREST error, so this
+       * upsert used to lose a whole day's demographics in silence — an
+       * unapplied migration naming a column that does not exist yet, a grant,
+       * an RLS policy, a constraint. Migration 0015 adds `dimensions`, and until
+       * it is applied every LinkedIn demographic is rejected here.
+       *
+       * Logged rather than thrown. The snapshot is genuinely optional — the
+       * surrounding catch says so — and taking down the metrics and content
+       * writes below because demographics could not be stored would turn a blank
+       * Audience panel into a blank dashboard. What must not happen is that it
+       * goes unrecorded.
+       */
+      const { error } = await db.from("audience_snapshots").upsert(
         { account_id: acc.id, platform: acc.platform, captured_on: today(), ...snap },
         { onConflict: "account_id,captured_on" }
       );
+      writeFailed("sync.audience_write_failed", error, {
+        account: acc.id, platform: acc.platform, captured_on: today(),
+        note: "demographics were fetched and then refused by the database. The Audience "
+          + "page will be empty, which is indistinguishable from a platform that reported "
+          + "nothing. Check that every migration has been applied.",
+      });
     }
   } catch (e) {
     if (e instanceof SkipAudience) { /* already have today's; nothing to do */ }
@@ -467,7 +489,14 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     if (error) throw error;
   }
 
-  await db.from("social_accounts").update({ last_synced_at: new Date().toISOString() }).eq("id", acc.id);
+  /*
+   * A lost `last_synced_at` is not cosmetic: it is what the manual-sync throttle
+   * and the "updated N minutes ago" line both read. Dropped silently, the run
+   * did happen and nothing in the product can tell.
+   */
+  const { error: stampErr } = await db
+    .from("social_accounts").update({ last_synced_at: new Date().toISOString() }).eq("id", acc.id);
+  writeFailed("sync.last_synced_write_failed", stampErr, { account: acc.id, platform: acc.platform });
   return { calls: counter.calls, rowsWritten };
 }
 

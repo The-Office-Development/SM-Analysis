@@ -1,5 +1,5 @@
 import type { Handler } from "./_lib";
-import { userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin } from "./_lib";
+import { userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin, writeFailed } from "./_lib";
 import { authorizeUrl, IG } from "./_instagram";
 
 /** Bump when the consent wording or the requested scopes change. */
@@ -26,7 +26,9 @@ export const handler: Handler = async (event) => {
 
   const redirectUri = `${process.env.VITE_SITE_URL ?? process.env.URL ?? ""}/api/oauth-instagram-callback`;
 
-  await admin().from("consents").insert({
+  // Checked, not fired and forgotten: this row is the evidence that consent was
+  // given, and under the PDPL an unrecorded consent is an absent one.
+  const { error: consentErr } = await admin().from("consents").insert({
     user_id: userId,
     purpose: "connect_instagram",
     version: CONSENT_VERSION,
@@ -37,6 +39,7 @@ export const handler: Handler = async (event) => {
       auth_mode: "instagram_login",
     },
   });
+  writeFailed("oauth.consent_write_failed", consentErr, { uid: userId, provider: "instagram" });
 
   const nonce = newNonce();
   const url = authorizeUrl(clientId, redirectUri, signState({ uid: userId, provider: "instagram", n: nonce }));

@@ -1,7 +1,7 @@
 import type { Handler } from "./_lib";
 import {
   env, verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
-  backToApp, encryptToken, log, AccountOwnedByAnotherTenant,
+  backToApp, encryptToken, log, requireWrite, AccountOwnedByAnotherTenant,
 } from "./_lib";
 
 /** TikTok OAuth redirect target — exchanges the code and stores the creator account. */
@@ -64,14 +64,22 @@ export const handler: Handler = async (event) => {
       },
       { access_token: tok.access_token, refresh_token: tok.refresh_token ?? null, expires_at: expiresAt, extra: { scope: tok.scope } });
 
-    // The refresh token is what keeps a TikTok connection alive past 24 hours.
-    await admin().from("provider_identities").upsert({
+    /*
+     * The refresh token is what keeps a TikTok connection alive past 24 hours.
+     *
+     * Thrown rather than logged: without this row the connection is dead by
+     * tomorrow, and a client told "connected" who finds an empty dashboard the
+     * next morning has no way to tell that from a broken product. Better to fail
+     * the connection now, while they are still in the flow and can retry.
+     */
+    const { error: idErr } = await admin().from("provider_identities").upsert({
       user_id: state.uid, provider: "tiktok",
       external_user_id: String(tok.open_id || u.open_id || "tiktok_user"),
       access_token: encryptToken(tok.access_token),
       refresh_token: tok.refresh_token ? encryptToken(tok.refresh_token) : null,
       expires_at: expiresAt, updated_at: new Date().toISOString(),
     }, { onConflict: "user_id,provider,external_user_id" });
+    requireWrite("oauth.identity_write_failed", idErr, { uid: state.uid, provider: "tiktok" });
 
     log("oauth.connected", { provider: "tiktok", uid: state.uid });
     return backToApp("connected", "tiktok", clear);

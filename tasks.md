@@ -224,16 +224,27 @@ connection.
   (`needs_reauth`) is **not yet applied**.
 - **Phase 2, audience demographics — DONE 2026-09-12.** Migration **0015**
   (`dimensions` on `audience_snapshots`) is **not yet applied**. Until it is, the
-  snapshot write names a column that does not exist; PostgREST returns an error
-  which this call site does not check, so the demographics are **silently not
-  stored** and the Audience page stays empty with nothing logged. Apply 0014 and
-  0015 together. (That unchecked upsert is pre-existing and applies to every
-  platform's audience write — worth fixing separately.) The Audience page renders industry, seniority, job function, company
-  size and market areas, and says plainly that age and gender are not reported
-  for a Company Page rather than showing an empty panel. Rendering it found two
-  more defects that code review had not — one of them already shipped and
-  affecting Facebook Pages: an account with no gender data was drawing a full bar
-  reading "Other 100%".
+  snapshot write names a column that does not exist and PostgREST refuses it, so
+  the demographics are not stored and the Audience page stays empty. Apply 0014
+  and 0015 together. **It is no longer silent** — that unchecked upsert was
+  pre-existing and applied to every platform's audience write, and it is now
+  fixed along with the other 21 unchecked writes; a refused snapshot logs
+  `sync.audience_write_failed` carrying the database's own message, which is what
+  turns "the Audience page is empty" into "0015 has not been applied". See
+  `writeFailed`/`requireWrite` in `_lib.ts` and the invariant in CLAUDE.md.
+  The Audience page renders industry, seniority, job function, company size and
+  market areas, and says plainly that age and gender are not reported for a
+  Company Page rather than showing an empty panel. Rendering it found two more
+  defects that code review had not — one of them already shipped and affecting
+  Facebook Pages: an account with no gender data was drawing a full bar reading
+  "Other 100%".
+- **Migration `0017` (deletion status `failed`) is not yet applied.** Written as
+  0016 on a parallel branch and renumbered on merge, because 0016 is the
+  migrations ledger and is already applied in production. Both deletion endpoints
+  now record what actually happened rather than what was attempted, and `failed`
+  is the value that says so. Until 0017 is applied the 0003 check constraint
+  rejects it, so the record of a failed erasure is itself refused — logged, but
+  lost.
 - **Phase 3, live verification — blocked** on Community Management API access,
   which needs a brand-new developer application holding no other API product.
 

@@ -1,5 +1,5 @@
 import type { Handler } from "./_lib";
-import { env, userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin } from "./_lib";
+import { env, userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin, writeFailed } from "./_lib";
 
 /**
  * Starts the TikTok Login Kit (v2) OAuth flow.
@@ -24,7 +24,9 @@ export const handler: Handler = async (event) => {
 
   // Consent is the lawful basis under Jordan's PDPL, so the moment it is given
   // is recorded rather than assumed. Withdrawal is the Disconnect action.
-  await admin().from("consents").insert({
+  // Checked, not fired and forgotten: this row is the evidence that consent was
+  // given, and under the PDPL an unrecorded consent is an absent one.
+  const { error: consentErr } = await admin().from("consents").insert({
     user_id: userId,
     purpose: "connect_tiktok",
     version: CONSENT_VERSION,
@@ -34,6 +36,7 @@ export const handler: Handler = async (event) => {
       scopes: scope,
     },
   });
+  writeFailed("oauth.consent_write_failed", consentErr, { uid: userId, provider: "tiktok" });
 
   const nonce = newNonce();
   const url = new URL("https://www.tiktok.com/v2/auth/authorize/");

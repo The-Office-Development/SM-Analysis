@@ -1,4 +1,4 @@
-import { type Db, env, encryptToken, decryptToken, graphGet, log, GRAPH } from "./_lib";
+import { type Db, env, encryptToken, decryptToken, graphGet, log, writeFailed, requireWrite, GRAPH } from "./_lib";
 import { refreshLongLivedToken } from "./_instagram";
 
 /**
@@ -50,17 +50,24 @@ export function needsRefresh(id: Identity, now = Date.now()): boolean {
  */
 export async function acquireRefreshLock(db: Db, identityId: string, now = Date.now()): Promise<boolean> {
   const stale = new Date(now - LOCK_STALE_MS).toISOString();
-  const { data } = await db
+  const { data, error } = await db
     .from("provider_identities")
     .update({ refresh_lock_at: new Date(now).toISOString() })
     .eq("id", identityId)
     .or(`refresh_lock_at.is.null,refresh_lock_at.lt.${stale}`)
     .select("id");
+  // Failing closed is right — never refresh without the lock — but an error and
+  // a lost race produce the same empty result, and only one of them is normal.
+  writeFailed("token.lock_acquire_failed", error, { identity: identityId });
   return Array.isArray(data) && data.length > 0;
 }
 
 export async function releaseRefreshLock(db: Db, identityId: string) {
-  await db.from("provider_identities").update({ refresh_lock_at: null }).eq("id", identityId);
+  // A lock that fails to clear blocks every refresh of this identity until it
+  // goes stale. Recoverable, but only if somebody can see it happened.
+  const { error } = await db.from("provider_identities")
+    .update({ refresh_lock_at: null }).eq("id", identityId);
+  writeFailed("token.lock_release_failed", error, { identity: identityId });
 }
 
 /** Re-exchange a Meta long-lived user token, then refresh the Page tokens. */
@@ -76,12 +83,20 @@ async function refreshMeta(db: Db, id: Identity): Promise<boolean> {
   if (!body.access_token) throw new Error(body.error?.message || "meta_refresh_failed");
 
   const expiresAt = body.expires_in ? new Date(Date.now() + body.expires_in * 1000).toISOString() : null;
-  await db.from("provider_identities").update({
+  /*
+   * The platform has already issued a new token by this point. If storing it
+   * fails and nobody notices, the identity keeps the old one and the refresh
+   * window closes around it — the connection dies at its own expiry, weeks
+   * later, with no line anywhere saying why. Thrown, so refreshIdentity records
+   * a failure instead of logging "token.refreshed" over a token it did not keep.
+   */
+  const { error: idErr } = await db.from("provider_identities").update({
     access_token: encryptToken(body.access_token),
     expires_at: expiresAt,
     last_refresh_at: new Date().toISOString(),
     refresh_failures: 0,
   }).eq("id", id.id);
+  requireWrite("token.identity_write_failed", idErr, { identity: id.id, provider: "meta" });
 
   // Page tokens are derived from the user token; re-read them so a rotated or
   // newly-permitted Page does not go stale.
@@ -91,9 +106,10 @@ async function refreshMeta(db: Db, id: Identity): Promise<boolean> {
       const { data: accts } = await db
         .from("social_accounts").select("id").eq("identity_id", id.id).eq("external_id", p.id);
       for (const a of accts ?? []) {
-        await db.from("account_secrets")
+        const { error } = await db.from("account_secrets")
           .update({ access_token: encryptToken(p.access_token), expires_at: expiresAt })
           .eq("account_id", a.id);
+        writeFailed("token.account_secret_write_failed", error, { account: a.id, provider: "meta" });
       }
     }
   } catch (e) {
@@ -123,7 +139,10 @@ async function refreshTiktok(db: Db, id: Identity): Promise<boolean> {
   if (!body.access_token) throw new Error(body.error_description || body.error || "tiktok_refresh_failed");
 
   const expiresAt = body.expires_in ? new Date(Date.now() + body.expires_in * 1000).toISOString() : null;
-  await db.from("provider_identities").update({
+  // TikTok has just rotated the refresh token, which invalidates the one we
+  // hold. Losing this write silently is therefore not "no change" — it is the
+  // end of the connection, and the next refresh fails with no explanation.
+  const { error: idErr } = await db.from("provider_identities").update({
     access_token: encryptToken(body.access_token),
     // Persist the ROTATED refresh token, falling back to the existing one only
     // if the provider did not issue a new one.
@@ -132,13 +151,15 @@ async function refreshTiktok(db: Db, id: Identity): Promise<boolean> {
     last_refresh_at: new Date().toISOString(),
     refresh_failures: 0,
   }).eq("id", id.id);
+  requireWrite("token.identity_write_failed", idErr, { identity: id.id, provider: "tiktok" });
 
   // The account rows carry their own copy of the access token.
   const { data: accts } = await db.from("social_accounts").select("id").eq("identity_id", id.id);
   for (const a of accts ?? []) {
-    await db.from("account_secrets")
+    const { error } = await db.from("account_secrets")
       .update({ access_token: encryptToken(body.access_token), expires_at: expiresAt })
       .eq("account_id", a.id);
+    writeFailed("token.account_secret_write_failed", error, { account: a.id, provider: "tiktok" });
   }
   return true;
 }
@@ -146,18 +167,23 @@ async function refreshTiktok(db: Db, id: Identity): Promise<boolean> {
 /** Refresh an Instagram Login token by presenting the token itself. */
 async function refreshInstagram(db: Db, id: Identity): Promise<boolean> {
   const { accessToken, expiresAt } = await refreshLongLivedToken(decryptToken(id.access_token));
-  await db.from("provider_identities").update({
+  // An Instagram Login token that lapses cannot be recovered at all — the client
+  // has to re-authorise — so a refreshed token that fails to store is the
+  // expensive kind of silence.
+  const { error: idErr } = await db.from("provider_identities").update({
     access_token: encryptToken(accessToken),
     expires_at: expiresAt,
     last_refresh_at: new Date().toISOString(),
     refresh_failures: 0,
   }).eq("id", id.id);
+  requireWrite("token.identity_write_failed", idErr, { identity: id.id, provider: "instagram" });
 
   const { data: accts } = await db.from("social_accounts").select("id").eq("identity_id", id.id);
   for (const a of accts ?? []) {
-    await db.from("account_secrets")
+    const { error } = await db.from("account_secrets")
       .update({ access_token: encryptToken(accessToken), expires_at: expiresAt })
       .eq("account_id", a.id);
+    writeFailed("token.account_secret_write_failed", error, { account: a.id, provider: "instagram" });
   }
   return true;
 }
@@ -176,9 +202,10 @@ export async function refreshIdentity(db: Db, id: Identity): Promise<"skipped" |
     return "refreshed";
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
-    await db.from("provider_identities")
+    const { error: failErr } = await db.from("provider_identities")
       .update({ refresh_failures: (0) + 1, last_refresh_at: new Date().toISOString() })
       .eq("id", id.id);
+    writeFailed("token.failure_counter_write_failed", failErr, { identity: id.id, provider: id.provider });
     log("token.refresh_failed", { identity: id.id, provider: id.provider, detail });
     return "failed";
   } finally {
@@ -222,9 +249,10 @@ export async function flagLinkedInExpiry(
   // `needs_reauth` is what the Connections page reads to put a reconnect prompt
   // in front of the client. Set on the ACCOUNT rather than the identity because
   // that is the thing they recognise: a page with a name, not a token.
-  await db.from("social_accounts")
+  const { error: flagErr } = await db.from("social_accounts")
     .update({ needs_reauth: true })
     .eq("identity_id", id.id);
+  writeFailed("token.needs_reauth_write_failed", flagErr, { identity: id.id, provider: id.provider });
 
   log("token_refresh.linkedin_needs_browser", {
     identity: id.id, provider: id.provider, days_left: daysLeft,

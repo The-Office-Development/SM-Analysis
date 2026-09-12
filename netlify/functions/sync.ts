@@ -1,5 +1,5 @@
 import type { Handler } from "./_lib";
-import { admin, userIdFromToken, json, isAuthError, isThrottleError, log, type Db } from "./_lib";
+import { admin, userIdFromToken, json, isAuthError, isThrottleError, log, writeFailed, type Db } from "./_lib";
 import { syncAccount, MAX_BACKFILL, type AccountRow } from "./_sync";
 
 /**
@@ -48,7 +48,11 @@ export async function runAccount(db: Db, acc: AccountRow, userId: string | null)
     // message: a metric-deprecation error containing the word "token" used to
     // flag a healthy account as expired and send the client round OAuth again.
     if (code === "auth") {
-      await db.from("social_accounts").update({ status: "expired" }).eq("id", acc.id);
+      // This flag is the only thing that puts a reconnect prompt in front of the
+      // client. Lost, the account stays "connected" while every sync fails.
+      const { error: flagErr } = await db
+        .from("social_accounts").update({ status: "expired" }).eq("id", acc.id);
+      writeFailed("sync.expired_flag_write_failed", flagErr, { account: acc.id });
     }
     const { error: logErr } = await db.from("sync_log").insert({
       account_id: acc.id, user_id: userId, started_at: started,

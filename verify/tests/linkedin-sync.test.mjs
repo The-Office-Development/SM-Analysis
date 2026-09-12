@@ -242,7 +242,10 @@ test("a LinkedIn token is never reported as refreshed, because it cannot be", as
   const updates = [];
   const db = {
     from: () => ({
-      update: (patch) => ({ eq: async (col, val) => { updates.push({ patch, col, val }); } }),
+      // Resolves to { error } like the real client does, because the caller now
+      // reads it: a flag that silently failed to save is a client who never gets
+      // the reconnect prompt this whole function exists to raise.
+      update: (patch) => ({ eq: async (col, val) => { updates.push({ patch, col, val }); return { data: [], error: null }; } }),
     }),
   };
   const id = {

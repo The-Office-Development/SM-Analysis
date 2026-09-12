@@ -9,6 +9,7 @@ process.env.TOKEN_ENC_KEY = Buffer.alloc(32, 7).toString("base64");
 process.env.META_APP_SECRET = "test-app-secret";
 
 const { verifySignedRequest, deleteEverythingForMetaUser } = await import("../build/meta-data-deletion.js");
+const { deletionStatus } = await import("../build/_lib.js");
 
 function signedRequest(payload, secret = "test-app-secret") {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -50,8 +51,9 @@ test("deletion actually removes the tokens, the accounts and the metrics", async
     audience_snapshots: [{ account_id: "a1", captured_on: "2026-08-01" }],
   });
 
-  const deleted = await deleteEverythingForMetaUser(db, "fb-9");
+  const { deleted, failed } = await deleteEverythingForMetaUser(db, "fb-9");
   assert.equal(deleted, 2);
+  assert.equal(failed, 0);
 
   assert.deepEqual(db._rows("social_accounts").map((r) => r.id), ["other"], "only this user's accounts go");
   assert.deepEqual(db._rows("account_secrets").map((r) => r.account_id), ["other"], "tokens deleted");
@@ -63,5 +65,43 @@ test("deletion actually removes the tokens, the accounts and the metrics", async
 
 test("a deletion request for an unknown user reports nothing deleted", async () => {
   const db = makeDb({ provider_identities: [], social_accounts: [] });
-  assert.equal(await deleteEverythingForMetaUser(db, "nobody"), 0);
+  assert.deepEqual(await deleteEverythingForMetaUser(db, "nobody"), { deleted: 0, failed: 0 });
+});
+
+test("a deletion that could not delete reports the failure, not a count", async () => {
+  /*
+   * The count alone cannot tell an erasure that worked from one where every
+   * delete was refused: the loop reaches the end either way, and supabase-js
+   * resolves rather than throws, so `deleted` is 1 in both cases.
+   *
+   * This is the difference between a confirmation code that means something and
+   * one that closes a data subject's request against data we still hold —
+   * which the suite's own comment above calls an App Review failure and an
+   * enforcement risk.
+   */
+  const db = makeDb({
+    provider_identities: [{ id: "pi-1", provider: "meta", external_user_id: "fb-9", user_id: "u1" }],
+    social_accounts: [{ id: "a1", identity_id: "pi-1", user_id: "u1", platform: "instagram" }],
+    metrics_daily: [{ account_id: "a1", date: "2026-08-01" }],
+  }, { failWrites: { metrics_daily: { code: "42501", message: "permission denied for table metrics_daily" } } });
+
+  const { deleted, failed } = await deleteEverythingForMetaUser(db, "fb-9");
+  assert.equal(deleted, 1, "the account itself did go");
+  assert.ok(failed > 0, "and the refused delete is counted, not absorbed");
+  assert.equal(db._rows("metrics_daily").length, 1, "the data really is still there");
+});
+
+/* ---- what the request row is allowed to claim ---------------------------- */
+
+test("a failure outranks every other status", () => {
+  /*
+   * There is no "partly deleted" for a data subject: either their data is gone
+   * or it is not. A row that says 'completed' over rows the database refused
+   * closes the request, issues a confirmation code, and tells the person their
+   * data is gone while we still hold it.
+   */
+  assert.equal(deletionStatus(true, 0), "completed");
+  assert.equal(deletionStatus(false, 0), "not_found", "holding nothing is not a refusal");
+  assert.equal(deletionStatus(true, 1), "failed", "one refused write is enough");
+  assert.equal(deletionStatus(false, 1), "failed", "and it outranks 'nothing to delete' too");
 });

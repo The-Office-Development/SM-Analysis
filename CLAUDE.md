@@ -216,6 +216,30 @@ P0 finding. There is a test and a mutation guarding every one.
   dashboard snapshot goes in a user turn; captions are data, not instructions.
 - **Never swallow a throttle or auth error** in the sync. Degrading silently is
   what turned platform rate limiting into data loss.
+- **Never leave a Supabase write unchecked.** supabase-js does not throw on a
+  PostgREST error — `.upsert()` resolves with `{ error }` and the next line runs
+  — so a call site that ignores `error` reads an unapplied migration, a missing
+  grant, an RLS refusal or a constraint violation as success. The audience
+  snapshot did exactly that: until `0015` is applied, every LinkedIn demographic
+  was fetched, refused and reported as stored, presenting as an empty Audience
+  page that looks identical to a platform with nothing to report. Use
+  `writeFailed()` from `_lib.ts`, or `requireWrite()` where losing the write
+  changes what the caller may then claim. Three mutations guard it.
+- **Never record a deletion as completed without checking that it deleted.** The
+  count of accounts reached is identical whether every delete succeeded or every
+  one was refused, because the loop runs to the end either way. `deletionStatus()`
+  in `_lib.ts` holds the rule for both endpoints: a failure outranks everything,
+  because there is no "partly deleted" for a data subject. Meta's callback
+  response has no failure channel — it documents `url` and `confirmation_code`
+  and nothing else — but it does require the confirmation URL to give "a
+  human-readable explanation of the status of their request, including a
+  legitimate justification for any refusal to delete", so the status page is
+  where the truth goes. Needs migration `0017`. Two mutations guard it.
+- **Never delete the sign-in record when the erasure failed.** `account-data.ts`
+  keeps it deliberately: rows we could not delete, orphaned from the only
+  identity tying them to a person, become data about someone we can no longer
+  identify, cannot erase on request, and cannot let sign in to retry. An
+  incomplete erasure is recoverable; one with the key thrown away is not.
 - **Never add `paidFollowerCount` to `organicFollowerCount`** in LinkedIn's
   follower demographics. The field is named for one thing and documented to hold
   another: "results are rolled up as a total of both organic and paid followers
