@@ -145,6 +145,57 @@ Meta names the reason. Map it:
 Resubmission is allowed. Fix the named reason rather than resubmitting the same
 pack, and change one thing at a time so you learn what mattered.
 
+## 1b. What actually happened, 2026-09-13
+
+Submitted and **in review** (Meta states about 2 business days). Recorded because
+the route differed from Phase 1-2 above in three ways that a future session would
+otherwise re-derive:
+
+- **The wizard is not reached from Security Centre on its own.** Security Centre
+  said *"Your organization does not need to be verified"* until the app was
+  connected to the portfolio. Business Verification is demand-driven: connecting
+  the app under **App settings - Basic - Business portfolio** on
+  developers.facebook.com is what turns it into "Eligible for verification", with
+  a **Start business verification** button on that same page, and a use-case
+  selector ("App requires access to permissions on Meta for Developers") in
+  Security Centre.
+- **The name fields solved the Arabic/English question rather than forcing it.**
+  The form takes a **Business name** plus an **Alternative business name**, so the
+  Arabic legal name went in the first and the AGATO English rendering in the
+  second, with a single upload carrying both (Arabic registration pages followed
+  by the certified translation, national IDs redacted). Meta then resolved the
+  record itself and now displays **AL HUJRA INFORMATION TECHNOLOGY** - the
+  no-suffix string D&B and Google hold - which means the lookup matched an
+  official register rather than falling back to document review.
+- **The address came from the D&B record, not the registration.** The
+  registration carries only "Amman". D-U-N-S 850390322 holds
+  **Lina An-Nabulsi Street, Amman 11171**, phone **+962 78 866 1142**, created
+  14 Aug 2026 and resolved by D&B as "verified through national registry". That is
+  what was submitted, and it agrees with the public website and the Play Console.
+  A third address in circulation (Ali Al-Lawansi Street 10, 11623, from the v4 D&B
+  questionnaire) reached **no** register and must not be submitted anywhere. The
+  full record is in the handbook at `company/README.md`, "Office address".
+
+**A utility bill was therefore not the blocker this document assumed.** Phase 0
+recorded it as "the only genuinely missing item", reasoning that Business info
+needs a street address the registration does not carry. The step that actually
+mattered was having an address an external register already held.
+
+### Access verification (Tech Provider) - a gate this document did not know about
+
+The same App settings page carries a second control, below business verification:
+
+> "Verify that your business is a Tech Provider. This is an additional step that
+> is required to get access to the Meta business assets and information of other
+> businesses. We review submissions and follow up within 5 days."
+
+**That describes this product exactly.** Clients connect their own Instagram
+professional accounts, which are other businesses' assets. Treat it as a third
+gate beside Business Verification and App Review rather than an optional extra,
+and note that it is itself blocked until business verification completes, so the
+sequencing is fixed. Nothing here has been attempted yet, and the 5-day figure is
+Meta's own wording on that page, not a measured turnaround.
+
 ## 2. The Instagram app — configuration
 
 **Where:** [developers.facebook.com](https://developers.facebook.com) → your app.

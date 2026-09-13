@@ -93,6 +93,22 @@ Further consequences identified:
   The earlier worry that a resold `it.com` subdomain would block both was wrong.
   Point `app.theoffice.it.com` at Netlify and keep the marketing site where it is.
 
+### Business Verification: submitted 2026-09-13, in review
+
+Meta says about 2 business days. **Do not edit the business name or address while
+it is pending**; a mid-review change is treated as a mismatch.
+
+The utility bill was never needed. The address submitted is the one D&B already
+holds against D-U-N-S 850390322 - Lina An-Nabulsi Street, Amman 11171, phone
++962 78 866 1142 - so the bullet above saying the registration's missing street
+address was "the only genuinely missing item" was wrong about what was missing.
+What was missing was an address an external register corroborates, and one
+existed. `SETUP-META.md` §1b has the full account, including that the wizard only
+appears once the app is connected to the portfolio, and that a **Tech Provider
+access verification** (Meta's wording: required "to get access to the Meta
+business assets and information of other businesses") is a third gate nobody had
+recorded.
+
 ### The plan — direct Meta, Tester-role pilot
 
 **Decided 2026-08-28, superseding the two-track proposal.** The data source is
