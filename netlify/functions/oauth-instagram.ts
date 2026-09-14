@@ -3,7 +3,7 @@ import { userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, a
 import { authorizeUrl, IG } from "./_instagram";
 
 /** Bump when the consent wording or the requested scopes change. */
-const CONSENT_VERSION = "2026-08-1";
+const CONSENT_VERSION = "2026-09-14";
 
 /**
  * Starts the Instagram Login flow.

@@ -11,7 +11,7 @@ import { LI } from "./_linkedin";
  * materially different from the Instagram connection, and the consent record has
  * to show which wording they saw when they agreed to it.
  */
-const CONSENT_VERSION = "2026-09-1";
+const CONSENT_VERSION = "2026-09-14";
 
 /**
  * Starts the LinkedIn Company Page flow.

@@ -25,6 +25,9 @@ const ANALYTICS = "verify/build-lib/analytics.js";
 const SNAPSHOT = "verify/build-lib/snapshot.js";
 
 const mutations = [
+  { name: "an Instagram deletion request looked up as a Meta user", file: DELETION,
+    find: 'return { payload: ig, provider: "instagram" };',
+    replace: 'return { payload: ig, provider: "meta" };' },
   { name: "reach inflated 10x", file: SYNC,
     find: "byDate[date] = v.value;", replace: "byDate[date] = v.value * 10;" },
   { name: "every day filed 5 days late", file: SYNC,
@@ -364,8 +367,8 @@ const mutations = [
     find: "    if (failed > 0)\n        return \"failed\";",
     replace: "    if (false)\n        return \"failed\";" },
   { name: "refused deletes not counted, so the request looks clean", file: DELETION,
-    find: "{ provider: \"meta\", account: a.id, table }))\n                    failed++;",
-    replace: "{ provider: \"meta\", account: a.id, table }))\n                    failed += 0;" },
+    find: "{ provider, account: a.id, table }))\n                    failed++;",
+    replace: "{ provider, account: a.id, table }))\n                    failed += 0;" },
   { name: "writeFailed reports every failed write as a success", file: LIB,
     find: "    if (!error)\n        return false;",
     replace: "    if (error)\n        return false;" },

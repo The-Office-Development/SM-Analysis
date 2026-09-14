@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { useDemo } from "../context/DemoContext";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
 import { isConfigured } from "../lib/supabase";
 import { startOAuth, disconnectAccount, exportMyData, deleteMyAccount } from "../lib/api";
 import { PLATFORMS, PLATFORM_ORDER, PLATFORM_FILL } from "../lib/platforms";
@@ -58,10 +59,20 @@ export default function Connections() {
     }
   }
 
-  async function disconnect(id: string, name: string) {
+  async function disconnect(id: string, platform: Platform) {
     if (demo) { toast("Preview mode: disconnecting is disabled."); return; }
+    const name = PLATFORMS[platform].name;
+    /*
+     * Say "revokes" only where disconnect.ts actually revokes. It does for
+     * Facebook Login and TikTok; for Instagram Login and LinkedIn it deletes our
+     * token and data but cannot withdraw the grant at the platform, so the client
+     * is told where to do that themselves. This dialog used to promise revocation
+     * for every platform, including the only one with live accounts.
+     */
+    const withdraw = REMOVE_AT_PLATFORM[platform];
     if (!confirm(
-      `Disconnect ${name}?\n\nThis revokes PulseBoard's access at the platform and permanently deletes the metrics, posts and audience data we hold for this account. It cannot be undone.`
+      `Disconnect ${name}?\n\nThis permanently deletes the metrics, posts and audience data we hold for this account, and our stored access token. It cannot be undone.`
+      + (withdraw ? `\n\nTo also withdraw the permission on ${name}'s side, open ${withdraw} afterwards.` : "")
     )) return;
     try {
       toast(await disconnectAccount(id));
@@ -79,19 +90,26 @@ export default function Connections() {
         <IcAlert />
         <div className="bt">
           <b>Live data needs approved platform apps.</b>
-          <p>Connections use official read-only OAuth: PulseBoard never sees your password, and you can revoke access at any time from the platform's own settings. Until the developer apps pass review, only accounts added as testers can connect. See the README for setup.</p>
+          <p>Connections use official read-only OAuth: PulseBoard never sees your password, and you can revoke access at any time from the platform's own settings. Until the developer apps pass review, only accounts added as testers can connect.</p>
         </div>
       </div>
 
       {/* Consent is the lawful basis under Jordan's PDPL, and the server records
-          the moment it is given. This is the visible half of that. */}
+          the moment it is given. This is the visible half of that.
+          The sentence about processing outside Jordan is what PDPL Article 15(A)(5)
+          requires for a transfer abroad: consent "after informing them of the
+          insufficient level of protection". Change the wording and bump
+          CONSENT_VERSION in every oauth-*.ts starter, or the recorded consents stop
+          describing what was agreed to. */}
       <label className="panel" style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: 14, marginBottom: 4, cursor: "pointer" }}>
         <input type="checkbox" checked={consented} onChange={(e) => setConsented(e.target.checked)} style={{ marginTop: 3 }} />
         <span style={{ fontSize: 13.5, lineHeight: 1.5 }}>
           I own or am authorised to manage the accounts I connect, and I agree that PulseBoard may read their
           analytics, including aggregated audience statistics about my followers, as described in the{" "}
           <a href="/privacy" target="_blank" rel="noreferrer">privacy policy</a> and{" "}
-          <a href="/terms" target="_blank" rel="noreferrer">terms</a>. Access is read-only and I can withdraw it at any time by disconnecting.
+          <a href="/terms" target="_blank" rel="noreferrer">terms</a>. I understand this data is stored and processed
+          outside Jordan, by the providers the privacy policy names, where the level of protection may be lower than
+          Jordanian law requires. PulseBoard only reads, and I can withdraw at any time by disconnecting.
         </span>
       </label>
 
@@ -133,7 +151,7 @@ export default function Connections() {
                       )}
                       <span>@{a.username}</span>
                       {a.last_synced_at && <span className="muted">· synced {formatDistanceToNow(new Date(a.last_synced_at), { addSuffix: true })}</span>}
-                      <button className="btn btn--sm btn--danger" style={{ marginLeft: 8, height: 24 }} onClick={() => disconnect(a.id, PLATFORMS[p].name)}>Disconnect</button>
+                      <button className="btn btn--sm btn--danger" style={{ marginLeft: 8, height: 24 }} onClick={() => disconnect(a.id, p)}>Disconnect</button>
                       {a.status === "connected" && a.needs_reauth && (
                         <div className="muted" style={{ flexBasis: "100%", fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>
                           {PLATFORMS[p].name} connections expire and cannot be renewed for
@@ -165,7 +183,78 @@ export default function Connections() {
           <IcRefresh className={dash.syncing ? "spin" : ""} /> Sync now
         </button>
       </div>
+
+      <YourData demo={demo} />
     </>
+  );
+}
+
+/**
+ * Where a client withdraws the grant themselves, for the platforms whose
+ * disconnect cannot revoke it (see disconnect.ts). Absent means we revoke.
+ */
+const REMOVE_AT_PLATFORM: Partial<Record<Platform, string>> = {
+  instagram: "Instagram → Settings and activity → Website permissions → Apps and websites",
+  linkedin: "LinkedIn → Settings & Privacy → Data privacy → Permitted services",
+};
+
+/**
+ * The self-service data rights the privacy policy names.
+ *
+ * `/api/account-data` has served both since 2026-08-24, and the policy has told
+ * people to use "Export my data" and "Delete my account" since then, but no
+ * button calling either was ever rendered: the functions were imported here and
+ * never used. A reviewer following the policy found nothing to press.
+ */
+function YourData({ demo }: { demo: boolean }) {
+  const toast = useToast();
+  const { signOut } = useAuth();
+  const [busy, setBusy] = useState<"export" | "delete" | null>(null);
+
+  async function doExport() {
+    if (demo) { toast("Preview mode: there is no data of yours to export."); return; }
+    setBusy("export");
+    try { await exportMyData(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Could not build your export."); }
+    finally { setBusy(null); }
+  }
+
+  async function doDelete() {
+    if (demo) { toast("Preview mode: deleting is disabled."); return; }
+    if (!confirm(
+      "Delete your PulseBoard account?\n\nEvery connected account, metric, post, audience breakdown, goal, report link and consent record is deleted, then your sign-in. It cannot be undone."
+    )) return;
+    setBusy("delete");
+    try {
+      // The server's own message, not a fixed one: it differs when the sign-in record survived.
+      const { message, code } = await deleteMyAccount();
+      alert(`${message}\n\nConfirmation code: ${code}`);
+      await signOut();
+    } catch (e) {
+      // A failed erasure keeps the sign-in on purpose, so the message says to retry.
+      toast(e instanceof Error ? e.message : "Could not delete your account.");
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="panel" style={{ marginTop: 20 }}>
+      <div className="panel__body stack" style={{ gap: 10 }}>
+        <b style={{ fontSize: 13.5 }}>Your data</b>
+        <p className="muted" style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55 }}>
+          Download everything PulseBoard holds about you as a file, or delete your account and all of it.
+          See the <a href="/privacy" target="_blank" rel="noreferrer">privacy policy</a>.
+        </p>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <button className="btn btn--sm" onClick={doExport} disabled={busy !== null}>
+            {busy === "export" ? "Preparing…" : "Export my data"}
+          </button>
+          <button className="btn btn--sm btn--danger" onClick={doDelete} disabled={busy !== null}>
+            {busy === "delete" ? "Deleting…" : "Delete my account"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

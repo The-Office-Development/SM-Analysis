@@ -125,20 +125,68 @@ Needs Community Management API access, which needs a **new** developer
 application holding no other API product, Development Tier first, then Standard
 with a screencast. Until then the first real call cannot be made.
 
-When access lands, in order:
+### Decided 2026-09-14: Drinkat's Company Page is the test account and the oracle
+
+We administer no Company Page with posts. The operator's own profile has 500+
+followers and no posts, and it is a member profile, which this integration
+deliberately does not support (see "Not being built"). So **every live check
+below runs on the Drinkat client's Company Page**, and the Instagram sequence is
+repeated for LinkedIn in full: first call, raw responses read, reconciliation
+against the platform's own analytics, defects recorded in `DATA-INTEGRITY.md`,
+then the Standard tier application with a screencast.
+
+**Who has to press Connect.** `rw_organization_admin` is "Restricted to
+organizations in which the authenticated member has the following role:
+`ADMINISTRATOR`" (learn.microsoft.com, Increasing Access, read 2026-09-14).
+`ANALYST` can see the Analytics tab but cannot authorise the reporting scope. So
+either Drinkat's Page super admin connects from a PulseBoard workspace, or
+Drinkat adds the operator as a super admin of their page. The second lets us run
+every step without scheduling around them; it is their decision.
+
+### Two blockers found in the Development tier terms, before any call
+
+Read from "Increasing Access" on 2026-09-14. Both would hit Drinkat's page on
+the first day, and both must be fixed before they connect.
+
+1. 🔴 **Development tier allows no BATCH_GET calls at all:** "All APIs with
+   BATCH_GET: No API calls allowed". `liResolveGeo` and `liResolveIndustries` are
+   BATCH_GETs. The response status for a refused call is not documented. If it is
+   403, `liGet` maps it to auth code 190, `optional()` rethrows auth errors, and
+   `sync.ts` sets the account `status: "expired"`: Drinkat would be told to
+   reconnect a working connection, every day. If it is 429, it is a throttle and
+   the run stops. Either way the demographics never get names. Seniorities and
+   functions are GET_ALL and are unaffected; the industry taxonomy may also be
+   GET_ALL-able, geo is not.
+2. 🔴 **100 calls per member per 24 hours.** A LinkedIn run spends at least four
+   calls (share statistics, network size, post list, per-post statistics), plus
+   the audience calls once a day. The cron gives every connected account a turn
+   every 15 minutes in rotation; with three accounts LinkedIn's turn comes about
+   32 times a day, which is roughly 130 calls. LinkedIn needs its own minimum
+   interval (a few hours is plenty for data that trails by two days) before a
+   page is connected.
+
+### Then, in order
 
 1. Set `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET` as Cloudflare secrets.
-2. Connect a Company Page we administer and read the raw responses before
+2. Fix the two blockers above, with a test and a mutation each.
+3. Write `verify/probe-live-linkedin.mjs`, the LinkedIn twin of
+   `probe-live.mjs`: every call `syncLinkedIn` and `audienceLinkedIn` make, read
+   only, printing raw responses. Run it with Drinkat's token before the sync ever
+   writes a row.
+4. Connect Drinkat's Company Page and read the raw responses before
    trusting any stored figure.
-3. Reconcile against LinkedIn's own analytics tab, the way Instagram was
-   reconciled. That gate is what turns "written" into "works".
-4. Check the four things the mock asserts but has never proven: the exclusive
+5. Reconcile against the page's own Analytics tab, the way Instagram was
+   reconciled, with `reconcile.mjs` extended to LinkedIn's columns. That gate is
+   what turns "written" into "works". Record what it finds in `DATA-INTEGRITY.md`.
+6. Check the four things the mock asserts but has never proven: the exclusive
    end, absent per-share reach, an omitted post meaning zero, and a negative
    like count.
-5. **Settle whether `followerGains` is gross or net** — see the correction below.
-6. Check the demographic facets against the page's own Analytics tab, which
+7. **Settle whether `followerGains` is gross or net** — see the correction below.
+8. Check the demographic facets against the page's own Analytics tab, which
    shows the same breakdowns. Unlike the Instagram reconciliation there IS a
    visible oracle here, and it should be used before a client sees the page.
+9. Apply for Standard tier with a screencast of Drinkat's page connected and
+   reconciled. Development tier must be finished within twelve months of approval.
 
 ## Known constraints, carried forward
 

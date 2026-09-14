@@ -105,3 +105,43 @@ test("a failure outranks every other status", () => {
   assert.equal(deletionStatus(true, 1), "failed", "one refused write is enough");
   assert.equal(deletionStatus(false, 1), "failed", "and it outranks 'nothing to delete' too");
 });
+
+/* ---- Instagram Login is the path every live account uses ----------------- */
+
+test("a request signed by the Instagram app deletes the Instagram identity, not a Meta one", async () => {
+  /*
+   * Every connected account is provider "instagram", under INSTAGRAM_APP_SECRET.
+   * Both callbacks used to verify with META_APP_SECRET and look up provider
+   * "meta" only, so a real request about one of those users was refused as forged
+   * or matched nothing and was acknowledged anyway.
+   */
+  process.env.INSTAGRAM_APP_SECRET = "test-instagram-secret";
+  const { verifyMetaFamilyRequest } = await import("../build/meta-data-deletion.js");
+
+  const ig = verifyMetaFamilyRequest(signedRequest({ user_id: "1784" }, "test-instagram-secret"));
+  assert.equal(ig.provider, "instagram");
+  assert.equal(ig.payload?.user_id, "1784");
+
+  const fb = verifyMetaFamilyRequest(signedRequest({ user_id: "fb-9" }, "test-app-secret"));
+  assert.equal(fb.provider, "meta", "the Facebook Login app still resolves to meta");
+
+  assert.equal(verifyMetaFamilyRequest(signedRequest({ user_id: "1784" }, "not-ours")).provider, null);
+  assert.equal(verifyMetaFamilyRequest(null).provider, null);
+
+  const db = makeDb({
+    provider_identities: [
+      { id: "pi-ig", provider: "instagram", external_user_id: "1784", user_id: "u1" },
+      { id: "pi-fb", provider: "meta", external_user_id: "1784", user_id: "u2" },
+    ],
+    social_accounts: [
+      { id: "a-ig", identity_id: "pi-ig", user_id: "u1", platform: "instagram" },
+      { id: "a-fb", identity_id: "pi-fb", user_id: "u2", platform: "facebook" },
+    ],
+    account_secrets: [{ account_id: "a-ig", access_token: "T1" }, { account_id: "a-fb", access_token: "T2" }],
+  });
+  const { deleted, failed } = await deleteEverythingForMetaUser(db, "1784", ig.provider);
+  assert.equal(deleted, 1);
+  assert.equal(failed, 0);
+  assert.deepEqual(db._rows("social_accounts").map((r) => r.id), ["a-fb"], "only the Instagram identity's account goes");
+  assert.deepEqual(db._rows("provider_identities").map((r) => r.id), ["pi-fb"]);
+});

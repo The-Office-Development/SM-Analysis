@@ -14,15 +14,15 @@ export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { message: "Use POST." });
 
   const signed = parseFormField(event.body ?? "", "signed_request");
-  const payload = signed ? verifySignedRequest(signed, env.META_APP_SECRET) : null;
-  if (!payload?.user_id) {
+  const { payload, provider } = verifyMetaFamilyRequest(signed);
+  if (!payload?.user_id || !provider) {
     log("deletion.bad_signed_request", {});
     return json(400, { message: "Invalid signed_request." });
   }
 
   const db = admin();
   const code = crypto.randomBytes(12).toString("hex");
-  const { deleted, failed } = await deleteEverythingForMetaUser(db, String(payload.user_id));
+  const { deleted, failed } = await deleteEverythingForMetaUser(db, String(payload.user_id), provider);
 
   /*
    * The recorded status is what actually happened, not what was attempted.
@@ -38,24 +38,24 @@ export const handler: Handler = async (event) => {
   const status = deletionStatus(deleted > 0, failed);
   const { error: recErr } = await db.from("deletion_requests").insert({
     confirmation_code: code,
-    provider: "meta",
+    provider,
     external_user_id: String(payload.user_id),
     completed_at: new Date().toISOString(),
     accounts_deleted: deleted,
     status,
   });
-  writeFailed("deletion.record_write_failed", recErr, { provider: "meta", code, accounts: deleted, status });
+  writeFailed("deletion.record_write_failed", recErr, { provider, code, accounts: deleted, status });
 
   if (failed > 0) {
     // An operator has to finish this by hand, and has 30 days to do it. Nothing
     // here can retry on the subject's behalf.
     log("deletion.incomplete", {
-      provider: "meta", code, accounts: deleted, failed_writes: failed,
+      provider, code, accounts: deleted, failed_writes: failed,
       detail: "some rows for this subject could not be deleted. The confirmation page reports "
         + "this as failed. Complete the erasure manually and update the request row.",
     });
   } else {
-    log("deletion.completed", { provider: "meta", accounts: deleted, code });
+    log("deletion.completed", { provider, accounts: deleted, code });
   }
 
   /*
@@ -75,7 +75,32 @@ export const handler: Handler = async (event) => {
 };
 
 /**
- * Deletes every account, token and metric tied to a Meta user id.
+ * Which of our two Meta apps signed this request, and what it says.
+ *
+ * Every live account connects through Instagram Login, whose identities are
+ * stored as provider "instagram" under the separate INSTAGRAM_APP_SECRET. Until
+ * 2026-09-14 both callbacks verified with META_APP_SECRET alone and looked up
+ * provider "meta" alone, so a request about an Instagram user was either refused
+ * as forged or matched nothing: acknowledged to Meta, deleted nothing.
+ *
+ * Meta's Instagram Login page does not say which secret signs these callbacks, so
+ * this does not guess. Both secrets are ours; whichever verifies decides the
+ * provider. The Instagram secret is tried first, because that is where every
+ * connected account is.
+ */
+export function verifyMetaFamilyRequest(
+  signed: string | null,
+): { payload: Record<string, unknown> | null; provider: "instagram" | "meta" | null } {
+  if (!signed) return { payload: null, provider: null };
+  const ig = verifySignedRequest(signed, process.env.INSTAGRAM_APP_SECRET ?? "");
+  if (ig) return { payload: ig, provider: "instagram" };
+  const fb = verifySignedRequest(signed, env.META_APP_SECRET);
+  if (fb) return { payload: fb, provider: "meta" };
+  return { payload: null, provider: null };
+}
+
+/**
+ * Deletes every account, token and metric tied to a Meta or Instagram user id.
  *
  * Returns BOTH counts. `deleted` alone cannot distinguish an erasure that
  * worked from one where every delete was refused — the loop reaches the end
@@ -83,14 +108,19 @@ export const handler: Handler = async (event) => {
  * status and issues a confirmation code.
  */
 export async function deleteEverythingForMetaUser(
-  db: Db, externalUserId: string,
+  db: Db, externalUserId: string, provider: "instagram" | "meta" = "meta",
 ): Promise<{ deleted: number; failed: number }> {
   const { data: identities } = await db
     .from("provider_identities")
     .select("id")
-    .eq("provider", "meta")
+    .eq("provider", provider)
     .eq("external_user_id", externalUserId);
-  if (!identities?.length) return { deleted: 0, failed: 0 };
+  if (!identities?.length) {
+    // Logged with the id received, because the id format Instagram sends here has
+    // never been observed: a miss on a real removal is how that gets settled.
+    log("deletion.no_identity_match", { provider, external_user_id: externalUserId });
+    return { deleted: 0, failed: 0 };
+  }
 
   let deleted = 0;
   let failed = 0;
@@ -105,7 +135,7 @@ export async function deleteEverythingForMetaUser(
        * behalf, but it must not pass in silence.
        */
       const gone = (table: string, res: { error?: WriteError | null }) => {
-        if (writeFailed("deletion.delete_failed", res.error, { provider: "meta", account: a.id, table })) failed++;
+        if (writeFailed("deletion.delete_failed", res.error, { provider, account: a.id, table })) failed++;
       };
       gone("account_secrets", await db.from("account_secrets").delete().eq("account_id", a.id));
       gone("metrics_daily", await db.from("metrics_daily").delete().eq("account_id", a.id));
@@ -115,7 +145,7 @@ export async function deleteEverythingForMetaUser(
       deleted++;
     }
     const { error: idErr } = await db.from("provider_identities").delete().eq("id", identity.id);
-    if (writeFailed("deletion.delete_failed", idErr, { provider: "meta", identity: identity.id, table: "provider_identities" })) failed++;
+    if (writeFailed("deletion.delete_failed", idErr, { provider, identity: identity.id, table: "provider_identities" })) failed++;
   }
   return { deleted, failed };
 }

@@ -121,8 +121,23 @@ export const handler: Handler = async (event) => {
     }
 
     // Remove the sign-in record last: without it the rows above are unreachable.
-    try { await (db as any).auth.admin.deleteUser(uid); }
-    catch (e) { log("account.auth_delete_failed", { uid, detail: e instanceof Error ? e.message : String(e) }); }
+    // supabase-js resolves with `{ error }` rather than throwing, so the catch
+    // alone logged a refused deletion as a completed one.
+    let authErr: string | null = null;
+    try {
+      const { error } = await (db as any).auth.admin.deleteUser(uid);
+      if (error) authErr = error.message ?? String(error);
+    } catch (e) { authErr = e instanceof Error ? e.message : String(e); }
+
+    if (authErr) {
+      // Every data row is gone; only the sign-in record survived. Say exactly that.
+      log("account.auth_delete_failed", { uid, code, detail: authErr });
+      return json(200, {
+        message: "All your data has been deleted, but your sign-in record could not be removed. "
+          + `We have been alerted and will remove it by hand; quote ${code} if you contact us.`,
+        confirmation_code: code,
+      });
+    }
 
     log("account.deleted", { uid, accounts: (accounts ?? []).length, code });
     return json(200, { message: "Your account and all associated data have been deleted.", confirmation_code: code });

@@ -7,7 +7,7 @@ import { env, userIdFromToken, signState, newNonce, setNonceCookie, backToApp, l
  * The Supabase token is POSTed, not put in the URL — see oauth-meta.ts.
  */
 /** Bump when the consent wording or the requested scopes change. */
-const CONSENT_VERSION = "2026-08-1";
+const CONSENT_VERSION = "2026-09-14";
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Use POST." };

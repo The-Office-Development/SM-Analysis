@@ -1,6 +1,6 @@
 import type { Handler } from "./_lib";
-import { admin, env, json, log, writeFailed } from "./_lib";
-import { verifySignedRequest } from "./meta-data-deletion";
+import { admin, json, log, writeFailed } from "./_lib";
+import { verifyMetaFamilyRequest } from "./meta-data-deletion";
 
 /**
  * Meta deauthorize callback.  POST /api/meta-deauthorize
@@ -14,14 +14,15 @@ export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { message: "Use POST." });
 
   const signed = new URLSearchParams(event.body ?? "").get("signed_request");
-  const payload = signed ? verifySignedRequest(signed, env.META_APP_SECRET) : null;
-  if (!payload?.user_id) return json(400, { message: "Invalid signed_request." });
+  // Either of our Meta apps; see verifyMetaFamilyRequest for why both.
+  const { payload, provider } = verifyMetaFamilyRequest(signed);
+  if (!payload?.user_id || !provider) return json(400, { message: "Invalid signed_request." });
 
   const db = admin();
   const { data: identities } = await db
     .from("provider_identities")
     .select("id")
-    .eq("provider", "meta")
+    .eq("provider", provider)
     .eq("external_user_id", String(payload.user_id));
 
   let stopped = 0;
@@ -44,6 +45,7 @@ export const handler: Handler = async (event) => {
     writeFailed("deauthorize.write_failed", idErr, { identity: identity.id, table: "provider_identities" });
   }
 
-  log("deauthorize.handled", { provider: "meta", accounts: stopped });
+  if (!identities?.length) log("deauthorize.no_identity_match", { provider, external_user_id: String(payload.user_id) });
+  log("deauthorize.handled", { provider, accounts: stopped });
   return json(200, { ok: true, accounts: stopped });
 };

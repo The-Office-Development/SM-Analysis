@@ -186,8 +186,8 @@ export async function exportMyData(): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(href), 30_000);
 }
 
-/** Erase the account and everything associated with it. */
-export async function deleteMyAccount(): Promise<string> {
+/** Erase the account and everything associated with it. Resolves to the server's message and code. */
+export async function deleteMyAccount(): Promise<{ message: string; code: string }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not signed in.");
   const res = await fetch("/api/account-data", {
@@ -196,7 +196,7 @@ export async function deleteMyAccount(): Promise<string> {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.message || "Could not delete your account.");
-  return body.confirmation_code as string;
+  return { message: body.message as string, code: body.confirmation_code as string };
 }
 
 /** Kicks off a server-side sync (the deployed function) for the signed-in user. */

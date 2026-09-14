@@ -10,7 +10,7 @@ import { env, userIdFromToken, signState, newNonce, setNonceCookie, redirect, ba
  * TLS-terminating proxy along the way, and it is a live session for this tenant.
  */
 /** Bump when the consent wording or the requested scopes change. */
-const CONSENT_VERSION = "2026-08-1";
+const CONSENT_VERSION = "2026-09-14";
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Use POST." };
