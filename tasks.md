@@ -296,8 +296,17 @@ connection.
 - [x] **100 calls per member per day — fixed 2026-09-14.** A LinkedIn page runs
       at most every 4 hours (`LINKEDIN_MIN_SYNC_INTERVAL_MS`), counted from the
       last attempt in `sync_log`, in both the cron and manual sync.
-- [ ] `verify/probe-live-linkedin.mjs`, the twin of `probe-live.mjs`, run on
-      Drinkat's token before the sync writes anything.
+- [x] `verify/probe-live-linkedin.mjs` written 2026-09-14; `reconcile.mjs` reads LinkedIn
+- [x] **Rest.li encoding, ugcPosts, zeros-on-failure, admin field name — fixed 2026-09-14.**
+      Every LinkedIn request was malformed before any call. `LINKEDIN-PLAN.md` Phase 3.
+- [x] **LinkedIn Data Storage Requirements enforced 2026-09-14**: posts 6 months,
+      reporting 1 year, name refreshed daily, locations never stored.
+- [ ] 🔴 **The Office needs its own LinkedIn Page** with a super admin: the
+      developer app must be verified by the applying organisation's page. `SETUP-LINKEDIN.md` §0
+- [ ] Create the app and submit the Development tier form (`SETUP-LINKEDIN.md`); a rejection
+      cannot be resubmitted, so step 0 first
+- [ ] Drinkat: route A (make us super admin) or B (they connect). `CLIENT-CONNECT-LINKEDIN.md`
+- [ ] Probe, connect, sync a few days, reconcile against the Analytics tab, record
 
 ### Phase 2 was the first session that could read LinkedIn's own docs
 

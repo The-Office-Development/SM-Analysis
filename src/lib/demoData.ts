@@ -251,7 +251,9 @@ export const demoAudience: AudienceSnapshot[] = [
    * The Company Page. Age and gender are EMPTY on purpose — LinkedIn reports
    * neither, and the Audience page says so in words rather than drawing a bar.
    * What it reports instead is professional, and richer than Instagram's:
-   * industry, seniority, job function, company size and market area.
+   * industry, seniority, job function and company size. No countries and no
+   * market areas: their names are Bing Maps data, which LinkedIn's storage
+   * requirements say may not be stored, so a real page never shows them.
    *
    * "Unknown" is in the industry mix deliberately. LinkedIn caps each facet at
    * its top 100 values and can only classify the followers it has data for, so
@@ -261,7 +263,7 @@ export const demoAudience: AudienceSnapshot[] = [
   {
     account_id: "demo-li", platform: "linkedin", captured_on: isoDay(0),
     age: {}, gender: {},
-    countries: { Jordan: 0.44, "United Arab Emirates": 0.17, "Saudi Arabia": 0.12, "United States": 0.11, Egypt: 0.09, Germany: 0.07 },
+    countries: {},
     devices: {}, active_hours: emptyHeat(),
     dimensions: {
       industry: {
@@ -276,10 +278,6 @@ export const demoAudience: AudienceSnapshot[] = [
       company_size: {
         "2–10 employees": 0.29, "11–50 employees": 0.26, "51–200 employees": 0.18,
         "201–500 employees": 0.12, "1 employee": 0.09, "1001+ employees": 0.06,
-      },
-      regions: {
-        "Amman Governorate, Jordan": 0.38, "Dubai, United Arab Emirates": 0.15,
-        "Riyadh, Saudi Arabia": 0.11, "Greater London": 0.08, "Cairo, Egypt": 0.07,
       },
     },
   },

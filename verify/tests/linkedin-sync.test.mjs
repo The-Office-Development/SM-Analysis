@@ -51,8 +51,8 @@ function seedDb() {
   });
 }
 
-async function run(opts = {}) {
-  const db = seedDb();
+async function run(opts = {}, seed = null) {
+  const db = seed ?? seedDb();
   const mock = installLinkedInMock({ days: [FROM, TO], ...opts });
   try { await syncAccount(db, account); } finally { mock.restore(); }
   return { db, calls: mock.calls };
@@ -154,6 +154,36 @@ test("a post omitted from the statistics response is a real zero", async () => {
   assert.equal(posts.length, 3, "the silent post is still stored");
   const zeroed = posts.filter((p) => p.views === 0);
   assert.equal(zeroed.length, 1, "and its figures are zero, not null");
+});
+
+test("a ugcPost is measured under ugcPosts, not recorded as a zero share", async () => {
+  /*
+   * LinkedIn lists a page's posts as share OR ugcPost URNs, and the statistics
+   * finder takes them in different parameters. Sent as shares, a ugcPost came
+   * back absent and the omitted-means-zero rule recorded it as zero.
+   */
+  const { db, calls } = await run({ posts: 4, ugcPosts: 2 });
+  const perPost = calls.filter((c) => c.includes("organizationalEntityShareStatistics") && !c.includes("timeIntervals"));
+  assert.equal(perPost.length, 2, "one call per URN type");
+  assert.ok(perPost.some((c) => c.includes("ugcPosts=List(")), "ugcPosts asked for under their own parameter");
+  const ugc = db._rows("content").filter((p) => p.external_id.startsWith("urn:li:ugcPost:"));
+  assert.equal(ugc.length, 2);
+  for (const p of ugc) assert.ok(p.views > 0, `${p.external_id} carries its real impressions, not a zero`);
+});
+
+test("a failed per-post statistics call leaves figures unknown, never zero", async () => {
+  /*
+   * The failure path returned an empty element list, which the zero rule read
+   * as "LinkedIn omitted every post", so one 500 wrote zeros over every post the
+   * page has. LinkedIn's zero rule is about a request that SUCCEEDED.
+   */
+  const { db } = await run({ posts: 3, failPostStats: 500 });
+  const posts = db._rows("content");
+  assert.equal(posts.length, 3, "the posts themselves are still stored");
+  for (const p of posts) {
+    assert.equal(p.views, null, `${p.external_id}: a figure nobody reported is unknown`);
+    assert.equal(p.likes, null);
+  }
 });
 
 test("the post's text becomes a single-line title", async () => {
@@ -353,23 +383,18 @@ test("a URN the taxonomy cannot name becomes Unknown and keeps its weight", asyn
   near(total, 1, "shares must still sum to one");
 });
 
-test("countries share the existing column; market areas do not", async () => {
-  const { db } = await run();
-  const snap = snapshot(db);
-
-  near(snap.countries["Jordan"], trueShare("followerCountsByGeoCountry", "urn:li:geo:102713980"),
-    "country share");
-  assert.ok(snap.countries["United States"] > 0, "both countries stored");
-
+test("no location name is fetched or stored, because LinkedIn forbids storing it", async () => {
   /*
-   * followerCountsByGeo is a COARSER second geography — a follower appears in
-   * both it and the country facet — so merging them into one column would count
-   * every follower twice.
+   * LinkedIn's Data Storage Requirements exclude "the Microsoft Bing Maps
+   * location data which may not be stored". Country and market-area names come
+   * from /v2/geo, which is that data, and a demographic snapshot is stored.
    */
-  assert.ok(!("Amman Governorate, Jordan" in snap.countries),
-    "market areas must not be mixed into countries");
-  near(snap.dimensions.regions["Amman Governorate, Jordan"],
-    trueShare("followerCountsByGeo", "urn:li:geo:90009626"), "region share");
+  const { db, calls } = await run();
+  assert.equal(calls.filter((c) => c.includes("/v2/geo")).length, 0, "no geo lookup at all");
+  const snap = snapshot(db);
+  assert.deepEqual(snap.countries, {}, "no countries stored");
+  assert.equal(snap.dimensions.regions, undefined, "no market areas stored");
+  assert.ok(!JSON.stringify(snap).includes("Jordan"), "no location name anywhere in the snapshot");
 });
 
 test("enum facets are rendered without inventing a value", async () => {
@@ -406,7 +431,7 @@ test("each taxonomy costs one call, not one per value", async () => {
    * would spend that on a single sync of a single page, which is why geo and
    * industry are batched and the two small taxonomies are fetched whole.
    */
-  assert.equal(v2.filter((c) => c.includes("/v2/geo")).length, 1, "one batched geo call");
+  assert.equal(v2.filter((c) => c.includes("/v2/geo")).length, 0, "location names may not be stored, so never fetched");
   assert.equal(v2.filter((c) => c.includes("industryTaxonomyVersions")).length, 1, "one batched industry call");
   assert.equal(v2.filter((c) => c.includes("/v2/seniorities")).length, 1, "one seniorities call");
   assert.equal(v2.filter((c) => c.includes("/v2/functions")).length, 1, "one functions call");
@@ -448,14 +473,13 @@ test("a refused taxonomy lookup does not mark a working page expired", async () 
    * token had just worked for the follower statistics, telling the client to
    * reconnect every day.
    */
-  const { db } = await run({ refuse: { geo: 403 } });
+  const { db } = await run({ refuse: { industry: 403 } });
   const acc = db._rows("social_accounts")[0];
   assert.equal(acc.status, "connected", "the page is not flagged for reconnection");
   const snap = snapshot(db);
   assert.ok(snap, "the snapshot is still written");
-  assert.deepEqual(snap.countries, {}, "the refused taxonomy's facets are omitted");
-  assert.equal(snap.dimensions.regions, undefined);
-  assert.ok(snap.dimensions.industry["Software Development"] > 0, "the taxonomies that answered still count");
+  assert.equal(snap.dimensions.industry, undefined, "the refused taxonomy's facet is omitted");
+  assert.ok(Object.keys(snap.dimensions.seniority).length > 0, "the taxonomies that answered still count");
 });
 
 test("a LinkedIn page is not synced again within its interval, counted from the last attempt", async () => {
@@ -474,4 +498,47 @@ test("a LinkedIn page is not synced again within its interval, counted from the 
   assert.equal(await linkedInNotDue(db, { id: "li-3", platform: "linkedin" }, now), false, "a page never synced runs");
   assert.equal(await linkedInNotDue(db, { id: "ig-1", platform: "instagram" }, now), false,
     "other platforms keep the 15-minute rotation");
+});
+
+/* ---- LinkedIn's storage limits ---------------------------------------------- */
+
+test("a post older than six months is never stored", async () => {
+  // "Organizations' Social Activity Data ... you may store it for six months."
+  const { db, calls } = await run({ posts: 3, oldPosts: 1 });
+  const posts = db._rows("content");
+  assert.equal(posts.length, 2, "the out-of-limit post is not written");
+  // Filtered before its statistics are asked for, not merely purged afterwards:
+  // a post we may not keep should not spend one of 100 daily calls.
+  const oldUrn = encodeURIComponent("urn:li:share:700000000000000000");
+  const perPost = calls.filter((c) => c.includes("shares=List("));
+  assert.ok(perPost.length > 0, "the recent posts were measured");
+  assert.ok(perPost.every((c) => !c.includes(oldUrn)), "the out-of-limit post is not even requested");
+});
+
+test("data past LinkedIn's storage limits is purged on every sync", async () => {
+  const old = addDays(TODAY, -400);
+  const recent = addDays(TODAY, -30);
+  const db = makeDb({
+    metrics_daily: [{ account_id: "li-1", date: old, impressions: 5 }, { account_id: "li-1", date: recent, impressions: 7 }],
+    audience_snapshots: [{ account_id: "li-1", captured_on: old }, { account_id: "li-1", captured_on: recent }],
+    content: [
+      { account_id: "li-1", external_id: "urn:li:share:old", published_at: `${addDays(TODAY, -200)}T00:00:00Z` },
+      { account_id: "li-1", external_id: "urn:li:share:fresh", published_at: `${addDays(TODAY, -20)}T00:00:00Z` },
+      { account_id: "ig-9", external_id: "urn:li:share:other-page", published_at: `${addDays(TODAY, -200)}T00:00:00Z` },
+    ],
+  });
+  const { purgeLinkedInExpired } = await import("../build/_sync.js");
+  const failed = await purgeLinkedInExpired(db, { id: "li-1" });
+  assert.equal(failed, 0);
+  assert.deepEqual(db._rows("metrics_daily").map((r) => r.date), [recent], "reporting data older than a year is deleted");
+  assert.deepEqual(db._rows("audience_snapshots").map((r) => r.captured_on), [recent], "demographic snapshots older than a year too");
+  assert.deepEqual(db._rows("content").map((r) => r.external_id), ["urn:li:share:fresh", "urn:li:share:other-page"],
+    "a LinkedIn post past six months is deleted; a recent one and another account's rows are untouched");
+});
+
+test("the page name is re-read once a day", async () => {
+  // "Organization Profile Data ... you may store it for eight weeks."
+  const { db, calls } = await run();
+  assert.equal(calls.filter((c) => /\/rest\/organizations\//.test(c)).length, 1, "one profile read on the first run of the day");
+  assert.equal(db._rows("social_accounts")[0].display_name, "Drinkat");
 });

@@ -124,13 +124,36 @@ export function installLinkedInMock(opts = {}) {
   const silent = opts.silentPosts ?? 0;
   // { geo: 403 } answers that taxonomy with an error, as development tier does to a BATCH_GET.
   const refuse = opts.refuse ?? {};
+  // How many of the posts are ugcPosts rather than shares; LinkedIn lists both.
+  const ugcCount = opts.ugcPosts ?? 0;
+  // Answer the per-post statistics call with this HTTP status instead of data.
+  const failPostStats = opts.failPostStats ?? 0;
+  // How many of the FIRST posts were published more than six months ago.
+  const oldPosts = opts.oldPosts ?? 0;
   const calls = [];
   const real = globalThis.fetch;
 
-  const postUrn = (i) => `urn:li:share:70000000000000000${i}`;
+  // The LAST `ugcCount` posts are ugcPosts; the rest are shares.
+  const postUrn = (i) => i >= postCount - ugcCount
+    ? `urn:li:ugcPost:70000000000000000${i}`
+    : `urn:li:share:70000000000000000${i}`;
 
   globalThis.fetch = async (url) => {
-    const u = new URL(String(url));
+    const rawUrl = String(url);
+    /*
+     * Reject what LinkedIn's Rest.li 2.0 parser cannot read: an unencoded URN,
+     * the List(...) / (key:value) parentheses percent-encoded, or anything
+     * encoded twice. Every sample on LinkedIn's pages keeps the parentheses raw;
+     * some encode the `:` and `,` inside and some do not, so those are allowed.
+     * This mock used to decode whatever arrived, so a client that encoded
+     * everything passed every test while every real call would have failed.
+     */
+    const rawQuery = rawUrl.includes("?") ? rawUrl.slice(rawUrl.indexOf("?") + 1) : "";
+    if (rawUrl.includes("urn:li:") || /%28|%29/i.test(rawQuery) || /%25/.test(rawUrl)) {
+      calls.push(rawUrl);
+      return new Response(JSON.stringify({ message: `malformed Rest.li request: ${rawUrl}`, status: 400 }), { status: 400 });
+    }
+    const u = new URL(rawUrl);
     calls.push(u.toString());
     const path = u.pathname.replace("/rest", "");
     const json = (body) => new Response(JSON.stringify(body), {
@@ -139,10 +162,12 @@ export function installLinkedInMock(opts = {}) {
 
     if (path === "/organizationAcls") {
       return json({ elements: [
-        { organizationalTarget: ORG_URN, role: "ADMINISTRATOR", state: "APPROVED" },
+        // The documentation's two samples name this field differently; the mock
+        // uses one of each so the reader is tested against both.
+        { organization: ORG_URN, role: "ADMINISTRATOR", state: "APPROVED" },
         // A page the member can post to but NOT report on. The sync must ignore
         // it, because the statistics endpoints answer 403 for this role.
-        { organizationalTarget: "urn:li:organization:999", role: "CONTENT_ADMIN", state: "APPROVED" },
+        { organizationTarget: "urn:li:organization:999", role: "CONTENT_ADMIN", state: "APPROVED" },
       ] });
     }
 
@@ -158,8 +183,8 @@ export function installLinkedInMock(opts = {}) {
       const elements = Array.from({ length: postCount }, (_, i) => ({
         id: postUrn(i),
         commentary: `Post ${i}\n  with a newline and   spaces`,
-        publishedAt: Date.parse(`${addDays(from, i)}T09:00:00Z`),
-        createdAt: Date.parse(`${addDays(from, i)}T09:00:00Z`),
+        publishedAt: Date.parse(`${addDays(from, i < oldPosts ? -300 : i)}T09:00:00Z`),
+        createdAt: Date.parse(`${addDays(from, i < oldPosts ? -300 : i)}T09:00:00Z`),
         content: i === 1 ? { media: { id: "urn:li:video:abc" } } : {},
       }));
       return json({ elements, paging: { start: 0, count: elements.length } });
@@ -233,13 +258,23 @@ export function installLinkedInMock(opts = {}) {
     }
 
     if (path === "/organizationalEntityShareStatistics") {
-      // Per-share when `shares` is present; otherwise the daily series.
-      if (u.searchParams.has("shares")) {
+      // Per-post when `shares` or `ugcPosts` is present; otherwise the daily series.
+      const perParam = u.searchParams.has("shares") ? "shares" : u.searchParams.has("ugcPosts") ? "ugcPosts" : null;
+      if (perParam) {
+        if (failPostStats) {
+          return new Response(JSON.stringify({ message: "Internal error", status: failPostStats }), { status: failPostStats });
+        }
+        // Answer only for the ids asked, under the field that matches the
+        // parameter, as LinkedIn does. A ugcPost asked for as a share is simply
+        // not in the response.
+        const asked = new Set(/List\(([^)]*)\)/.exec(u.searchParams.get(perParam) ?? "")?.[1]?.split(",") ?? []);
+        const field = perParam === "shares" ? "share" : "ugcPost";
         const elements = [];
         for (let i = 0; i < postCount - silent; i++) {
+          if (!asked.has(postUrn(i)) || !postUrn(i).startsWith(`urn:li:${field}:`)) continue;
           elements.push({
             organizationalEntity: ORG_URN,
-            share: postUrn(i),
+            [field]: postUrn(i),
             totalShareStatistics: {
               impressionCount: 1000 + i * 10,
               likeCount: i === 0 ? -3 : 40 + i,   // LinkedIn documents negatives

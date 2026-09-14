@@ -1,9 +1,9 @@
 import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log, writeFailed } from "./_lib";
 import { igGet, IG } from "./_instagram";
 import {
-  LI, liGet, liNum, liLikes, liTime, liDayKey, type LiShareStats,
+  LI, liGet, liUrn, liNum, liLikes, liTime, liDayKey, type LiShareStats,
   LI_FACETS, liDemographicCount, urnTail, liEnumLabel,
-  liResolveGeo, liResolveIndustries, liResolveTaxonomy, liTier,
+  liResolveIndustries, liResolveTaxonomy, liTier,
 } from "./_linkedin";
 
 export const today = () => new Date().toISOString().slice(0, 10);
@@ -490,6 +490,12 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     if (error) throw error;
   }
 
+  if (acc.platform === "linkedin") {
+    await purgeLinkedInExpired(db, acc);
+    // Once a day, with the demographics: the page name may be kept eight weeks.
+    if (!todaysSnapshot) await refreshLinkedInProfile(db, acc, token, counter);
+  }
+
   /*
    * A lost `last_synced_at` is not cosmetic: it is what the manual-sync throttle
    * and the "updated N minutes ago" line both read. Dropped silently, the run
@@ -499,6 +505,43 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     .from("social_accounts").update({ last_synced_at: new Date().toISOString() }).eq("id", acc.id);
   writeFailed("sync.last_synced_write_failed", stampErr, { account: acc.id, platform: acc.platform });
   return { calls: counter.calls, rowsWritten };
+}
+
+/**
+ * Delete what LinkedIn no longer allows us to hold for this page.
+ *
+ * Runs on every LinkedIn sync, so nothing outlives its limit by more than the
+ * sync interval. Database deletes only; no LinkedIn call. Each delete is checked,
+ * because a refused purge keeps data past a platform limit while every sync
+ * reports success.
+ */
+export async function purgeLinkedInExpired(db: Db, acc: { id: string }, now = Date.now()): Promise<number> {
+  const reportingFloor = new Date(now - LI.REPORTING_RETENTION_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const postFloor = new Date(now - LI.POST_RETENTION_DAYS * 86_400_000).toISOString();
+  let failed = 0;
+  const check = (table: string, error: unknown) => {
+    if (writeFailed("sync.linkedin_purge_failed", error as never, { account: acc.id, table })) failed++;
+  };
+  check("metrics_daily", (await db.from("metrics_daily").delete().eq("account_id", acc.id).lt("date", reportingFloor)).error);
+  check("audience_snapshots", (await db.from("audience_snapshots").delete().eq("account_id", acc.id).lt("captured_on", reportingFloor)).error);
+  check("content", (await db.from("content").delete().eq("account_id", acc.id).lt("published_at", postFloor)).error);
+  return failed;
+}
+
+/** Re-read the page's name, which LinkedIn allows us to keep for eight weeks. */
+async function refreshLinkedInProfile(db: Db, acc: AccountRow, token: string, c: { calls: number }): Promise<void> {
+  try {
+    spend(c);
+    const org = await liGet<{ localizedName?: string; vanityName?: string }>(`${LI.ORGANIZATION}/${acc.external_id}`, {}, { token });
+    const username = org.vanityName ?? org.localizedName;
+    if (!username) return;
+    const { error } = await db.from("social_accounts")
+      .update({ username, display_name: org.localizedName ?? null }).eq("id", acc.id);
+    writeFailed("sync.linkedin_profile_write_failed", error, { account: acc.id });
+  } catch (e) {
+    if (isThrottleError(e) || (isAuthError(e) && (e as GraphError).status !== 403)) throw e;
+    log("sync.linkedin_profile_unavailable", { account: acc.id, detail: e instanceof Error ? e.message : String(e) });
+  }
 }
 
 /** A day whose follower total is already known, used to anchor the walk. */
@@ -2008,7 +2051,7 @@ async function audienceLinkedIn(acc: AccountRow, token: string, c: { calls: numb
   const data = await liGet<{ elements?: Record<string, unknown>[] }>(
     LI.FOLLOWER_STATS,
     // No timeIntervals. See (1) above — this is the whole reason the facets come back.
-    { q: "organizationalEntity", organizationalEntity: urn },
+    { q: "organizationalEntity", organizationalEntity: liUrn(urn) },
     { token },
   );
   const el = (data.elements ?? [])[0] ?? {};
@@ -2017,7 +2060,7 @@ async function audienceLinkedIn(acc: AccountRow, token: string, c: { calls: numb
   type Bucket = { id: string | null; value: string; count: number };
   const raw: Record<string, Bucket[]> = {};
   const ids: Record<string, Set<string>> = {
-    geo: new Set(), industry: new Set(), seniority: new Set(), function: new Set(),
+    industry: new Set(), seniority: new Set(), function: new Set(),
   };
 
   for (const f of LI_FACETS) {
@@ -2085,21 +2128,19 @@ async function audienceLinkedIn(acc: AccountRow, token: string, c: { calls: numb
   // One call per taxonomy, not one per value, once a day per account (see the
   // snapshot check in syncAccount).
   if (liTier() === "standard") {
-    await learn("geo", () => liResolveGeo([...ids.geo], token));
     await learn("industry", () => liResolveIndustries([...ids.industry], token));
-  } else if (ids.geo.size || ids.industry.size) {
+  } else if (ids.industry.size) {
     // Not attempted: development tier refuses every BATCH_GET, and a refused
     // call still counts against 100 calls a day.
     log("sync.linkedin_facets_skipped", {
-      account: acc.id, taxonomies: "geo,industry", tier: "development",
-      detail: "industry, countries and market areas need BATCH_GET, which development tier forbids; set LINKEDIN_API_TIER=standard once upgraded",
+      account: acc.id, taxonomies: "industry", tier: "development",
+      detail: "industry names need BATCH_GET, which development tier forbids; set LINKEDIN_API_TIER=standard once upgraded",
     });
   }
   await learn("seniority", () => liResolveTaxonomy(LI.SENIORITIES, token));
   await learn("function", () => liResolveTaxonomy(LI.FUNCTIONS, token));
 
   /* ---- distributions, keyed by something a person can read -------------- */
-  const countries: Record<string, number> = {};
   const dimensions: Record<string, Record<string, number>> = {};
 
   for (const f of LI_FACETS) {
@@ -2122,8 +2163,7 @@ async function audienceLinkedIn(acc: AccountRow, token: string, c: { calls: numb
         : (b.id ? labels.get(`${f.kind}:${b.id}`) : null) ?? "Unknown";
       dist[label] = (dist[label] ?? 0) + b.count;
     }
-    if (f.into === "countries") Object.assign(countries, dist);
-    else dimensions[f.into] = toShares(dist);
+    dimensions[f.into] = toShares(dist);
   }
 
   return {
@@ -2131,7 +2171,8 @@ async function audienceLinkedIn(acc: AccountRow, token: string, c: { calls: numb
     // offered, which the Audience page says out loud rather than drawing a
     // flat bar that looks like a measurement.
     age: {}, gender: {},
-    countries: toShares(countries),
+    // Never stored for LinkedIn: location names are Bing Maps data. See LI_FACETS.
+    countries: {},
     devices: {}, active_hours: emptyHeat(),
     dimensions,
   };
@@ -2160,7 +2201,7 @@ async function syncLinkedIn(
     LI.SHARE_STATS,
     {
       q: "organizationalEntity",
-      organizationalEntity: urn,
+      organizationalEntity: liUrn(urn),
       // Rest.li 2.0 object syntax. `end` is EXCLUSIVE, so a day is added to
       // include the last day asked for — the opposite convention to Meta's
       // end_time, and the single easiest place to file every figure a day out.
@@ -2212,7 +2253,7 @@ async function syncLinkedIn(
   try {
     spend(c);
     const net = await liGet<{ firstDegreeSize?: number }>(
-      `${LI.NETWORK_SIZE}/${urn}`, { edgeType: LI.FOLLOWER_EDGE }, { token },
+      `${LI.NETWORK_SIZE}/${liUrn(urn)}`, { edgeType: LI.FOLLOWER_EDGE }, { token },
     );
     const total = liNum(net.firstDegreeSize);
     if (total !== null) {
@@ -2238,7 +2279,7 @@ async function syncLinkedIn(
     content?: Record<string, unknown>;
   }[] }>(
     LI.POSTS,
-    { q: "author", author: urn, count: String(LI.POSTS_PAGE), sortBy: "CREATED" },
+    { q: "author", author: liUrn(urn), count: String(LI.POSTS_PAGE), sortBy: "CREATED" },
     { token },
   ).catch((e) => {
     // Platform errors are re-thrown, as everywhere else. So is anything that is
@@ -2249,33 +2290,54 @@ async function syncLinkedIn(
     return { elements: [] };
   });
 
-  const found = (list.elements ?? []).filter((p) => p.id);
+  /*
+   * Only posts inside LinkedIn's six-month storage limit for an authenticated
+   * organization's social activity. An older post is not stored at all, and a
+   * stored one is purged as it ages out (purgeLinkedInExpired). This also spends
+   * no call on statistics for a post we are not allowed to keep.
+   */
+  const postFloorMs = Date.now() - LI.POST_RETENTION_DAYS * 86_400_000;
+  const found = (list.elements ?? []).filter((p) => p.id && (p.publishedAt ?? p.createdAt ?? 0) >= postFloorMs);
   if (found.length) {
     /*
-     * Statistics for those posts, in ONE more call.
+     * Statistics for those posts: ONE call per URN type, not one per post.
      *
-     * The endpoint takes a List() of share URNs, so the whole page costs a
-     * single request rather than one per post. That is the difference between
-     * fitting inside 500 calls a day and not.
+     * A post's id is either `urn:li:share:` or `urn:li:ugcPost:`, and the finder
+     * takes them in different parameters, `shares=List(...)` and
+     * `ugcPosts=List(...)` (Share Statistics, read 2026-09-14). This used to send
+     * every id as a share, so a ugcPost was never measured, came back absent,
+     * and was then recorded as a real zero under the rule below.
+     *
+     * `answered` holds the URN types whose call SUCCEEDED. The zero rule applies
+     * only inside a successful call; a failed call used to return an empty
+     * element list, which read as "every post omitted" and wrote zeros over
+     * every post the page has, the fabricated zero this codebase exists to avoid.
      */
-    spend(c);
-    const perPost = await liGet<{ elements?: { share?: string; ugcPost?: string; totalShareStatistics?: LiShareStats }[] }>(
-      LI.SHARE_STATS,
-      {
-        q: "organizationalEntity",
-        organizationalEntity: urn,
-        shares: `List(${found.map((p) => encodeURIComponent(p.id as string)).join(",")})`,
-      },
-      { token },
-    ).catch((e) => {
-      if (isThrottleError(e) || isAuthError(e) || !(e instanceof GraphError)) throw e;
-      return { elements: [] };
-    });
-
     const statsByUrn = new Map<string, LiShareStats>();
-    for (const el of perPost.elements ?? []) {
-      const key = el.share ?? el.ugcPost;
-      if (key) statsByUrn.set(key, el.totalShareStatistics ?? {});
+    const answered = new Set<string>();
+    for (const [kind, param] of [["share", "shares"], ["ugcPost", "ugcPosts"]] as const) {
+      const ofKind = found.filter((p) => String(p.id).startsWith(`urn:li:${kind}:`));
+      if (!ofKind.length) continue;
+      spend(c);
+      const perPost = await liGet<{ elements?: { share?: string; ugcPost?: string; totalShareStatistics?: LiShareStats }[] }>(
+        LI.SHARE_STATS,
+        {
+          q: "organizationalEntity",
+          organizationalEntity: liUrn(urn),
+          [param]: `List(${ofKind.map((p) => liUrn(p.id as string)).join(",")})`,
+        },
+        { token },
+      ).catch((e) => {
+        if (isThrottleError(e) || isAuthError(e) || !(e instanceof GraphError)) throw e;
+        log("sync.linkedin_post_stats_unavailable", { account: acc.id, kind, detail: e.message });
+        return null;
+      });
+      if (!perPost) continue;
+      answered.add(kind);
+      for (const el of perPost.elements ?? []) {
+        const key = el.share ?? el.ugcPost;
+        if (key) statsByUrn.set(key, el.totalShareStatistics ?? {});
+      }
     }
 
     for (const p of found) {
@@ -2287,12 +2349,12 @@ async function syncLinkedIn(
        * of elements can be assumed to have counts of 0 for all statistics."
        * That is the opposite of Instagram, where absence means unreported, and
        * it is the one place in this codebase where a missing figure may become a
-       * zero. It applies ONLY when the request succeeded and the post was
-       * omitted — which is why the empty-elements failure path above returns
-       * early rather than falling through to mark every post as zero.
+       * zero. It applies ONLY when the request for that post's URN type
+       * succeeded and the post was omitted; see `answered` above.
        */
       const known = statsByUrn.get(id);
-      const s: LiShareStats = known ?? (perPost.elements ? {
+      const kindOf = id.startsWith("urn:li:ugcPost:") ? "ugcPost" : id.startsWith("urn:li:share:") ? "share" : null;
+      const s: LiShareStats = known ?? (kindOf && answered.has(kindOf) ? {
         impressionCount: 0, likeCount: 0, commentCount: 0, shareCount: 0, clickCount: 0,
       } : {});
 

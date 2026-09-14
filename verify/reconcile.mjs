@@ -80,14 +80,17 @@ if (!rows?.length) {
   process.exit(0);
 }
 
-console.log(`  ${padR("date", 13)}${pad("followers", 11)}${pad("reach", 10)}${pad("views", 10)}${pad("engagements", 13)}   flag`);
-console.log("  " + "-".repeat(70));
+// LinkedIn has no page views; its comparable daily figure is impressions.
+const isLinkedIn = acct.platform === "linkedin";
+const third = isLinkedIn ? "impressions" : "views";
+console.log(`  ${padR("date", 13)}${pad("followers", 11)}${pad("reach", 10)}${pad(third, 13)}${pad("engagements", 13)}   flag`);
+console.log("  " + "-".repeat(73));
 for (const r of rows) {
   const flags = [];
   if (r.provisional) flags.push("provisional");
-  if ([r.followers, r.reach, r.views, r.engagements].every((v) => v === null)) flags.push("ALL UNKNOWN");
+  if ([r.followers, r.reach, r[third], r.engagements].every((v) => v === null)) flags.push("ALL UNKNOWN");
   console.log(
-    `  ${padR(r.date, 13)}${pad(fmt(r.followers), 11)}${pad(fmt(r.reach), 10)}${pad(fmt(r.views), 10)}${pad(fmt(r.engagements), 13)}   ${flags.join(", ")}`
+    `  ${padR(r.date, 13)}${pad(fmt(r.followers), 11)}${pad(fmt(r.reach), 10)}${pad(fmt(r[third]), 13)}${pad(fmt(r.engagements), 13)}   ${flags.join(", ")}`
   );
 }
 
@@ -96,7 +99,7 @@ const problems = [];
 const settled = rows.filter((r) => !r.provisional);
 
 // A run of identical values usually means a frozen or carried-forward figure.
-for (const key of ["reach", "views", "engagements"]) {
+for (const key of ["reach", third, "engagements"]) {
   const vals = settled.map((r) => r[key]).filter((v) => v !== null);
   if (vals.length >= 4 && new Set(vals).size === 1) {
     problems.push(`every settled day has an identical ${key} (${fmt(vals[0])}) — suspect a frozen or carried value`);
@@ -117,13 +120,44 @@ if (missing.length) problems.push(`${missing.length} day(s) missing entirely: ${
 
 // Followers should not move backwards violently or sit perfectly flat.
 const foll = rows.map((r) => r.followers).filter((v) => v !== null);
-if (foll.length >= 3 && new Set(foll).size === 1) {
+// A LinkedIn page stores only today's follower total, so a flat series is not a symptom there.
+if (!isLinkedIn && foll.length >= 3 && new Set(foll).size === 1) {
   problems.push(`followers identical on every day (${fmt(foll[0])}) — the daily series may not be real`);
 }
 
 console.log("\n  Automated checks");
 if (problems.length) for (const p of problems) console.log(`    SUSPECT  ${p}`);
 else console.log("    nothing obviously wrong in the stored shape");
+
+if (isLinkedIn) {
+  console.log(`
+  Now do the part only a human can do (LinkedIn)
+  ----------------------------------------------
+  On linkedin.com, open the page as a super admin -> Analytics -> Content.
+  Set the range to cover the settled days above and read the daily chart for
+  each metric. LinkedIn's data stops about two days before today, so ignore the
+  newest days entirely. For three or four settled days, compare:
+
+      impressions   Impressions (organic)
+      reach         Unique impressions (organic)
+      engagements   Reactions + Comments + Reposts, added together
+                    (the sync does not count clicks as engagements)
+
+  Then Analytics -> Followers: today's total should equal "followers" on
+  today's row, and the Audience page in PulseBoard should match the demographic
+  breakdowns there, as shares of the followers LinkedIn could classify.
+
+  What the answers mean:
+    - numbers match                  the chain is correct; record it in
+                                     docs/DATA-INTEGRITY.md
+    - off by exactly one day         the exclusive-end +1 in syncLinkedIn or
+                                     liDayKey is wrong
+    - impressions match, reach not   uniqueImpressionsCount means something else
+    - engagements higher here        LinkedIn is counting clicks or sponsored
+                                     activity; the endpoint is organic only
+`);
+  process.exit(0);
+}
 
 console.log(`
   Now do the part only a human can do

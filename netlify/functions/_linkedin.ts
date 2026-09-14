@@ -139,6 +139,21 @@ export const LI = {
    * why the percentages do not match their own page.
    */
   FACET_LIMIT: 100,
+  /*
+   * LinkedIn's Data Storage Requirements (read 2026-09-14). The shortest
+   * applicable duration wins, and each of these is enforced by
+   * `purgeLinkedInExpired` in _sync.ts:
+   *  - "Organization Pages' Admin and Reporting Data" (followers, statistics,
+   *    demographics): One Year. -> metrics_daily and audience_snapshots.
+   *  - "Organizations' Social Activity Data" (posts and their metadata), for an
+   *    organization that has authenticated: six months. -> content, by
+   *    publication date, and posts older than that are never stored at all.
+   *  - "Organization Profile Data" (name) for an authenticated organization:
+   *    eight weeks. The name is re-read once a day instead.
+   * Six months is taken as 182 days, the short reading.
+   */
+  REPORTING_RETENTION_DAYS: 365,
+  POST_RETENTION_DAYS: 182,
   /** Listing the page's posts. */
   POSTS: "/posts",
   /** Max the finder accepts per page. */
@@ -171,6 +186,13 @@ export interface LiShareStats {
   clickCount?: number;
   engagement?: number;
 }
+
+/**
+ * A URN as it must appear inside a LinkedIn request, in a path or a parameter.
+ * Rest.li 2.0 encodes the URN itself (`urn%3Ali%3Aorganization%3A12345`) and
+ * leaves the `List(...)` or `(key:value)` structure around it unencoded.
+ */
+export const liUrn = (urn: string): string => encodeURIComponent(urn);
 
 /** Milliseconds since epoch, which is how LinkedIn takes every time range. */
 export const liTime = (iso: string): number => Date.parse(`${iso}T00:00:00Z`);
@@ -251,10 +273,24 @@ export async function liGet<T = any>(
    * guarantee is the test asserting this function issues nothing but GETs.
    */
   const base = opts.base ?? LI.REST;
-  const url = new URL(base + path);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  /*
+   * Values are sent AS GIVEN, not through URLSearchParams.
+   *
+   * Rest.li 2.0: "special characters in a params string not part of a resource
+   * key should not be encoded", e.g. `authors=List(urn%3Ali%3Aorganization%3A12345)`
+   * (learn.microsoft.com, Protocol Versions, read 2026-09-14). URLSearchParams
+   * encodes every `(`, `)`, `,` and `:`, so `timeIntervals=(timeRange:(start:…))`
+   * and `shares=List(…)` left here unreadable, and a share URN the caller had
+   * already encoded was encoded a second time. The mock decoded whatever it was
+   * sent, so no test could see it. Callers encode URNs with `liUrn`; the
+   * structure around them stays raw.
+   */
+  const query = Object.entries(params).map(([k, v]) => `${encodeURIComponent(k)}=${v}`).join("&");
+  const url = base + path + (query ? (path.includes("?") ? "&" : "?") + query : "");
+  // A URN anywhere in the request must be encoded, in the path and in values alike.
+  if (url.includes("urn:li:")) throw new Error(`liGet: unencoded URN in ${path}; wrap it in liUrn()`);
 
-  const res = await fetch(url.toString(), {
+  const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${opts.token}`,
       /*
@@ -314,12 +350,21 @@ export async function liGet<T = any>(
 export async function administeredOrganizations(
   token: string,
 ): Promise<{ urn: string; role: string }[]> {
-  const data = await liGet<{ elements?: { organizationalTarget?: string; role?: string; state?: string }[] }>(
+  type Acl = { organization?: string; organizationTarget?: string; organizationalTarget?: string; role?: string; state?: string };
+  const data = await liGet<{ elements?: Acl[] }>(
     LI.ORG_ACLS, { q: "roleAssignee", role: LI.ADMIN_ROLE, state: "APPROVED" }, { token },
   );
+  /*
+   * The page's field name is not settled by the documentation. Its two samples
+   * for this same finder disagree with each other, `organization` in one and
+   * `organizationTarget` in the other, and this code read `organizationalTarget`,
+   * which neither shows. Reading only one name would leave a real administrator
+   * with "no page you administer" on the first connection. All three are read
+   * until a live response settles it; probe-live-linkedin.mjs prints the raw one.
+   */
   return (data.elements ?? [])
-    .filter((e) => e.organizationalTarget && e.role === LI.ADMIN_ROLE)
-    .map((e) => ({ urn: e.organizationalTarget as string, role: e.role as string }));
+    .map((e) => ({ urn: e.organization ?? e.organizationTarget ?? e.organizationalTarget, role: e.role }))
+    .filter((e): e is { urn: string; role: string } => Boolean(e.urn) && e.role === LI.ADMIN_ROLE);
 }
 
 /* ===========================================================================
@@ -367,8 +412,14 @@ export const LI_FACETS = [
   { field: "followerCountsBySeniority", value: "seniority", kind: "seniority", into: "seniority" },
   { field: "followerCountsByFunction", value: "function", kind: "function", into: "function" },
   { field: "followerCountsByStaffCountRange", value: "staffCountRange", kind: "enum", into: "company_size" },
-  { field: "followerCountsByGeoCountry", value: "geo", kind: "geo", into: "countries" },
-  { field: "followerCountsByGeo", value: "geo", kind: "geo", into: "regions" },
+  /*
+   * followerCountsByGeoCountry and followerCountsByGeo are deliberately absent.
+   * Their values are urn:li:geo, whose names come from /v2/geo, and LinkedIn's
+   * Data Storage Requirements exclude "the Microsoft Bing Maps location data
+   * which may not be stored" (read 2026-09-14). A demographic snapshot is stored
+   * by definition, so countries and market areas cannot be kept for a LinkedIn
+   * page. Naming them from a source of our own would be allowed; it is not built.
+   */
 ] as const;
 
 export type LiFacetKind = (typeof LI_FACETS)[number]["kind"];
@@ -450,28 +501,6 @@ export function liTier(): "development" | "standard" {
  */
 export function liMinSyncIntervalMs(): number {
   return Math.max(15 * 60_000, Number(process.env.LINKEDIN_MIN_SYNC_INTERVAL_MS ?? 4 * 3_600_000));
-}
-
-/**
- * Resolve `urn:li:geo:*`, in one BATCH_GET.
- *
- * `GET /v2/geo?ids=List(1,2)` -> `results: { "1": { defaultLocalizedName: { value } } }`.
- * Note this is Bing Maps data under Microsoft's terms, which is a licensing fact
- * to carry rather than a technical one.
- */
-export async function liResolveGeo(
-  ids: string[], token: string,
-): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  if (!ids.length) return out;
-  const data = await liGet<{ results?: Record<string, { defaultLocalizedName?: { value?: string } }> }>(
-    LI.GEO, { ids: `List(${ids.join(",")})` }, { token, base: LI.V2 },
-  );
-  for (const [id, row] of Object.entries(data.results ?? {})) {
-    const v = row?.defaultLocalizedName?.value;
-    if (typeof v === "string" && v) out.set(id, v);
-  }
-  return out;
 }
 
 /** Resolve `urn:li:industry:*` against the PINNED taxonomy version. */

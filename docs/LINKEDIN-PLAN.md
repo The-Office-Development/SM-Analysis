@@ -171,14 +171,51 @@ areas, until the upgrade.
    interval (a few hours is plenty for data that trails by two days) before a
    page is connected.
 
+### Found 2026-09-14 by reading the primary docs against the code, still before any call
+
+All fixed the same day, each with a test and a mutation (197 tests, 86/86):
+
+1. 🔴 **Every request was malformed.** `liGet` sent values through
+   URLSearchParams, percent-encoding the `(`, `)`, `:` and `,` that Rest.li 2.0
+   requires raw ("special characters in a params string not part of a resource
+   key should not be encoded"), and encoded share URNs twice. The daily
+   statistics, per-post statistics and follower total would all have failed on
+   the first sync. The mock decoded whatever it received, so no test could see
+   it; it now rejects what LinkedIn rejects, and `liGet` refuses an unencoded URN.
+2. **ugcPost URNs were asked for as shares.** The finder takes `ugcPosts=List(...)`
+   separately. A ugcPost was never measured and, being absent, was recorded as a
+   real zero.
+3. 🔴 **A failed per-post call wrote zeros over every post.** Its catch returned an
+   empty element list, which the omitted-means-zero rule read as "every post
+   omitted".
+4. **The page-admin field name.** The docs' two samples say `organization` and
+   `organizationTarget`; the code read `organizationalTarget`, which neither shows.
+   All three are read until the probe settles it.
+5. 🔴 **LinkedIn's Data Storage Requirements were not met.** Posts may be kept six
+   months, reporting data one year, the page name eight weeks, and **Bing Maps
+   location data may not be stored at all**. The sync stored the latest 100 posts
+   of any age, purged nothing, and (on standard tier) stored country and market
+   area names. Now: posts older than 182 days are never stored, a purge runs on
+   every LinkedIn sync, the name is re-read daily, and location facets are
+   neither fetched nor kept. The Audience page, the demo and the privacy policy
+   say so.
+
+Also open, not a defect yet: LinkedIn's days are **UTC** days, while the product
+defines an Instagram day in Amman time. Reconciliation against the Analytics tab
+will show which boundary LinkedIn's own UI uses; the dashboard must not imply
+Amman days for LinkedIn if they are not.
+
+The step-by-step for the developer app is `SETUP-LINKEDIN.md`, and for Drinkat
+`CLIENT-CONNECT-LINKEDIN.md`. **The app has to be verified by The Office's own
+LinkedIn Page**, not Drinkat's.
+
 ### Then, in order
 
 1. Set `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET` as Cloudflare secrets.
 2. ~~Fix the two blockers above.~~ Done 2026-09-14.
-3. Write `verify/probe-live-linkedin.mjs`, the LinkedIn twin of
-   `probe-live.mjs`: every call `syncLinkedIn` and `audienceLinkedIn` make, read
-   only, printing raw responses. Run it with Drinkat's token before the sync ever
-   writes a row.
+3. ~~Write `verify/probe-live-linkedin.mjs`.~~ Written 2026-09-14. Run it with a
+   Drinkat super admin's token before the sync ever writes a row, then once with
+   `--try-batch`.
 4. Connect Drinkat's Company Page and read the raw responses before
    trusting any stored figure.
 5. Reconcile against the page's own Analytics tab, the way Instagram was

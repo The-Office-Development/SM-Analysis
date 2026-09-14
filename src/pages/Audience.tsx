@@ -129,7 +129,8 @@ function AudienceInner() {
       <section className="panel">
         <div className="panel__head"><h3>Top locations</h3></div>
         <div className="panel__body">
-          {countryRows.length ? <BarList keyWidth={130} rows={countryRows} /> : <Unavailable />}
+          {countryRows.length ? <BarList keyWidth={130} rows={countryRows} />
+            : <Unavailable label={onlyLinkedIn ? NO_LOCATIONS_ON_LINKEDIN : undefined} />}
         </div>
       </section>
 
@@ -198,6 +199,14 @@ function AudienceInner() {
     </div>
   );
 }
+
+/*
+ * LinkedIn does report follower locations, but their names are Bing Maps data
+ * that LinkedIn's storage requirements say may not be stored, so PulseBoard
+ * keeps none. Said plainly, so the empty panel does not read as a failed sync.
+ */
+const NO_LOCATIONS_ON_LINKEDIN =
+  "LinkedIn's terms do not allow follower locations to be stored, so PulseBoard does not keep them for a LinkedIn page. The page's own Analytics tab shows them.";
 
 const NOT_ON_LINKEDIN =
   "LinkedIn does not report age or gender for a Company Page. It reports industry, seniority and job function instead, below.";

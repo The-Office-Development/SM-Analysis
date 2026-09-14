@@ -100,7 +100,7 @@ export function Privacy() {
         <li><b>Access tokens</b> issued by those platforms. They are encrypted at rest with AES-256-GCM and are never sent to your browser. We never ask for and never hold your social media password. We request read-only permissions wherever the platform offers them. LinkedIn is the exception: its reporting permission for a Company Page also carries page-management rights, and no read-only alternative exists. PulseBoard never uses those rights; it only ever reads.</li>
         <li><b>Metrics</b>: daily followers, reach, views and engagement figures for the accounts you connect.</li>
         <li><b>Your posts</b>: captions, publication times, links and per-post performance.</li>
-        <li><b>Aggregated audience information about your followers</b>: for Instagram and Facebook, age bands, gender split, country distribution and hourly activity; for a LinkedIn Company Page, industry, seniority, job function, company size, country and market area. These are statistical breakdowns only. We never receive the identity of any individual follower.</li>
+        <li><b>Aggregated audience information about your followers</b>: for Instagram and Facebook, age bands, gender split, country distribution and hourly activity; for a LinkedIn Company Page, industry, seniority, job function and company size (LinkedIn's terms do not allow us to store follower locations). These are statistical breakdowns only. We never receive the identity of any individual follower.</li>
         <li><b>Operational records</b>: sync history, and errors, retained so we can tell you when something failed.</li>
       </ul>
 

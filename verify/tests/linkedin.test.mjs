@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { LI, liDayKey, liTime, liNum } from "../build/_linkedin.js";
+import { LI, liDayKey, liTime, liNum, liGet, liUrn, administeredOrganizations } from "../build/_linkedin.js";
+import { installLinkedInMock, ORG_ID } from "./mock-linkedin.mjs";
 
 /**
  * LinkedIn, tested where it can be tested.
@@ -130,4 +131,53 @@ test("the API version is pinned in exactly one place", () => {
   const src = readFileSync("netlify/functions/_sync.ts", "utf8");
   assert.ok(!/LinkedIn-Version/i.test(src),
     "the version header belongs to the API block, not to the sync");
+});
+
+/* ---- the wire format ------------------------------------------------------ */
+
+test("a request keeps Rest.li structure raw and encodes the URNs inside it", async () => {
+  /*
+   * "special characters in a params string not part of a resource key should not
+   * be encoded": `List(urn%3Ali%3Aorganization%3A12345)`. liGet used to send every
+   * value through URLSearchParams, which encoded the parentheses and colons, and
+   * the mock decoded it anyway, so nothing caught that every call was malformed.
+   */
+  const seen = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => { seen.push(String(url)); return new Response("{}", { status: 200 }); };
+  try {
+    const urn = "urn:li:organization:12345";
+    await liGet(`/networkSizes/${liUrn(urn)}`, { edgeType: "COMPANY_FOLLOWED_BY_MEMBER" }, { token: "t" });
+    await liGet("/organizationalEntityShareStatistics", {
+      q: "organizationalEntity",
+      organizationalEntity: liUrn(urn),
+      timeIntervals: "(timeRange:(start:1,end:2),timeGranularityType:DAY)",
+      shares: `List(${liUrn("urn:li:share:1")},${liUrn("urn:li:share:2")})`,
+    }, { token: "t" });
+  } finally { globalThis.fetch = real; }
+
+  assert.equal(seen[0], "https://api.linkedin.com/rest/networkSizes/urn%3Ali%3Aorganization%3A12345?edgeType=COMPANY_FOLLOWED_BY_MEMBER",
+    "a URN in the path is encoded");
+  assert.ok(seen[1].includes("timeIntervals=(timeRange:(start:1,end:2),timeGranularityType:DAY)"), "object syntax stays raw");
+  assert.ok(seen[1].includes("shares=List(urn%3Ali%3Ashare%3A1,urn%3Ali%3Ashare%3A2)"), "a List stays raw, its URNs encoded once");
+  assert.ok(seen[1].includes("organizationalEntity=urn%3Ali%3Aorganization%3A12345"));
+  assert.ok(!seen[1].includes("%25"), "nothing is encoded twice");
+});
+
+test("an unencoded URN is refused before it is sent", async () => {
+  await assert.rejects(
+    liGet("/organizationalEntityFollowerStatistics", { q: "organizationalEntity", organizationalEntity: "urn:li:organization:1" }, { token: "t" }),
+    /unencoded URN/,
+  );
+});
+
+test("the administered page is found under either field name the documentation shows", async () => {
+  // The mock answers with `organization` for the administrator and
+  // `organizationTarget` for a content admin, one of each documented spelling.
+  const mock = installLinkedInMock();
+  try {
+    const orgs = await administeredOrganizations("t");
+    assert.deepEqual(orgs, [{ urn: `urn:li:organization:${ORG_ID}`, role: "ADMINISTRATOR" }],
+      "the administrator's page is found, and the content-admin page is not offered");
+  } finally { mock.restore(); }
 });
