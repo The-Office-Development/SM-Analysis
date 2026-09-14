@@ -205,6 +205,13 @@ defines an Instagram day in Amman time. Reconciliation against the Analytics tab
 will show which boundary LinkedIn's own UI uses; the dashboard must not imply
 Amman days for LinkedIn if they are not.
 
+**Parity pass, same day.** Every Instagram mechanism was checked against the
+LinkedIn path; the table is `LINKEDIN-PARITY.md`. It fixed nine more things: the
+chunked 30-day window (now the full year in one call), post paging, sponsored and
+draft posts, the scope audit, the secret fingerprint, and on screen the "Views"
+label on impressions, the 0.0% engagement rate, "read from Instagram" on every
+platform, and a live post read LinkedIn cannot serve. 200 tests, 91/91.
+
 The step-by-step for the developer app is `SETUP-LINKEDIN.md`, and for Drinkat
 `CLIENT-CONNECT-LINKEDIN.md`. **The app has to be verified by The Office's own
 LinkedIn Page**, not Drinkat's.

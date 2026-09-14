@@ -130,6 +130,12 @@ export function installLinkedInMock(opts = {}) {
   const failPostStats = opts.failPostStats ?? 0;
   // How many of the FIRST posts were published more than six months ago.
   const oldPosts = opts.oldPosts ?? 0;
+  // Index -> what else the finder returns for that post, as LinkedIn does.
+  const sponsored = new Set(opts.sponsoredPosts ?? []);   // adContext.isDsc
+  const dark = new Set(opts.darkPosts ?? []);             // distribution.feedDistribution NONE
+  const drafts = new Set(opts.draftPosts ?? []);          // lifecycleState DRAFT
+  // Serve posts this many per page, with a `next` link while more remain.
+  const pageSize = opts.postsPageSize ?? Infinity;
   const calls = [];
   const real = globalThis.fetch;
 
@@ -180,14 +186,22 @@ export function installLinkedInMock(opts = {}) {
     }
 
     if (path === "/posts") {
-      const elements = Array.from({ length: postCount }, (_, i) => ({
+      const all = Array.from({ length: postCount }, (_, i) => ({
+        ...(sponsored.has(i) ? { adContext: { isDsc: true, dscStatus: "ACTIVE" } } : {}),
+        distribution: { feedDistribution: dark.has(i) ? "NONE" : "MAIN_FEED" },
+        lifecycleState: drafts.has(i) ? "DRAFT" : "PUBLISHED",
         id: postUrn(i),
         commentary: `Post ${i}\n  with a newline and   spaces`,
         publishedAt: Date.parse(`${addDays(from, i < oldPosts ? -300 : i)}T09:00:00Z`),
         createdAt: Date.parse(`${addDays(from, i < oldPosts ? -300 : i)}T09:00:00Z`),
         content: i === 1 ? { media: { id: "urn:li:video:abc" } } : {},
       }));
-      return json({ elements, paging: { start: 0, count: elements.length } });
+      // Newest first, as sortBy=CREATED returns them.
+      all.sort((a, b) => b.createdAt - a.createdAt);
+      const start = Number(u.searchParams.get("start") ?? 0);
+      const elements = all.slice(start, start + pageSize);
+      const more = start + elements.length < all.length;
+      return json({ elements, paging: { start, count: elements.length, links: more ? [{ rel: "next", href: "/rest/posts?start=" + (start + elements.length) }] : [] } });
     }
 
     /*

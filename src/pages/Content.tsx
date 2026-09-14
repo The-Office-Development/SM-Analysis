@@ -43,16 +43,28 @@ function ContentInner() {
   // Totals sum what was reported. An unreported post contributes nothing rather
   // than a fabricated zero, and a post with no reach is skipped in the rate
   // rather than counted as a 0% performer.
-  const totalViews = items.reduce((s, c) => s + (c.views ?? 0), 0);
-  const totalEng = items.reduce((s, c) => s + (sumKnown(c.likes, c.comments, c.shares, c.saves) ?? 0), 0);
+  //
+  // A LinkedIn post's `views` column holds IMPRESSIONS, a different quantity, so
+  // it is never added to other platforms' views: a LinkedIn-only list totals
+  // impressions, and a mixed list totals views without the LinkedIn posts. And a
+  // total or rate with nothing behind it is unknown, not 0 — with LinkedIn
+  // selected no post has reach, and this card used to read "0.0%".
+  const onlyLinkedIn = platforms.length === 1 && platforms[0] === "linkedin";
+  const viewRows = items.filter((c) => onlyLinkedIn || c.platform !== "linkedin");
+  const totalViews = sumKnown(...viewRows.map((c) => c.views));
+  const totalEng = sumKnown(...items.map((c) => sumKnown(c.likes, c.comments, c.shares, c.saves)));
   const erRows = items.filter((c) => c.reach !== null && c.reach > 0);
   const avgEr = erRows.length
     ? (erRows.reduce((s, c) => s + (sumKnown(c.likes, c.comments, c.shares, c.saves) ?? 0) / (c.reach as number), 0) / erRows.length) * 100
-    : 0;
+    : null;
+  const viewsLabel = onlyLinkedIn ? "Impressions" : "Views";
 
   const sorted = [...items].sort((a, b) => {
     const av = a[sortKey], bv = b[sortKey];
     if (typeof av === "string" && typeof bv === "string") return dir * av.localeCompare(bv);
+    // Unknown sorts last in both directions; ordering it as 0 ranks a figure nobody reported.
+    if (av === null || av === undefined) return bv === null || bv === undefined ? 0 : 1;
+    if (bv === null || bv === undefined) return -1;
     return dir * ((av as number) - (bv as number));
   });
 
@@ -71,9 +83,9 @@ function ContentInner() {
     <>
       <div className="kpis">
         <StatCard label="Posts stored" value={compact(items.length)} />
-        <StatCard label="Total views" value={compact(totalViews)} />
-        <StatCard label="Total engagements" value={compact(totalEng)} />
-        <StatCard label="Avg engagement rate" value={pctPlain(avgEr)} />
+        <StatCard label={`Total ${viewsLabel.toLowerCase()}`} value={metric(totalViews)} />
+        <StatCard label="Total engagements" value={metric(totalEng)} />
+        <StatCard label="Avg engagement rate" value={avgEr === null ? "n/a" : pctPlain(avgEr)} />
       </div>
 
       <section className="panel" style={{ marginTop: 16 }}>
@@ -88,7 +100,7 @@ function ContentInner() {
               * screen?", which is the question someone holding their phone next
               * to it is actually asking.
               */}
-            {lastRead && ` · read from Instagram ${lastRead}`}
+            {lastRead && ` · read from ${platforms.length === 1 ? PLATFORMS[platforms[0]].name : "the platforms"} ${lastRead}`}
           </span>
           <span style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
             <button type="button" className={`btn btn--sm${inRange ? "" : " btn--on"}`}
@@ -103,7 +115,9 @@ function ContentInner() {
               <tr>
                 {COLS.map((c) => (
                   <th key={c.key} className={c.num ? "num" : ""} onClick={() => toggle(c.key)}>
-                    {c.label}{sortKey === c.key && <span className="arrow"> {dir === 1 ? "▲" : "▼"}</span>}
+                    {c.key === "views" && onlyLinkedIn ? "Impressions"
+                      : c.key === "views" && platforms.includes("linkedin") ? "Views / impr."
+                      : c.key === "shares" && onlyLinkedIn ? "Reposts" : c.label}{sortKey === c.key && <span className="arrow"> {dir === 1 ? "▲" : "▼"}</span>}
                   </th>
                 ))}
                 <th className="num">Watch</th>

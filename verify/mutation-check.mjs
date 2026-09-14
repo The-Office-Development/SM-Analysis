@@ -26,6 +26,16 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "LinkedIn history dug in Instagram-sized chunks", file: SYNC,
+    find: "addDays(today(), -(LI.MAX_HISTORY_DAYS - 1)), counter, today())", replace: "start, counter, window.end)" },
+  { name: "LinkedIn sponsored dark posts stored as page posts", file: SYNC,
+    find: "&& !p.adContext?.isDsc", replace: "" },
+  { name: "LinkedIn posts that never reach the feed stored as page posts", file: SYNC,
+    find: '&& p.distribution?.feedDistribution !== "NONE"', replace: "" },
+  { name: "LinkedIn drafts stored as page posts", file: SYNC,
+    find: '(p.lifecycleState === undefined || p.lifecycleState === "PUBLISHED")', replace: "true" },
+  { name: "LinkedIn posts read from the first page only", file: SYNC,
+    find: "if (reachedFloor || !hasNext)", replace: "if (true)" },
   { name: "LinkedIn posts past the six-month storage limit are stored", file: SYNC,
     find: "(p.publishedAt ?? p.createdAt ?? 0) >= postFloorMs", replace: "true" },
   { name: "LinkedIn reporting data kept past its one-year limit", file: SYNC,

@@ -58,8 +58,13 @@ verified website and domain, app verified by the organisation's page.
 2. Redeploy the Pages app, and **also the cron Worker**
    (`CLAUDE.md`, "The cron Worker is NOT deployed by CI").
 3. Get a token for the probe: Developer Portal → the app → **Auth → OAuth 2.0
-   tools**, scopes `r_organization_social` and `rw_organization_admin`, signed in
-   as a **super admin of Drinkat's page** (see `CLIENT-CONNECT-LINKEDIN.md`).
+   tools** (the token generator), scopes `r_organization_social` and
+   `rw_organization_admin`, signed in as a **super admin of Drinkat's page** (see
+   `CLIENT-CONNECT-LINKEDIN.md`).
+   🔴 **Exactly those two scopes, no more and no fewer.** LinkedIn: "If you request
+   a different scope than the previously granted scope, all the previous access
+   tokens are invalidated." A token made with an extra scope silently kills the
+   connection PulseBoard holds for that member.
 4. Run the probe before anything syncs:
    `LI_TOKEN=... node verify/probe-live-linkedin.mjs`
    then once more with `--try-batch` to learn how development tier refuses a

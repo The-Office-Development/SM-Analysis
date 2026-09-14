@@ -457,7 +457,16 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
   else if (acc.platform === "instagram") ({ days, posts } = await syncInstagram(acc, token, start, counter, window.end, anchor));
   else if (acc.platform === "facebook") ({ days, posts } = await syncFacebook(acc, token, start, counter));
   else if (acc.platform === "tiktok") ({ days, posts } = await syncTiktok(acc, token, counter));
-  else if (acc.platform === "linkedin") ({ days, posts } = await syncLinkedIn(acc, token, start, counter, window.end));
+  /*
+   * LinkedIn does not use syncWindow. That walk exists because Instagram costs a
+   * call per day, so history is dug in chunks and one run in four is spent on
+   * the present. LinkedIn returns any range in ONE call, so each run asks for the
+   * whole year it serves: the backfill completes on the first sync instead of
+   * over a day of 4-hour turns, and every stored day is re-read, which is the
+   * trailing re-fetch for all of them at no extra cost.
+   */
+  else if (acc.platform === "linkedin") ({ days, posts } = await syncLinkedIn(
+    acc, token, addDays(today(), -(LI.MAX_HISTORY_DAYS - 1)), counter, today()));
 
   let rowsWritten = 0;
   if (days.length) {
@@ -2273,23 +2282,6 @@ async function syncLinkedIn(
   }
 
   /* ---- the page's posts ------------------------------------------------- */
-  spend(c);
-  const list = await liGet<{ elements?: {
-    id?: string; commentary?: string; publishedAt?: number; createdAt?: number;
-    content?: Record<string, unknown>;
-  }[] }>(
-    LI.POSTS,
-    { q: "author", author: liUrn(urn), count: String(LI.POSTS_PAGE), sortBy: "CREATED" },
-    { token },
-  ).catch((e) => {
-    // Platform errors are re-thrown, as everywhere else. So is anything that is
-    // NOT a platform error: this catch exists for LinkedIn saying no, and a
-    // programming mistake quietly becoming "this page has no posts" is how the
-    // read-only guard above hid itself until a test looked.
-    if (isThrottleError(e) || isAuthError(e) || !(e instanceof GraphError)) throw e;
-    return { elements: [] };
-  });
-
   /*
    * Only posts inside LinkedIn's six-month storage limit for an authenticated
    * organization's social activity. An older post is not stored at all, and a
@@ -2297,7 +2289,62 @@ async function syncLinkedIn(
    * no call on statistics for a post we are not allowed to keep.
    */
   const postFloorMs = Date.now() - LI.POST_RETENTION_DAYS * 86_400_000;
-  const found = (list.elements ?? []).filter((p) => p.id && (p.publishedAt ?? p.createdAt ?? 0) >= postFloorMs);
+  type LiPost = {
+    id?: string; commentary?: string; publishedAt?: number; createdAt?: number;
+    content?: Record<string, unknown>; lifecycleState?: string;
+    distribution?: { feedDistribution?: string }; adContext?: { isDsc?: boolean };
+  };
+  const listed: LiPost[] = [];
+  /*
+   * Paged, newest first, until the storage floor.
+   *
+   * LinkedIn: "Receive less than the `count` number of results in a page, when
+   * there are more posts available in the subsequent paginated requests. The
+   * `links` field in the response will provide a link to the next page." So a
+   * short page is not the end; only a missing next link, or reaching posts older
+   * than the floor, is. Capped at LI.POSTS_MAX_PAGES because each page is one of
+   * 100 daily calls.
+   */
+  for (let page = 0, startAt = 0; page < LI.POSTS_MAX_PAGES; page++) {
+    spend(c);
+    const res = await liGet<{ elements?: LiPost[]; paging?: { links?: { rel?: string }[] } }>(
+      LI.POSTS,
+      { q: "author", author: liUrn(urn), count: String(LI.POSTS_PAGE), start: String(startAt), sortBy: "CREATED" },
+      { token },
+    ).catch((e) => {
+      // Platform errors are re-thrown, as everywhere else. So is anything that is
+      // NOT a platform error: this catch exists for LinkedIn saying no, and a
+      // programming mistake quietly becoming "this page has no posts" is how the
+      // read-only guard above hid itself until a test looked.
+      if (isThrottleError(e) || isAuthError(e) || !(e instanceof GraphError)) throw e;
+      log("sync.linkedin_posts_unavailable", { account: acc.id, page, detail: e.message });
+      return null;
+    });
+    if (!res) break;
+    const els = res.elements ?? [];
+    listed.push(...els);
+    const oldest = els.at(-1);
+    const reachedFloor = oldest ? (oldest.createdAt ?? oldest.publishedAt ?? 0) < postFloorMs : true;
+    const hasNext = (res.paging?.links ?? []).some((l) => l.rel === "next");
+    if (reachedFloor || !hasNext) break;
+    startAt += els.length || LI.POSTS_PAGE;
+  }
+
+  /*
+   * What counts as one of the PAGE's posts.
+   *
+   * The author finder "will return both organic and sponsored posts together"
+   * (isDsc is deprecated). A sponsored "dark" post never appears on the page, and
+   * organizationalEntityShareStatistics "returns organic statistics only", so it
+   * would be stored beside real posts with figures near zero, dragging every
+   * median down. Excluded, along with anything not PUBLISHED.
+   */
+  const found = listed.filter((p) =>
+    p.id
+    && (p.publishedAt ?? p.createdAt ?? 0) >= postFloorMs
+    && (p.lifecycleState === undefined || p.lifecycleState === "PUBLISHED")
+    && !p.adContext?.isDsc
+    && p.distribution?.feedDistribution !== "NONE");
   if (found.length) {
     /*
      * Statistics for those posts: ONE call per URN type, not one per post.

@@ -117,6 +117,14 @@ if (org?.body) console.log(`        ${org.body.localizedName ?? "?"} (vanity: ${
 console.log("\n2. FOLLOWER TOTAL");
 const net = await get("networkSizes/{urn} COMPANY_FOLLOWED_BY_MEMBER", REST, `/networkSizes/${enc(orgUrn)}`,
   { edgeType: "COMPANY_FOLLOWED_BY_MEMBER" }, { raw: true });
+// LinkedIn's own sample puts the URN in this path UNENCODED, while its protocol
+// page says a resource key must be encoded. If the encoded form (what the sync
+// sends) is refused, try the raw form once so the run says which one works.
+if (net && !net.body) {
+  const rawTry = await get("networkSizes with the URN unencoded, as LinkedIn's sample shows", REST,
+    `/networkSizes/${orgUrn}`, { edgeType: "COMPANY_FOLLOWED_BY_MEMBER" }, { optional: true, raw: true });
+  if (rawTry?.body) notes.push("*** networkSizes accepts only the UNENCODED URN in its path. liGet refuses a raw urn:li: in a request, so this call needs an exemption there.");
+}
 const total = net?.body?.firstDegreeSize;
 if (net?.body && typeof total !== "number") notes.push("*** networkSizes returned no firstDegreeSize; the sync stores no follower total");
 

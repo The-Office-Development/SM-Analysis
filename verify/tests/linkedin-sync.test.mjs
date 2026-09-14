@@ -542,3 +542,35 @@ test("the page name is re-read once a day", async () => {
   assert.equal(calls.filter((c) => /\/rest\/organizations\//.test(c)).length, 1, "one profile read on the first run of the day");
   assert.equal(db._rows("social_accounts")[0].display_name, "Drinkat");
 });
+
+/* ---- parity with the Instagram path ------------------------------------------ */
+
+test("every LinkedIn sync asks for the whole year LinkedIn serves, in one call", async () => {
+  /*
+   * syncWindow digs Instagram history in chunks because Instagram costs a call
+   * per day. LinkedIn answers any range at once, so chunking only made a backfill
+   * take a day of 4-hour turns and left older days never re-read.
+   */
+  const { calls } = await run();
+  const daily = calls.filter((c) => c.includes("organizationalEntityShareStatistics") && c.includes("timeIntervals"));
+  assert.equal(daily.length, 1, "one daily-statistics call");
+  const start = Number(/start:(\d+)/.exec(decodeURIComponent(daily[0]))?.[1]);
+  const expected = Date.parse(`${addDays(TODAY, -364)}T00:00:00Z`);
+  assert.equal(start, expected, "from 364 days ago, not a 10-day chunk");
+});
+
+test("sponsored dark posts and drafts are not stored as the page's posts", async () => {
+  // The finder returns organic and sponsored posts together; share statistics are
+  // organic only, so a dark post would be stored with near-zero figures.
+  // Each marker on its own post, so each filter is tested alone.
+  const { db } = await run({ posts: 6, sponsoredPosts: [1], darkPosts: [2], draftPosts: [3] });
+  const ids = db._rows("content").map((p) => p.external_id).sort();
+  assert.equal(ids.length, 3, "only the three organic, published posts");
+  for (const i of [1, 2, 3]) assert.ok(!ids.some((id) => id.endsWith(`0000${i}`)), `post ${i} is excluded`);
+});
+
+test("posts are paged past a short page until there is no next link", async () => {
+  const { db, calls } = await run({ posts: 5, postsPageSize: 2 });
+  assert.equal(calls.filter((c) => c.includes("/rest/posts?")).length, 3, "three pages of two, two, one");
+  assert.equal(db._rows("content").length, 5, "every post on every page is stored");
+});

@@ -304,6 +304,29 @@ P0 finding. There is a test and a mutation guarding every one.
   updating only what it read, and has **no test at all**: no handler-level test
   rig exists in this repo.
 
+### LinkedIn: where the Instagram rules bend, and the rules of its own
+Checked 2026-09-14 against LinkedIn's primary docs; the full comparison is
+`docs/LINKEDIN-PARITY.md`.
+
+- **The day boundary is LinkedIn's, in UTC.** The invariant above says never to
+  define a day from the platform's bucketing. LinkedIn offers no other: its
+  statistics run "till 2 days before the request date (UTC)" at DAY granularity,
+  so a LinkedIn day is a UTC day. Do not "fix" this with `tz_offset_minutes`; there
+  is no finer data to re-bucket.
+- **Rest.li 2.0 encoding.** URNs encoded, the `List(...)` / `(key:value)` structure
+  raw. `liGet` sends values as given and refuses an unencoded URN; wrap URNs in
+  `liUrn`. Never route LinkedIn parameters through URLSearchParams.
+- **Absent means zero, for per-post statistics only**, and only inside a call that
+  succeeded for that URN type (`shares` and `ugcPosts` are separate parameters).
+- **Storage limits are LinkedIn's, and enforced.** Posts six months, reporting data
+  one year, page name eight weeks, Bing Maps location names never. See
+  `purgeLinkedInExpired` and `LI.REPORTING_RETENTION_DAYS`.
+- **No BATCH_GET on development tier, 100 calls per member a day.**
+  `LINKEDIN_API_TIER` and `liMinSyncIntervalMs`.
+- **Never generate a probe token with different scopes.** "If you request a
+  different scope than the previously granted scope, all the previous access
+  tokens are invalidated": the client's live connection dies.
+
 ### The cron Worker is NOT deployed by CI
 A push to `main` deploys the Pages app only. The scheduled sync runs in
 `worker-cron/`, which bundles `netlify/functions/sync-cron.ts` and everything

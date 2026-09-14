@@ -158,6 +158,8 @@ export const LI = {
   POSTS: "/posts",
   /** Max the finder accepts per page. */
   POSTS_PAGE: 100,
+  /** Pages of posts per sync at most: 300 posts inside six months is plenty. */
+  POSTS_MAX_PAGES: 3,
 
   /**
    * Statistics only reach back twelve months.

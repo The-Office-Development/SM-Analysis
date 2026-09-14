@@ -1,6 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
+import type { Platform } from "../lib/types";
 import { metric, sumKnown, full, shortDate, timeAgo } from "../lib/format";
 import { postContext, postRank, engagementSplit, ageHours, tooEarly, reachMultiples } from "../lib/insights";
 import { PlatformBadge } from "../components/PlatformTile";
@@ -49,6 +50,27 @@ const METRICS = [
   { key: "saves", label: "Saves", hint: "Kept for later. Someone meant to come back to it" },
 ] as const;
 
+/*
+ * What each column means ON THIS PLATFORM. The content table is shared, and a
+ * LinkedIn post's `views` column holds impressions: "a display", which LinkedIn
+ * reports instead of views. Labelled "Views" it put a different quantity under a
+ * heading a client reads across platforms. LinkedIn also never reports reach or
+ * saves per post, so their absence is not "did not give us this figure".
+ */
+function metricLabel(key: typeof METRICS[number]["key"], platform: Platform): string {
+  if (platform === "linkedin" && key === "views") return "Impressions";
+  if (platform === "linkedin" && key === "shares") return "Reposts";
+  return METRICS.find((m) => m.key === key)!.label;
+}
+function metricHint(key: typeof METRICS[number]["key"], platform: Platform): string | null {
+  if (platform === "linkedin" && key === "views") return "Times it was shown in someone's feed. LinkedIn counts displays, not views";
+  if (platform === "linkedin" && key === "shares") return "Reposted by someone. The strongest sign a post is spreading";
+  return METRICS.find((m) => m.key === key)!.hint;
+}
+const NEVER_PER_POST: Partial<Record<Platform, string[]>> = { linkedin: ["reach", "saves"] };
+/** Only Instagram posts can be re-read on demand; see refresh-post.ts. */
+const LIVE_READ: Platform[] = ["instagram"];
+
 function PostDetailInner() {
   const { id } = useParams<{ id: string }>();
   const dash = useDash();
@@ -95,6 +117,9 @@ function PostDetailInner() {
   const AUTO_STALE_MS = 2 * 60_000;
   useEffect(() => {
     if (!post || isDemoMode()) return;
+    // A platform with no single-post read would only spend a Worker invocation
+    // on a refusal. LinkedIn in particular has 100 calls a day to protect.
+    if (!LIVE_READ.includes(post.platform)) return;
     if (autoDone.current === post.id) return;
     const age = post.checked_at ? Date.now() - Date.parse(post.checked_at) : Infinity;
     if (Number.isFinite(age) && age < AUTO_STALE_MS) return;
@@ -171,7 +196,7 @@ function PostDetailInner() {
                 Open on {PLATFORMS[post.platform].name} ↗
               </a>
             )}
-            <button type="button" className="btn btn--sm" disabled={refreshing}
+            {LIVE_READ.includes(post.platform) && <button type="button" className="btn btn--sm" disabled={refreshing}
               style={{ marginLeft: "auto" }}
               onClick={async () => {
                 setRefreshing(true); setRefreshMsg(null);
@@ -187,7 +212,7 @@ function PostDetailInner() {
                 } finally { setRefreshing(false); }
               }}>
               {refreshing ? "Checking..." : "Check now"}
-            </button>
+            </button>}
           </div>
           <h2 style={{ margin: 0, fontSize: 19, lineHeight: 1.35 }}>
             {post.title || "Untitled"}
@@ -220,6 +245,12 @@ function PostDetailInner() {
                 <>These are sample figures, not read from {platform}.</>
               ) : refreshing ? (
                 `Reading the latest numbers from ${platform}...`
+              ) : !LIVE_READ.includes(post.platform) ? (
+                // No live read exists for this platform, so the page must not claim one.
+                <>Read from {platform} {checked ?? "by the scheduled sync"}.
+                {post.platform === "linkedin"
+                  ? " LinkedIn allows only a limited number of requests a day, so its posts are read at most every four hours, and its figures trail by about two days."
+                  : ` ${platform} keeps counting for days, so these will still move.`}</>
               ) : checked ? (
                 <>Read from {platform} {checked}. This page checks {platform} each
                 time you open it. {platform} keeps counting for days, so these
@@ -285,13 +316,15 @@ function PostDetailInner() {
               return (
                 <div key={m.key} style={{ padding: "9px 0", borderBottom: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 550 }}>{m.label}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 550 }}>{metricLabel(m.key, post.platform)}</span>
                     <span className="tnum" style={{ fontSize: 17, fontWeight: 600 }}>{metric(value)}</span>
                   </div>
 
                   {value === null ? (
                     <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>
-                      Instagram did not give us this figure for this post. It does not mean zero.
+                      {NEVER_PER_POST[post.platform]?.includes(m.key)
+                        ? `${platform} does not report this for a single post. It does not mean zero.`
+                        : `${platform} did not give us this figure for this post. It does not mean zero.`}
                     </p>
                   ) : (
                     <>
@@ -316,7 +349,7 @@ function PostDetailInner() {
                             {ctx.sample < 3 && ` · only ${ctx.sample} to compare`}
                           </span>
                         )}
-                        {m.hint && <span>· {m.hint}</span>}
+                        {metricHint(m.key, post.platform) && <span>· {metricHint(m.key, post.platform)}</span>}
                       </div>
                     </>
                   )}
@@ -324,7 +357,7 @@ function PostDetailInner() {
               );
             })}
           </div>
-          {METRICS.some((m) => post[m.key] === null) && (
+          {post.platform === "instagram" && METRICS.some((m) => post[m.key] === null) && (
             <p className="muted" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
               "n/a" means Instagram did not give us that figure. Most often the post was
               published before this account became a professional account, in which case
@@ -352,7 +385,7 @@ function PostDetailInner() {
                 {METRICS.map((m) => (
                   <button key={m.key} type="button"
                           className={`btn btn--sm${stripKey === m.key ? " btn--on" : ""}`}
-                          onClick={() => setStripKey(m.key)}>{m.label}</button>
+                          onClick={() => setStripKey(m.key)}>{metricLabel(m.key, post.platform)}</button>
                 ))}
               </span>
             </div>

@@ -1,4 +1,5 @@
 import type { Handler } from "./_lib";
+import { createHash } from "node:crypto";
 import {
   verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
   backToApp, encryptToken, log, writeFailed, AccountOwnedByAnotherTenant,
@@ -56,6 +57,9 @@ export const handler: Handler = async (event) => {
         provider: "linkedin", status: res.status,
         client_id: clientId,
         cred_len: clientSecret.length,
+        // A fingerprint, as on the Instagram path: tells which secret is deployed
+        // without revealing it. The key is not named "secret" or the scrubber eats it.
+        cred_fp: clientSecret ? createHash("sha256").update(clientSecret).digest("hex").slice(0, 8) : "<unset>",
         redirect_uri: redirectUri,
         detail: String(body.error_description ?? body.error ?? "").slice(0, 200),
       });
@@ -155,7 +159,20 @@ export const handler: Handler = async (event) => {
      * column should say so. A client looking at their Connections page must see
      * the same warning here as there.
      */
-    const writeScopes = LI.SCOPES.filter((s) => s.startsWith("rw_") || s.startsWith("w_"));
+    /*
+     * The scopes LinkedIn says it GRANTED, not the ones we asked for. The token
+     * response carries `scope`, "URL-encoded, space-delimited", and auditing the
+     * token actually held is the lesson of the Instagram scope audit. Falls back
+     * to the request only if LinkedIn omits the field.
+     */
+    const granted = typeof body.scope === "string" && body.scope
+      ? decodeURIComponent(body.scope).split(/[\s,]+/).filter(Boolean)
+      : [...LI.SCOPES];
+    const writeScopes = granted.filter((s) => s.startsWith("rw_") || s.startsWith("w_"));
+    const unexpected = granted.filter((s) => !(LI.SCOPES as readonly string[]).includes(s));
+    if (unexpected.length) {
+      log("oauth.unexpected_scopes", { provider: "linkedin", uid: state.uid, scopes: unexpected.join(",") });
+    }
     // Checked: `needs_reauth: false` below is the whole point of a reconnection,
     // and losing it silently keeps nagging a client who has just done the thing.
     const { error: linkErr } = await db.from("social_accounts")

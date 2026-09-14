@@ -301,6 +301,9 @@ connection.
       Every LinkedIn request was malformed before any call. `LINKEDIN-PLAN.md` Phase 3.
 - [x] **LinkedIn Data Storage Requirements enforced 2026-09-14**: posts 6 months,
       reporting 1 year, name refreshed daily, locations never stored.
+- [x] **Parity pass against the Instagram path, 2026-09-14** — `docs/LINKEDIN-PARITY.md`;
+      full-year window, post paging, sponsored/draft exclusion, scope audit, and four
+      client-facing fixes on the Content and post pages
 - [ ] 🔴 **The Office needs its own LinkedIn Page** with a super admin: the
       developer app must be verified by the applying organisation's page. `SETUP-LINKEDIN.md` §0
 - [ ] Create the app and submit the Development tier form (`SETUP-LINKEDIN.md`); a rejection

@@ -36,6 +36,13 @@ reconnection (tokens last 60 days and LinkedIn does not let us renew them).
    hours: LinkedIn allows a small number of requests a day, and its figures
    already trail by two days.
 
+## Before they rely on a number
+
+Instagram's rule applies: **no figure is presented as trustworthy until the
+reconciliation has passed** (`LINKEDIN-PLAN.md` Phase 3). Drinkat is the test, and
+Development tier is "designed to build and test integrations"; LinkedIn is not
+part of a paid offer until Standard tier.
+
 ## What to tell them
 
 - PulseBoard reads the page's statistics. It never posts, comments or edits.
