@@ -29,7 +29,11 @@ reconnection (tokens last 60 days and LinkedIn does not let us renew them).
 ## The connection (either route)
 
 1. Sign in at `app.theoffice.it.com` → **Connections**, tick the consent box.
-2. **LinkedIn → Connect**, sign in to LinkedIn as the super admin, approve.
+2. **LinkedIn → Connect page** (a Company Page, as its super admin) or **Connect
+   profile** (their own personal profile, any member). Sign in to LinkedIn, approve.
+   A profile gives the follower count and the combined performance of all their
+   posts; LinkedIn does not let apps list a profile's posts or its followers'
+   demographics.
 3. Back in PulseBoard the page shows **Connected**. If they administer several
    pages, the first one is connected; check it is Drinkat's.
 4. Press **Sync** once. After that LinkedIn syncs by itself at most every four

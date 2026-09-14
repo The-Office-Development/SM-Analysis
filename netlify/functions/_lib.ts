@@ -169,7 +169,17 @@ export function decryptToken(stored: string): string {
 export type Db = SupabaseClient<any, any, any>;
 
 /** Service-role Supabase client — bypasses RLS. NEVER expose to the browser. */
+let testDb: Db | null = null;
+/**
+ * TESTS ONLY: route admin() to an in-memory database, so a whole handler (a
+ * connect start, an OAuth callback) can be run end to end. Until 2026-09-14 no
+ * handler-level test existed, and the connect flows were tested only in parts;
+ * production never calls this.
+ */
+export function __setAdminForTests(db: Db | null): void { testDb = db; }
+
 export function admin(): Db {
+  if (testDb) return testDb;
   if (!env.SUPABASE_URL || !env.SERVICE_ROLE) {
     throw new Error("Supabase service credentials are not configured.");
   }

@@ -8,6 +8,14 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { readdirSync } from "node:fs";
+
+/*
+ * EVERY test file, not a hand-kept list. The list missed the first three files
+ * added after it was written, so mutations of the LinkedIn onboarding code ran
+ * against a suite that never loaded the tests guarding it and "survived".
+ */
+const TEST_FILES = readdirSync("verify/tests").filter((f) => f.endsWith(".test.mjs")).sort().map((f) => `verify/tests/${f}`);
 
 const SYNC = "verify/build/_sync.js";
 const LIB = "verify/build/_lib.js";
@@ -26,6 +34,15 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "a LinkedIn profile connection stored as a Company Page", file: "verify/build/oauth-linkedin-callback.js",
+    find: 'if (state.k === "profile") {', replace: 'if (false) {' },
+  { name: "a LinkedIn profile's follower count dropped", file: SYNC,
+    find: "row(t).followers = total;", replace: "row(t).followers = null;" },
+  { name: "a profile with no posts shown as zero impressions", file: SYNC,
+    find: "date, followers: null, reach: null, impressions: null, views: null, engagements: null,",
+    replace: "date, followers: null, reach: null, impressions: 0, views: null, engagements: 0," },
+  { name: "a LinkedIn profile's post statistics kept past the 48-hour hold", file: SYNC,
+    find: "    if (member) {", replace: "    if (false) {" },
   { name: "an incomplete token audit recorded as clean", file: INSTA,
     find: "return incomplete ? null : held;", replace: "return held;" },
   { name: "LinkedIn history dug in Instagram-sized chunks", file: SYNC,
@@ -274,8 +291,8 @@ const mutations = [
    * one that is specific to holding a write-capable scope.
    */
   { name: "LinkedIn asks for a write scope on top of reading", file: LINKEDIN,
-    find: 'SCOPES: ["r_organization_social", "rw_organization_admin"],',
-    replace: 'SCOPES: ["r_organization_social", "rw_organization_admin", "w_organization_social"],' },
+    find: 'SCOPES: ["r_organization_social", "rw_organization_admin", "r_basicprofile", "r_member_profileAnalytics", "r_member_postAnalytics"],',
+    replace: 'SCOPES: ["r_organization_social", "rw_organization_admin", "r_basicprofile", "r_member_profileAnalytics", "r_member_postAnalytics", "w_member_social"],' },
   { name: "an unreported LinkedIn figure becomes a zero", file: LINKEDIN,
     find: "export const liNum = (v) => typeof v === \"number\" && Number.isFinite(v) ? v : null;",
     replace: "export const liNum = (v) => typeof v === \"number\" && Number.isFinite(v) ? v : 0;" },
@@ -413,7 +430,7 @@ const mutations = [
 
 function runSuite() {
   try {
-    execFileSync("node", ["--test", "verify/tests/sync.test.mjs", "verify/tests/security.test.mjs", "verify/tests/csv.test.mjs", "verify/tests/tokens.test.mjs", "verify/tests/deletion.test.mjs", "verify/tests/instagram-login.test.mjs", "verify/tests/insights.test.mjs", "verify/tests/freshness.test.mjs", "verify/tests/deep-insights.test.mjs", "verify/tests/xlsx.test.mjs", "verify/tests/linkedin.test.mjs", "verify/tests/linkedin-sync.test.mjs", "verify/tests/grounding.test.mjs", "verify/tests/write-errors.test.mjs"], { stdio: "pipe" });
+    execFileSync("node", ["--test", ...TEST_FILES], { stdio: "pipe" });
     return true;   // suite passed
   } catch { return false; } // suite failed
 }

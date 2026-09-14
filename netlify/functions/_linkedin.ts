@@ -69,7 +69,21 @@ export const LI = {
    *
    * If LinkedIn ever ships a read-only reporting scope, this drops to it.
    */
-  SCOPES: ["r_organization_social", "rw_organization_admin"],
+  /*
+   * ONE scope set for both connection kinds, Company Page and personal profile.
+   *
+   * LinkedIn: "If you request a different scope than the previously granted
+   * scope, all the previous access tokens are invalidated." A member who
+   * connected their profile with one set and a page with another would silently
+   * kill the first connection with the second. So both flows ask for the same
+   * five: the two page scopes above, plus three member scopes, all read-only:
+   *  - r_basicprofile: the member's id, name and vanity name (/v2/me)
+   *  - r_member_profileAnalytics: follower count (memberFollowersCount)
+   *  - r_member_postAnalytics: impressions and reactions across the member's
+   *    posts (memberCreatorPostAnalytics, q=me)
+   * Never r_member_social, w_member_social or w_organization_social.
+   */
+  SCOPES: ["r_organization_social", "rw_organization_admin", "r_basicprofile", "r_member_profileAnalytics", "r_member_postAnalytics"],
 
   /**
    * Paths that become MUTATIONS when sent with a method other than GET.
@@ -83,6 +97,28 @@ export const LI = {
    * them happen, and that is enforced by asserting liGet issues only GETs.
    */
   WRITE_ENDPOINTS: ["/posts", "/comments", "/reactions"] as string[],
+
+  /** The authenticated member: id, names, vanity name. Legacy /v2, no version header. */
+  ME: "/me",
+  /** The member's follower count: q=me lifetime, q=dateRange daily. */
+  MEMBER_FOLLOWERS: "/memberFollowersCount",
+  /** Analytics across ALL the member's posts with q=me, no post list needed. */
+  MEMBER_POST_ANALYTICS: "/memberCreatorPostAnalytics",
+  /**
+   * The metrics read per day. DAILY is documented for these four; not for
+   * MEMBERS_REACHED, so a member has no daily reach. RESHARE, REACTION and
+   * COMMENT carry LinkedIn's own warning, "not consistent with UI at the moment",
+   * which reconciliation must take into account.
+   */
+  MEMBER_POST_METRICS: ["IMPRESSION", "REACTION", "COMMENT", "RESHARE"],
+  /*
+   * How long member post statistics may be kept: 48 hours, the operator's
+   * decision of 2026-09-14. LinkedIn's storage table allows "Members' Social
+   * Activity Data" 48 hours and does not say whether aggregated analytics of a
+   * member's own posts fall under it. Until LinkedIn confirms, the short reading
+   * applies; follower counts are kept, post statistics are not.
+   */
+  MEMBER_POST_STATS_HOLD_DAYS: 2,
 
   /** Which organizations this member administers, and in what role. */
   ORG_ACLS: "/organizationAcls",
@@ -187,6 +223,38 @@ export interface LiShareStats {
   shareCount?: number;
   clickCount?: number;
   engagement?: number;
+}
+
+/**
+ * A Rest.li date range, `(start:(year:Y,month:M,day:D),end:(...))`, from ISO days.
+ * `end` is EXCLUSIVE, as for every LinkedIn range; pass the day AFTER the last one wanted.
+ */
+export function liDateRange(fromIso: string, endExclusiveIso: string): string {
+  const part = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return `(year:${y},month:${m},day:${d})`;
+  };
+  return `(start:${part(fromIso)},end:${part(endExclusiveIso)})`;
+}
+
+/** A member-analytics `dateRange.start` back to a calendar day; null if malformed. */
+export function liDateKey(d: { year?: number; month?: number; day?: number } | undefined): string | null {
+  if (!d || !Number.isInteger(d.year) || !Number.isInteger(d.month) || !Number.isInteger(d.day)) return null;
+  return `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+}
+
+/**
+ * A metric's name in a member-analytics element. Until 202604 LinkedIn wrapped
+ * it, `{"com.linkedin...CreatorPostAnalyticsMetricTypeV1": "REACTION"}`; from
+ * 202605 it is the bare string. Both are read so a version change cannot empty it.
+ */
+export function liMetricType(v: unknown): string | null {
+  if (typeof v === "string") return v;
+  if (v && typeof v === "object") {
+    const inner = Object.values(v as Record<string, unknown>)[0];
+    return typeof inner === "string" ? inner : null;
+  }
+  return null;
 }
 
 /**

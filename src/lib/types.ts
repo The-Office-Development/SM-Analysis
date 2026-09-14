@@ -27,6 +27,8 @@ export interface SocialAccount {
    * never be shown as clean.
    */
   write_scopes?: string[] | null;
+  /** How the account was connected: e.g. "linkedin_member" for a personal profile, "linkedin_organization" for a page. */
+  auth_mode?: string | null;
   scopes_checked_at?: string | null;
 }
 

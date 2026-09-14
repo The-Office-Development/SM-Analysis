@@ -3,6 +3,7 @@
  * Probe the live LinkedIn API with a Company Page administrator's token.
  *
  *   LI_TOKEN=... node verify/probe-live-linkedin.mjs [--org 12345] [--try-batch]
+ *   LI_TOKEN=... node verify/probe-live-linkedin.mjs --profile     (a personal profile)
  *
  * WHY THIS EXISTS
  * The LinkedIn integration is written entirely against documentation, and has
@@ -18,9 +19,11 @@
  *
  * GETTING A TOKEN
  * LinkedIn Developer Portal -> the PulseBoard app -> Auth -> OAuth 2.0 tools ->
- * create a token with r_organization_social and rw_organization_admin, signed in
- * as a SUPER ADMIN of the page (Drinkat's). rw_organization_admin is restricted
- * to members with the ADMINISTRATOR role; an Analyst's token gets 403.
+ * create a token with EXACTLY the five scopes PulseBoard requests (LI.SCOPES):
+ * r_organization_social rw_organization_admin r_basicprofile
+ * r_member_profileAnalytics r_member_postAnalytics. A different set invalidates
+ * the member's other tokens, including the one PulseBoard holds. For a page, sign
+ * in as its SUPER ADMIN: an Analyst's token gets 403.
  *
  * COST
  * Development tier allows 100 calls per member per day and 500 per app. This
@@ -41,6 +44,7 @@ if (!TOKEN) {
 const argv = process.argv.slice(2);
 const argOrg = argv.includes("--org") ? argv[argv.indexOf("--org") + 1] : null;
 const TRY_BATCH = argv.includes("--try-batch");
+const PROFILE = argv.includes("--profile");
 
 const REST = "https://api.linkedin.com/rest";
 const V2 = "https://api.linkedin.com/v2";
@@ -90,6 +94,37 @@ async function get(label, base, path, params = {}, { optional = false, raw = fal
 const indent = (s) => s.split("\n").map((l) => `        ${l}`).join("\n");
 
 console.log(`\nProbing ${REST} with LinkedIn-Version ${VERSION}\n`);
+
+/* ---- a personal profile: the calls syncLinkedInMember makes --------------- */
+if (PROFILE) {
+  console.log("PROFILE");
+  const me = await get("v2/me", V2, "/me", {}, { raw: true });
+  if (me?.body && !me.body.id) notes.push("*** /v2/me returned no id; the callback cannot identify the member");
+
+  console.log("\nFOLLOWERS");
+  const lifetime = await get("memberFollowersCount q=me", REST, "/memberFollowersCount", { q: "me" }, { raw: true });
+  const total = lifetime?.body?.elements?.[0]?.memberFollowersCount;
+  if (lifetime?.body && typeof total !== "number") notes.push("*** memberFollowersCount returned no number; no follower total will be stored");
+  const d = (ms) => { const t = new Date(ms); return `(year:${t.getUTCFullYear()},month:${t.getUTCMonth() + 1},day:${t.getUTCDate()})`; };
+  const daily = await get("memberFollowersCount q=dateRange (last 7 days, NOT stored: gross or net?)", REST, "/memberFollowersCount",
+    { q: "dateRange", dateRange: `(start:${d(Date.now() - 7 * DAY)},end:${d(Date.now() + DAY)})` }, { optional: true, raw: true });
+  if (daily?.body) notes.push(`Daily follower values above vs the lifetime total ${total}: if they sum to a small number they are daily gains. Run again tomorrow and compare the lifetime change with that day's value to settle gross or net.`);
+
+  console.log("\nPOST ANALYTICS, summed across all posts (last 3 days, DAILY)");
+  for (const metric of ["IMPRESSION", "REACTION", "COMMENT", "RESHARE"]) {
+    const r = await get(`memberCreatorPostAnalytics q=me ${metric}`, REST, "/memberCreatorPostAnalytics", {
+      q: "me", queryType: metric, aggregation: "DAILY", dateRange: `(start:${d(Date.now() - 3 * DAY)},end:${d(Date.now() + DAY)})`,
+    }, { optional: true });
+    const els = r?.body?.elements ?? [];
+    if (r?.body) {
+      console.log(`        ${els.length} day(s)${els[0] ? `; first: ${JSON.stringify(els[0]).slice(0, 220)}` : " (no posts: expected for an account with none)"}`);
+      if (els[0] && typeof els[0].metricType !== "string") notes.push(`metricType came back wrapped (${JSON.stringify(els[0].metricType)}); liMetricType reads both forms`);
+    }
+  }
+  console.log(`\n${"-".repeat(60)}\n${pass} ok, ${fail} failed, ${calls} call(s) spent`);
+  if (notes.length) { console.log("\nWorth reading:"); for (const n of notes) console.log(`  - ${n}`); }
+  process.exit(fail > 0 ? 1 : 0);
+}
 
 /* ---- 1. which page, and the field name the docs disagree on --------------- */
 console.log("1. PAGES THIS MEMBER ADMINISTERS");

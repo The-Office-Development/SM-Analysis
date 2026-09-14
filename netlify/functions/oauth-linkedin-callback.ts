@@ -78,6 +78,69 @@ export const handler: Handler = async (event) => {
       : null;
     const refreshToken = typeof body.refresh_token === "string" ? body.refresh_token : null;
 
+    const granted = typeof body.scope === "string" && body.scope
+      ? decodeURIComponent(body.scope).split(/[\s,]+/).filter(Boolean)
+      : [...LI.SCOPES];
+    const writeScopes = granted.filter((s) => s.startsWith("rw_") || s.startsWith("w_"));
+    const unexpected = granted.filter((s) => !(LI.SCOPES as readonly string[]).includes(s));
+    if (unexpected.length) {
+      log("oauth.unexpected_scopes", { provider: "linkedin", uid: state.uid, scopes: unexpected.join(",") });
+    }
+
+    /*
+     * A personal profile. The same token and scopes as a page (LI.SCOPES says
+     * why they must be identical); what differs is what is connected: the member
+     * who authorised, identified by /v2/me, with no page lookup at all. The kind
+     * travels in the signed state, so it cannot be switched after consent.
+     */
+    if (state.k === "profile") {
+      const me = await liGet<{ id?: string; localizedFirstName?: string; localizedLastName?: string; vanityName?: string }>(
+        LI.ME, {}, { token: accessToken, base: LI.V2 },
+      );
+      const memberId = typeof me.id === "string" ? me.id : "";
+      if (!memberId) throw new Error("no_linkedin_member_id");
+      const fullName = [me.localizedFirstName, me.localizedLastName].filter(Boolean).join(" ") || null;
+
+      const db = admin();
+      const { data: identity, error: idErr } = await db
+        .from("provider_identities")
+        .upsert({
+          user_id: state.uid,
+          provider: "linkedin",
+          external_user_id: memberId,
+          access_token: encryptToken(accessToken),
+          expires_at: expiresAt,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id,provider,external_user_id" })
+        .select("id")
+        .single();
+      if (idErr) throw idErr;
+
+      const accountId = await saveAccount(db, state.uid,
+        {
+          platform: "linkedin",
+          external_id: memberId,
+          username: me.vanityName ?? fullName ?? `member-${memberId}`,
+          display_name: fullName,
+          avatar_url: null,
+        },
+        { access_token: accessToken, refresh_token: refreshToken, expires_at: expiresAt, extra: { kind: "li_member" } });
+
+      const { error: linkErr } = await db.from("social_accounts")
+        .update({
+          identity_id: identity.id,
+          auth_mode: "linkedin_member",
+          write_scopes: writeScopes,
+          scopes_checked_at: new Date().toISOString(),
+          needs_reauth: false,
+        })
+        .eq("id", accountId);
+      writeFailed("oauth.account_link_write_failed", linkErr, { uid: state.uid, account: accountId, provider: "linkedin" });
+
+      log("oauth.connected", { provider: "linkedin", uid: state.uid, mode: "member", write_scopes: writeScopes.length });
+      return backToApp("connected", "linkedin", clear);
+    }
+
     /*
      * Which page are we connecting?
      *
@@ -165,14 +228,7 @@ export const handler: Handler = async (event) => {
      * token actually held is the lesson of the Instagram scope audit. Falls back
      * to the request only if LinkedIn omits the field.
      */
-    const granted = typeof body.scope === "string" && body.scope
-      ? decodeURIComponent(body.scope).split(/[\s,]+/).filter(Boolean)
-      : [...LI.SCOPES];
-    const writeScopes = granted.filter((s) => s.startsWith("rw_") || s.startsWith("w_"));
-    const unexpected = granted.filter((s) => !(LI.SCOPES as readonly string[]).includes(s));
-    if (unexpected.length) {
-      log("oauth.unexpected_scopes", { provider: "linkedin", uid: state.uid, scopes: unexpected.join(",") });
-    }
+    // Computed above, before the branch, so both kinds record it.
     // Checked: `needs_reauth: false` below is the whole point of a reconnection,
     // and losing it silently keeps nagging a client who has just done the thing.
     const { error: linkErr } = await db.from("social_accounts")

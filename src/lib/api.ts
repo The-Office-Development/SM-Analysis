@@ -145,13 +145,17 @@ export async function fetchShare(slug: string): Promise<unknown> {
 }
 
 /** Begin a platform OAuth flow. The session token is POSTed, never put in a URL. */
-export async function startOAuth(provider: "meta" | "tiktok" | "instagram" | "linkedin"): Promise<string> {
+export async function startOAuth(
+  provider: "meta" | "tiktok" | "instagram" | "linkedin",
+  // LinkedIn only: a Company Page or the member's own profile.
+  kind?: "page" | "profile",
+): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not signed in.");
   const res = await fetch(`/api/oauth-${provider}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token: session.access_token }),
+    body: JSON.stringify({ token: session.access_token, kind }),
   });
   const body = await res.json().catch(() => ({}));
   // The server answers a code; the words live in one place (connectErrors.ts).

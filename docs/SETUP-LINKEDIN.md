@@ -43,9 +43,14 @@ new app and a new form. Have every item in step 0 ready before submitting.
 Reviewed for: approved use case, verified business email, verified organisation,
 verified website and domain, app verified by the organisation's page.
 
-- **Use case: Page Analytics.** Nothing else. PulseBoard reads a Company Page's
-  follower, post and page statistics and shows them to that page's own
-  administrators. It does not post, comment, or read member profiles.
+- **Use case: Page Analytics.** PulseBoard reads a Company Page's follower, post
+  and page statistics and shows them to that page's own administrators; and, for a
+  member who connects their own profile, their follower count and the combined
+  analytics of their own posts (`r_member_profileAnalytics`,
+  `r_member_postAnalytics`, `r_basicprofile`). It never posts or comments, and
+  never reads anyone else's profile.
+- **Scopes the app requests, all five, for both connection kinds:**
+  `r_organization_social rw_organization_admin r_basicprofile r_member_profileAnalytics r_member_postAnalytics`.
 - Say what is stored and for how long, matching `LI.REPORTING_RETENTION_DAYS`
   (one year) and `LI.POST_RETENTION_DAYS` (six months), and that follower
   locations are not stored.
@@ -58,16 +63,15 @@ verified website and domain, app verified by the organisation's page.
 2. Redeploy the Pages app, and **also the cron Worker**
    (`CLAUDE.md`, "The cron Worker is NOT deployed by CI").
 3. Get a token for the probe: Developer Portal → the app → **Auth → OAuth 2.0
-   tools** (the token generator), scopes `r_organization_social` and
-   `rw_organization_admin`, signed in as a **super admin of Drinkat's page** (see
-   `CLIENT-CONNECT-LINKEDIN.md`).
-   🔴 **Exactly those two scopes, no more and no fewer.** LinkedIn: "If you request
+   tools** (the token generator), with **exactly the five scopes above**, signed in
+   as the member being tested (your own profile first; a page's super admin for a page).
+   🔴 **Exactly those five scopes, no more and no fewer.** LinkedIn: "If you request
    a different scope than the previously granted scope, all the previous access
    tokens are invalidated." A token made with an extra scope silently kills the
    connection PulseBoard holds for that member.
 4. Run the probe before anything syncs:
-   `LI_TOKEN=... node verify/probe-live-linkedin.mjs`
-   then once more with `--try-batch` to learn how development tier refuses a
+   `LI_TOKEN=... node verify/probe-live-linkedin.mjs --profile` for a personal
+   profile, or without `--profile` for a Company Page, then once more with `--try-batch` to learn how development tier refuses a
    BATCH_GET. Record what it settles in `LINKEDIN-PLAN.md` Phase 3.
 5. Connect Drinkat's page in PulseBoard, let it sync for a few days, then run
    `node verify/reconcile.mjs --account <id>` beside the page's Analytics tab.

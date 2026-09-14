@@ -11,7 +11,9 @@ import { LI } from "./_linkedin";
  * materially different from the Instagram connection, and the consent record has
  * to show which wording they saw when they agreed to it.
  */
-const CONSENT_VERSION = "2026-09-14";
+// 2026-09-14b: the scope set grew by the three member scopes, so what a person
+// agrees to changed on the same day the wording did.
+const CONSENT_VERSION = "2026-09-14b";
 
 /**
  * Starts the LinkedIn Company Page flow.
@@ -26,7 +28,13 @@ export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Use POST." };
 
   let token: string | undefined;
-  try { token = JSON.parse(event.body || "{}").token; } catch { /* handled below */ }
+  let kind = "page";
+  try {
+    const parsed = JSON.parse(event.body || "{}");
+    token = parsed.token;
+    // "profile" connects the member's own profile; anything else is a Company Page.
+    if (parsed.kind === "profile") kind = "profile";
+  } catch { /* handled below */ }
 
   const userId = await userIdFromToken(token ?? event.headers.authorization);
   if (!userId) return startError(401, "not_signed_in");
@@ -40,13 +48,13 @@ export const handler: Handler = async (event) => {
   // given, and under the PDPL an unrecorded consent is an absent one.
   const { error: consentErr } = await admin().from("consents").insert({
     user_id: userId,
-    purpose: "connect_linkedin",
+    purpose: kind === "profile" ? "connect_linkedin_profile" : "connect_linkedin",
     version: CONSENT_VERSION,
     evidence: {
       ip: event.headers["x-nf-client-connection-ip"] ?? event.headers["client-ip"] ?? null,
       user_agent: event.headers["user-agent"] ?? null,
       scopes: LI.SCOPES.join(","),
-      auth_mode: "linkedin_organization",
+      auth_mode: kind === "profile" ? "linkedin_member" : "linkedin_organization",
       // Recorded explicitly, because "we only ever read" is a claim about our
       // behaviour and not about what the token can do. If this is ever
       // questioned, the consent row should show we knew and said so.
@@ -56,7 +64,7 @@ export const handler: Handler = async (event) => {
   writeFailed("oauth.consent_write_failed", consentErr, { uid: userId, provider: "linkedin" });
 
   const nonce = newNonce();
-  const state = signState({ uid: userId, provider: "linkedin", n: nonce });
+  const state = signState({ uid: userId, provider: "linkedin", n: nonce, k: kind });
 
   /*
    * LinkedIn requires `scope` to be SPACE separated, where Meta accepts commas.

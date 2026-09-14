@@ -44,6 +44,16 @@ function AudienceInner() {
     })
     .filter((x): x is { snap: AudienceSnapshot; weight: number } => x !== null);
 
+  // A LinkedIn personal profile never has demographics: LinkedIn offers no endpoint.
+  const onlyLinkedInProfiles = platforms.length === 1 && platforms[0] === "linkedin"
+    && dash.accounts.filter((a) => a.platform === "linkedin").every((a) => a.auth_mode === "linkedin_member");
+  if (parts.length === 0 && onlyLinkedInProfiles) {
+    return (
+      <div className="panel"><div className="panel__body muted" style={{ textAlign: "center", padding: 34 }}>
+        LinkedIn does not report who follows a personal profile, so there are no demographics to show. A LinkedIn Company Page does report them.
+      </div></div>
+    );
+  }
   if (parts.length === 0) {
     return (
       <div className="panel"><div className="panel__body muted" style={{ textAlign: "center", padding: 34 }}>

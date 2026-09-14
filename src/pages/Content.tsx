@@ -161,7 +161,10 @@ function ContentInner() {
               ))}
               {sorted.length === 0 && (
                 <tr><td colSpan={COLS.length + 3} className="muted" style={{ textAlign: "center", padding: 24 }}>
-                  No posts synced for this scope yet.
+                  {platforms.length === 1 && platforms[0] === "linkedin"
+                    && dash.accounts.filter((a) => a.platform === "linkedin").every((a) => a.auth_mode === "linkedin_member")
+                    ? "LinkedIn does not let apps list a personal profile's posts, so there is no per-post table for it."
+                    : "No posts synced for this scope yet."}
                 </td></tr>
               )}
             </tbody>

@@ -96,10 +96,10 @@ export function Privacy() {
       <h3>What we hold</h3>
       <ul>
         <li><b>Your account</b>: email address and sign-in credentials, handled by our authentication provider.</li>
-        <li><b>Your connected social accounts</b>: the account id, username, display name and profile picture of each Instagram professional account, Facebook Page, LinkedIn Company Page or TikTok account you connect.</li>
+        <li><b>Your connected social accounts</b>: the account id, username, display name and profile picture of each Instagram professional account, Facebook Page, LinkedIn Company Page, LinkedIn personal profile or TikTok account you connect.</li>
         <li><b>Access tokens</b> issued by those platforms. They are encrypted at rest with AES-256-GCM and are never sent to your browser. We never ask for and never hold your social media password. We request read-only permissions wherever the platform offers them. LinkedIn is the exception: its reporting permission for a Company Page also carries page-management rights, and no read-only alternative exists. PulseBoard never uses those rights; it only ever reads.</li>
         <li><b>Metrics</b>: daily followers, reach, views and engagement figures for the accounts you connect.</li>
-        <li><b>Your posts</b>: captions, publication times, links and per-post performance.</li>
+        <li><b>Your posts</b>: captions, publication times, links and per-post performance. For a LinkedIn personal profile we hold no posts, only your follower count and the combined impressions, reactions, comments and reposts of all your posts per day; those combined post figures are deleted after 48 hours.</li>
         <li><b>Aggregated audience information about your followers</b>: for Instagram and Facebook, age bands, gender split, country distribution and hourly activity; for a LinkedIn Company Page, industry, seniority, job function and company size (LinkedIn's terms do not allow us to store follower locations). These are statistical breakdowns only. We never receive the identity of any individual follower.</li>
         <li><b>Operational records</b>: sync history, and errors, retained so we can tell you when something failed.</li>
       </ul>

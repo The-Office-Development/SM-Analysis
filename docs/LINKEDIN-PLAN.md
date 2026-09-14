@@ -252,7 +252,24 @@ LinkedIn Page**, not Drinkat's.
 | API version | Sunsets roughly annually; pinned at `LI.VERSION` |
 | Write scope | `rw_organization_admin` is unavoidable and read/write |
 
-## Not being built
+## Personal profiles · BUILT 2026-09-14 (operator decision)
+
+Superseding "Not being built" below. A personal profile does not need a post
+list: `memberFollowersCount?q=me` gives the follower total and
+`memberCreatorPostAnalytics?q=me&aggregation=DAILY` gives impressions, reactions,
+comments and reposts summed across all posts, per day. Connected with **Connect
+profile** on Connections; same five scopes as a page (LI.SCOPES says why);
+`auth_mode` `linkedin_member`, `extra.kind` `li_member`.
+
+Stored: today's follower total (history accumulates one day at a time), and the
+summed post figures, which are **nulled after 48 hours** because LinkedIn's
+"Members' Social Activity Data" is limited to 48 hours and its table does not
+say whether aggregated analytics of one's own posts count. Not stored: the daily
+`dateRange` follower values (gross or net unstated), per-post rows, reach,
+demographics. Guarded by `linkedin-onboarding.test.mjs`, the first handler-level
+test in the repo, and four mutations.
+
+## Not being built (superseded for profiles, above)
 
 The **member path** — a personal LinkedIn profile. `r_member_postAnalytics` would
 read post analytics, but enumerating a member's posts needs `r_member_social`,

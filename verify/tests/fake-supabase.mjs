@@ -145,6 +145,14 @@ export function makeDb(seed = {}, opts = {}) {
         insert: (payload) => upsert(table, payload, {}),
       });
     },
+    // Just enough auth for a handler: `users` maps an access token to a user id.
+    auth: {
+      getUser: async (token) => {
+        const id = opts.users?.[token];
+        return id ? { data: { user: { id } }, error: null } : { data: { user: null }, error: { message: "invalid token" } };
+      },
+      admin: { deleteUser: async () => ({ data: null, error: null }) },
+    },
     _rows: (t) => rowsOf(t).map((r) => ({ ...r })),
     _tables: tables,
   };

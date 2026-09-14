@@ -3,7 +3,7 @@ import { igGet, IG, auditTokenScopes } from "./_instagram";
 import {
   LI, liGet, liUrn, liNum, liLikes, liTime, liDayKey, type LiShareStats,
   LI_FACETS, liDemographicCount, urnTail, liEnumLabel,
-  liResolveIndustries, liResolveTaxonomy, liTier,
+  liResolveIndustries, liResolveTaxonomy, liTier, liDateRange, liDateKey, liMetricType,
 } from "./_linkedin";
 
 export const today = () => new Date().toISOString().slice(0, 10);
@@ -370,6 +370,9 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
   // Instagram accounts arrive through one of two authentication paths. Instagram
   // Login needs no linked Facebook Page and talks to a different host.
   const igLogin = (secretRow?.extra as any)?.kind === "ig_login";
+  // A LinkedIn personal profile, as opposed to a Company Page. Same platform and
+  // token shape; entirely different endpoints, and no demographics or post list.
+  const liMember = (secretRow?.extra as any)?.kind === "li_member";
 
   /*
    * Demographics run BEFORE the day metrics, not after.
@@ -418,7 +421,9 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     const snap = acc.platform === "instagram"
       ? (igLogin ? await audienceInstagramLogin(acc, token, counter) : await audienceInstagram(acc, token, counter))
       : acc.platform === "facebook" ? await audienceFacebook(acc, token, counter)
-      : acc.platform === "linkedin" ? await audienceLinkedIn(acc, token, counter) : null;
+      // A personal profile has no demographics endpoint, and the page one would
+      // answer its member id with a 403.
+      : acc.platform === "linkedin" && !liMember ? await audienceLinkedIn(acc, token, counter) : null;
     if (snap && hasAudience(snap)) {
       /*
        * The error here is NOT discarded, for the same reason it is not discarded
@@ -465,6 +470,7 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
    * over a day of 4-hour turns, and every stored day is re-read, which is the
    * trailing re-fetch for all of them at no extra cost.
    */
+  else if (acc.platform === "linkedin" && liMember) ({ days, posts } = await syncLinkedInMember(acc, token, counter));
   else if (acc.platform === "linkedin") ({ days, posts } = await syncLinkedIn(
     acc, token, addDays(today(), -(LI.MAX_HISTORY_DAYS - 1)), counter, today()));
 
@@ -502,9 +508,10 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
   if (acc.platform === "instagram" && igLogin) await auditUnauditedToken(db, acc, token, counter);
 
   if (acc.platform === "linkedin") {
-    await purgeLinkedInExpired(db, acc);
+    await purgeLinkedInExpired(db, acc, Date.now(), liMember);
     // Once a day, with the demographics: the page name may be kept eight weeks.
-    if (!todaysSnapshot) await refreshLinkedInProfile(db, acc, token, counter);
+    // A member's own profile data has no such limit, and the page lookup would 403.
+    if (!todaysSnapshot && !liMember) await refreshLinkedInProfile(db, acc, token, counter);
   }
 
   /*
@@ -563,7 +570,7 @@ export async function auditUnauditedToken(
  * because a refused purge keeps data past a platform limit while every sync
  * reports success.
  */
-export async function purgeLinkedInExpired(db: Db, acc: { id: string }, now = Date.now()): Promise<number> {
+export async function purgeLinkedInExpired(db: Db, acc: { id: string }, now = Date.now(), member = false): Promise<number> {
   const reportingFloor = new Date(now - LI.REPORTING_RETENTION_DAYS * 86_400_000).toISOString().slice(0, 10);
   const postFloor = new Date(now - LI.POST_RETENTION_DAYS * 86_400_000).toISOString();
   let failed = 0;
@@ -573,6 +580,17 @@ export async function purgeLinkedInExpired(db: Db, acc: { id: string }, now = Da
   check("metrics_daily", (await db.from("metrics_daily").delete().eq("account_id", acc.id).lt("date", reportingFloor)).error);
   check("audience_snapshots", (await db.from("audience_snapshots").delete().eq("account_id", acc.id).lt("captured_on", reportingFloor)).error);
   check("content", (await db.from("content").delete().eq("account_id", acc.id).lt("published_at", postFloor)).error);
+  if (member) {
+    /*
+     * A personal profile's post statistics are held MEMBER_POST_STATS_HOLD_DAYS
+     * (see LI). Nulled, not deleted: the same rows carry the follower count,
+     * which is kept. Null is "not held", never zero.
+     */
+    const holdFloor = new Date(now - LI.MEMBER_POST_STATS_HOLD_DAYS * 86_400_000).toISOString().slice(0, 10);
+    check("metrics_daily", (await db.from("metrics_daily")
+      .update({ impressions: null, engagements: null, views: null, reach: null })
+      .eq("account_id", acc.id).lt("date", holdFloor)).error);
+  }
   return failed;
 }
 
@@ -2478,6 +2496,87 @@ async function syncLinkedIn(
   }
 
   return { days, posts };
+}
+
+/* ===========================================================================
+ * LinkedIn — a personal profile.
+ *
+ * Built 2026-09-14 on two member endpoints that need no post list, which is
+ * what had made a member connection impossible (listing a member's posts needs
+ * r_member_social, closed):
+ *  - memberFollowersCount?q=me: the lifetime follower count, stored as TODAY's
+ *    total. The daily `dateRange` variant is not stored: LinkedIn's sample
+ *    (lifetime 100, days of 2 and 4) reads as daily gains, gross or net unstated,
+ *    the same unknown as a page's followerGains. The probe settles it.
+ *  - memberCreatorPostAnalytics?q=me&aggregation=DAILY: impressions, reactions,
+ *    comments and reposts summed across every post, per day. Asked only for the
+ *    last few days, because post statistics are held two days (LI).
+ * No demographics, no per-post rows, no reach per day (MEMBERS_REACHED has no
+ * DAILY), no views. All null, never zero.
+ * ======================================================================== */
+async function syncLinkedInMember(
+  acc: AccountRow, token: string, c: { calls: number },
+): Promise<{ days: DayRow[]; posts: Post[] }> {
+  const t = today();
+  const byDate = new Map<string, DayRow>();
+  const row = (date: string): DayRow => {
+    let r = byDate.get(date);
+    if (!r) {
+      r = {
+        date, followers: null, reach: null, impressions: null, views: null, engagements: null,
+        follows: null, unfollows: null, reach_followers: null, reach_non_followers: null,
+        provisional: isProvisional(date, t),
+      };
+      byDate.set(date, r);
+    }
+    return r;
+  };
+
+  /* ---- today's follower total ------------------------------------------- */
+  try {
+    spend(c);
+    const f = await liGet<{ elements?: { memberFollowersCount?: number }[] }>(LI.MEMBER_FOLLOWERS, { q: "me" }, { token });
+    const total = liNum(f.elements?.[0]?.memberFollowersCount);
+    if (total !== null) row(t).followers = total;
+  } catch (e) {
+    if (isThrottleError(e) || isAuthError(e) || !(e instanceof GraphError)) throw e;
+    log("sync.linkedin_member_followers_unavailable", { account: acc.id, detail: e.message });
+  }
+
+  /* ---- post statistics, summed across all posts, per day --------------- */
+  const from = addDays(t, -(LI.MEMBER_POST_STATS_HOLD_DAYS + 1));
+  const parts = new Map<string, { reaction?: number | null; comment?: number | null; reshare?: number | null }>();
+  for (const metric of LI.MEMBER_POST_METRICS) {
+    let res: { elements?: { count?: number; metricType?: unknown; dateRange?: { start?: { year?: number; month?: number; day?: number } } }[] } | null;
+    try {
+      spend(c);
+      res = await liGet(LI.MEMBER_POST_ANALYTICS, {
+        q: "me", queryType: metric, aggregation: "DAILY", dateRange: liDateRange(from, addDays(t, 1)),
+      }, { token });
+    } catch (e) {
+      if (isThrottleError(e) || isAuthError(e) || !(e instanceof GraphError)) throw e;
+      log("sync.linkedin_member_post_stats_unavailable", { account: acc.id, metric, detail: e.message });
+      continue;   // this metric unknown for every day; the others still count
+    }
+    for (const el of res?.elements ?? []) {
+      const date = liDateKey(el.dateRange?.start);
+      if (!date || liMetricType(el.metricType) !== metric) continue;
+      const n = liNum(el.count);
+      if (metric === "IMPRESSION") row(date).impressions = n;
+      else {
+        const p = parts.get(date) ?? {};
+        if (metric === "REACTION") p.reaction = n;
+        if (metric === "COMMENT") p.comment = n;
+        if (metric === "RESHARE") p.reshare = n;
+        parts.set(date, p);
+      }
+    }
+  }
+  for (const [date, p] of parts) {
+    row(date).engagements = sumIfAny([p.reaction ?? null, p.comment ?? null, p.reshare ?? null]);
+  }
+
+  return { days: [...byDate.values()], posts: [] };
 }
 
 /** Sum the parts that were reported; null when none of them were. */

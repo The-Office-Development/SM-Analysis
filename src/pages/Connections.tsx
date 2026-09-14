@@ -47,7 +47,7 @@ export default function Connections() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function connect(platform: Platform) {
+  async function connect(platform: Platform, kind?: "page" | "profile") {
     if (demo) { toast("This is a preview. Real accounts connect here once the app is set up."); return; }
     if (!consented) { toast("Please confirm you agree to the terms before connecting."); return; }
     if (!isConfigured) { toast("Configure Supabase first (see README)."); return; }
@@ -62,7 +62,7 @@ export default function Connections() {
         : platform === "instagram" ? "instagram"
         : platform === "linkedin" ? "linkedin"
         : "meta";
-      window.location.href = await startOAuth(route);
+      window.location.href = await startOAuth(route, platform === "linkedin" ? kind ?? "page" : undefined);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not start the connection.");
       setConnecting(null);
@@ -160,8 +160,9 @@ export default function Connections() {
                         </span>
                       )}
                       <span>@{a.username}</span>
+                      {p === "linkedin" && <span className="muted">· {a.auth_mode === "linkedin_member" ? "profile" : "page"}</span>}
                       {a.last_synced_at && <span className="muted">· synced {formatDistanceToNow(new Date(a.last_synced_at), { addSuffix: true })}</span>}
-                      <ScopeNote platform={p} writeScopes={a.write_scopes} checkedAt={a.scopes_checked_at} />
+                      <ScopeNote platform={p} writeScopes={a.write_scopes} checkedAt={a.scopes_checked_at} member={a.auth_mode === "linkedin_member"} />
                       <button className="btn btn--sm btn--danger" style={{ marginLeft: 8, height: 24 }} onClick={() => disconnect(a.id, p)}>Disconnect</button>
                       {a.status === "connected" && a.needs_reauth && (
                         <div className="muted" style={{ flexBasis: "100%", fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>
@@ -180,9 +181,26 @@ export default function Connections() {
                     Setup guide
                   </button>
                 )}
-                <button className="btn btn--primary btn--sm" onClick={() => connect(p)} disabled={connecting === p}>
-                  <IcLink /> {accts.length ? "Reconnect" : "Connect"}
-                </button>
+                {p === "linkedin" ? (
+                  /*
+                   * Two kinds of LinkedIn connection. A Company Page needs its Super
+                   * admin; a personal profile needs only the member. Same scopes
+                   * either way (see LI.SCOPES), so connecting one never cancels the
+                   * other.
+                   */
+                  <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button className="btn btn--primary btn--sm" onClick={() => connect(p, "profile")} disabled={connecting === p}>
+                      <IcLink /> {accts.some((a) => a.auth_mode === "linkedin_member") ? "Reconnect profile" : "Connect profile"}
+                    </button>
+                    <button className="btn btn--sm" onClick={() => connect(p, "page")} disabled={connecting === p}>
+                      <IcLink /> {accts.some((a) => a.auth_mode !== "linkedin_member") ? "Reconnect page" : "Connect page"}
+                    </button>
+                  </span>
+                ) : (
+                  <button className="btn btn--primary btn--sm" onClick={() => connect(p)} disabled={connecting === p}>
+                    <IcLink /> {accts.length ? "Reconnect" : "Connect"}
+                  </button>
+                )}
               </div>
               {SHOW_SETUP_GUIDES && open && <SetupPanel platform={p} origin={origin} />}
             </div>
@@ -211,14 +229,16 @@ export default function Connections() {
  * exists to stop us making, so the result is shown, and "not yet checked" is
  * never shown as clean.
  */
-function ScopeNote({ platform, writeScopes, checkedAt }: {
-  platform: Platform; writeScopes?: string[] | null; checkedAt?: string | null;
+function ScopeNote({ platform, writeScopes, checkedAt, member }: {
+  platform: Platform; writeScopes?: string[] | null; checkedAt?: string | null; member?: boolean;
 }) {
   const note = { flexBasis: "100%", fontSize: 11.5, marginTop: 4, lineHeight: 1.5 } as const;
   if (platform === "linkedin") {
     return (
       <div className="muted" style={note}>
-        LinkedIn's reporting permission also allows managing the page. PulseBoard only ever reads.
+        {member
+          ? "Your follower count and how your posts perform in total. LinkedIn does not let apps list a personal profile's posts or report who your followers are. The page-management permission LinkedIn also shows is requested so that connecting a page later does not disconnect this; PulseBoard only ever reads."
+          : "LinkedIn's reporting permission also allows managing the page. PulseBoard only ever reads."}
       </div>
     );
   }

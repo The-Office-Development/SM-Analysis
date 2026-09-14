@@ -108,6 +108,9 @@ export const trueShare = (facet, value) => {
 };
 
 export const ORG_ID = "5515715";
+export const MEMBER_ID = "yrZCpj2Z12";
+/** Base daily counts per member metric; the day of the month is added to each. */
+export const MEMBER_METRIC = { IMPRESSION: 300, REACTION: 20, COMMENT: 4, RESHARE: 2 };
 export const ORG_URN = `urn:li:organization:${ORG_ID}`;
 export const FOLLOWERS = 8421;
 
@@ -136,6 +139,11 @@ export function installLinkedInMock(opts = {}) {
   const drafts = new Set(opts.draftPosts ?? []);          // lifecycleState DRAFT
   // Serve posts this many per page, with a `next` link while more remain.
   const pageSize = opts.postsPageSize ?? Infinity;
+  // A personal profile: follower total, and whether the member has any posts.
+  const memberFollowers = opts.memberFollowers ?? 512;
+  const memberHasPosts = opts.memberHasPosts ?? false;
+  // The page lookup: false answers "administers nothing".
+  const adminsPage = opts.adminsPage ?? true;
   const calls = [];
   const real = globalThis.fetch;
 
@@ -166,7 +174,38 @@ export function installLinkedInMock(opts = {}) {
       status: 200, headers: { "content-type": "application/json" },
     });
 
+    /* ---- a personal profile ---------------------------------------------- */
+    if (path === "/v2/me") {
+      return json({ id: MEMBER_ID, localizedFirstName: "Bader", localizedLastName: "Hamad", vanityName: "bader-hamad" });
+    }
+    if (path === "/memberFollowersCount") {
+      if (u.searchParams.get("q") !== "me") return json({ elements: [] });
+      return json({ elements: [{ memberFollowersCount: memberFollowers }], paging: { count: 10, start: 0, total: 1, links: [] } });
+    }
+    if (path === "/memberCreatorPostAnalytics") {
+      // A member with no posts: LinkedIn's answer is modelled as no elements,
+      // which the sync must store as unknown, not as zero.
+      if (!memberHasPosts) return json({ elements: [], paging: { count: 10, start: 0, links: [] } });
+      const metric = u.searchParams.get("queryType");
+      const dr = u.searchParams.get("dateRange") ?? "";
+      const s = /start:\(year:(\d+),month:(\d+),day:(\d+)\)/.exec(dr);
+      const e = /end:\(year:(\d+),month:(\d+),day:(\d+)\)/.exec(dr);
+      const iso = (m) => `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+      const elements = [];
+      for (let d = iso(s); d < iso(e); d = addDays(d, 1)) {
+        const [y, mo, da] = d.split("-").map(Number);
+        const [y2, mo2, da2] = addDays(d, 1).split("-").map(Number);
+        elements.push({
+          count: MEMBER_METRIC[metric] + da,
+          metricType: metric,
+          dateRange: { start: { year: y, month: mo, day: da }, end: { year: y2, month: mo2, day: da2 } },
+        });
+      }
+      return json({ elements, paging: { count: 10, start: 0, links: [] } });
+    }
+
     if (path === "/organizationAcls") {
+      if (!adminsPage) return json({ elements: [] });
       return json({ elements: [
         // The documentation's two samples name this field differently; the mock
         // uses one of each so the reader is tested against both.

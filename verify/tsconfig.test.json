@@ -26,6 +26,7 @@
     "../netlify/functions/_instagram.ts",
     "../netlify/functions/sync.ts",
     "../netlify/functions/oauth-linkedin.ts",
-    "../netlify/functions/oauth-instagram.ts"
+    "../netlify/functions/oauth-instagram.ts",
+    "../netlify/functions/oauth-linkedin-callback.ts"
   ]
 }

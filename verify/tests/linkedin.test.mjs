@@ -51,14 +51,16 @@ test("no write-capable endpoint is reachable through the API block", () => {
     "the list of endpoints we must never call should stay explicit");
 });
 
-test("the requested scopes are the two that are actually needed", () => {
+test("the requested scopes are exactly the five both connection kinds need", () => {
   // Not more. Every extra scope is something a client grants and cannot see us
-  // decline to use, and this is the integration where one of them is write.
-  assert.deepEqual(LI.SCOPES, ["r_organization_social", "rw_organization_admin"]);
-  assert.ok(!LI.SCOPES.includes("w_organization_social"),
-    "posting on behalf of a page is never requested");
-  assert.ok(!LI.SCOPES.includes("r_member_social"),
-    "the member path is not implemented; requesting its scope would be theatre");
+  // decline to use. One set for pages and profiles, because LinkedIn invalidates
+  // a member's earlier tokens when a later authorisation asks for different ones.
+  assert.deepEqual(LI.SCOPES, ["r_organization_social", "rw_organization_admin", "r_basicprofile", "r_member_profileAnalytics", "r_member_postAnalytics"]);
+  for (const never of ["w_organization_social", "w_member_social", "r_member_social", "w_member_social_feed", "w_organization_social_feed"]) {
+    assert.ok(!LI.SCOPES.includes(never), `${never} is never requested`);
+  }
+  assert.equal(LI.SCOPES.filter((s) => s.startsWith("rw_") || s.startsWith("w_")).length, 1,
+    "the only write-capable scope is the page-reporting one LinkedIn gives no read-only form of");
 });
 
 /* ---- the day boundary ---------------------------------------------------- */
