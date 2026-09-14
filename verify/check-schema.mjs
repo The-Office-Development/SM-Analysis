@@ -74,6 +74,7 @@ const EXPECTED = [
    * only evidence is a log line.
    */
   { version: "0017_deletion_status_failed", table: null, column: null, note: "widens a check constraint; ledger row is the only evidence" },
+  { version: "0018_linkedin_constraints", table: null, column: null, note: "widens three check constraints so LinkedIn can be stored; ledger row is the only evidence here, verify/tests/constraints.test.mjs guards the values" },
 ];
 
 /** Every table anon must NOT be able to read. */
