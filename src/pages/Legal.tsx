@@ -16,11 +16,9 @@ import ThemeToggle from "../components/ThemeToggle";
  * purge job — and Meta checks a privacy policy against real behaviour. If
  * expiry or retention is built later, describe it here THEN, not before.
  *
- * The registered name and address are now settled from the certified translation
- * (2026-08-19). What remains bracketed is genuinely unresolved, not unwritten:
- * items that wait on counsel rather than on the certified translation of the
- * commercial
- * registration, and the rest are questions for counsel in Jordan.
+ * The registered name and address are settled from the certified translation
+ * (2026-08-19). The former bracketed placeholders were filled on 2026-09-14 and
+ * the operator accepted the wording without a separate legal review.
  */
 // Exactly as it appears on the certified translation (Abu-Ghazaleh / AGATO,
 // 19 Aug 2026) of commercial registration 83622. Note it ends at "Limited
@@ -75,12 +73,6 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
       </div>
       <div className="shareview__body">
         <div className="panel" style={{ maxWidth: 760, margin: "24px auto", padding: "28px 32px" }}>
-          <div className="banner" style={{ marginBottom: 20 }}>
-            <div className="bt">
-              <b>Draft pending legal review.</b>
-              <p>This describes the system accurately, but the text has not yet been reviewed by qualified counsel in Jordan and may change after that review.</p>
-            </div>
-          </div>
           <h1 style={{ fontSize: 24, marginTop: 0 }}>{title}</h1>
           {children}
           <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "28px 0 16px" }} />

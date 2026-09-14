@@ -23,8 +23,17 @@ const XLSX = "verify/build-lib/xlsx.js";
 const REPORTMETA = "verify/build-lib/reportMeta.js";
 const ANALYTICS = "verify/build-lib/analytics.js";
 const SNAPSHOT = "verify/build-lib/snapshot.js";
+const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "development tier makes the BATCH_GET calls it forbids", file: SYNC,
+    find: 'if (liTier() === "standard") {', replace: 'if (true) {' },
+  { name: "a refused taxonomy lookup marks a working LinkedIn page expired", file: SYNC,
+    find: "if (isAuthError(e) && e.status !== 403)", replace: "if (isAuthError(e))" },
+  { name: "an unresolved taxonomy drawn as Unknown 100%", file: SYNC,
+    find: 'if (f.kind !== "enum" && !resolved.has(f.kind))', replace: "if (false)" },
+  { name: "a LinkedIn page synced on every cron turn, past its daily call limit", file: SYNC_HANDLER,
+    find: "return Boolean(last) && now - Date.parse(last) < liMinSyncIntervalMs();", replace: "return false;" },
   { name: "an Instagram deletion request looked up as a Meta user", file: DELETION,
     find: 'return { payload: ig, provider: "instagram" };',
     replace: 'return { payload: ig, provider: "meta" };' },

@@ -122,6 +122,8 @@ export function installLinkedInMock(opts = {}) {
   const [from, to] = opts.days ?? ["2026-08-01", "2026-08-07"];
   const postCount = opts.posts ?? 3;
   const silent = opts.silentPosts ?? 0;
+  // { geo: 403 } answers that taxonomy with an error, as development tier does to a BATCH_GET.
+  const refuse = opts.refuse ?? {};
   const calls = [];
   const real = globalThis.fetch;
 
@@ -194,6 +196,12 @@ export function installLinkedInMock(opts = {}) {
     }
 
     /* ---- the standardized-data taxonomies, on the legacy /v2 base -------- */
+    if (path === "/v2/geo" && refuse.geo) {
+      return new Response(JSON.stringify({ message: "Not enough permissions", status: refuse.geo }), { status: refuse.geo });
+    }
+    if (path.startsWith("/v2/industryTaxonomyVersions/") && refuse.industry) {
+      return new Response(JSON.stringify({ message: "Not enough permissions", status: refuse.industry }), { status: refuse.industry });
+    }
     if (path === "/v2/geo") {
       const ids = /List\(([^)]*)\)/.exec(u.searchParams.get("ids") ?? "")?.[1]?.split(",") ?? [];
       const results = {};

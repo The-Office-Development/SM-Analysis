@@ -143,10 +143,16 @@ either Drinkat's Page super admin connects from a PulseBoard workspace, or
 Drinkat adds the operator as a super admin of their page. The second lets us run
 every step without scheduling around them; it is their decision.
 
-### Two blockers found in the Development tier terms, before any call
+### Two blockers found in the Development tier terms, before any call — FIXED
 
-Read from "Increasing Access" on 2026-09-14. Both would hit Drinkat's page on
-the first day, and both must be fixed before they connect.
+Read from "Increasing Access" on 2026-09-14. Both would have hit Drinkat's page
+on the first day. Both were fixed the same day, each with tests and a mutation:
+`LINKEDIN_API_TIER` (default `development`) skips the BATCH_GET resolvers and
+omits their facets; a taxonomy 403 no longer propagates as an auth error; and
+`linkedInNotDue` holds a page to one attempt per `LINKEDIN_MIN_SYNC_INTERVAL_MS`
+(default 4 hours). On development tier the Audience page therefore shows
+seniority, job function and company size, and not industry, countries or market
+areas, until the upgrade.
 
 1. 🔴 **Development tier allows no BATCH_GET calls at all:** "All APIs with
    BATCH_GET: No API calls allowed". `liResolveGeo` and `liResolveIndustries` are
@@ -168,7 +174,7 @@ the first day, and both must be fixed before they connect.
 ### Then, in order
 
 1. Set `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET` as Cloudflare secrets.
-2. Fix the two blockers above, with a test and a mutation each.
+2. ~~Fix the two blockers above.~~ Done 2026-09-14.
 3. Write `verify/probe-live-linkedin.mjs`, the LinkedIn twin of
    `probe-live.mjs`: every call `syncLinkedIn` and `audienceLinkedIn` make, read
    only, printing raw responses. Run it with Drinkat's token before the sync ever

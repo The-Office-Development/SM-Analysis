@@ -1,6 +1,6 @@
 import type { Handler } from "./_lib";
 import { admin, log } from "./_lib";
-import { runAccount } from "./sync";
+import { runAccount, linkedInNotDue } from "./sync";
 import type { AccountRow } from "./_sync";
 
 /**
@@ -35,6 +35,8 @@ export const run: Handler = async () => {
   let ok = 0, failed = 0, attempted = 0;
   for (const acc of (accounts ?? []) as (AccountRow & { user_id: string })[]) {
     if (Date.now() - startedAt > TIME_BUDGET_MS) break;
+    // LinkedIn's per-member daily call limit; a skipped page is not an attempt.
+    if (await linkedInNotDue(db, acc)) continue;
     attempted++;
     const r = await runAccount(db, acc, acc.user_id);
     if (r.ok) ok++;

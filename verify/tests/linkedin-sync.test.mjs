@@ -32,6 +32,10 @@ import {
  * week would simply return nothing. Pinning these to today is what makes the
  * exclusive-end assertion meaningful rather than decorative.
  */
+// The existing cases describe an app on standard tier, where BATCH_GET is allowed.
+// Development tier is tested explicitly at the end of this file.
+process.env.LINKEDIN_API_TIER = "standard";
+
 const TODAY = new Date().toISOString().slice(0, 10);
 const FROM = addDays(TODAY, -9);
 const TO = TODAY;
@@ -406,4 +410,68 @@ test("each taxonomy costs one call, not one per value", async () => {
   assert.equal(v2.filter((c) => c.includes("industryTaxonomyVersions")).length, 1, "one batched industry call");
   assert.equal(v2.filter((c) => c.includes("/v2/seniorities")).length, 1, "one seniorities call");
   assert.equal(v2.filter((c) => c.includes("/v2/functions")).length, 1, "one functions call");
+});
+
+/* ---- development tier: what LinkedIn actually grants a new app ----------- */
+
+test("development tier never makes the BATCH_GET calls it forbids", async () => {
+  /*
+   * "All APIs with BATCH_GET: No API calls allowed." A refused call still spends
+   * one of the page's 100 daily calls, so the resolvers are not even attempted.
+   */
+  process.env.LINKEDIN_API_TIER = "development";
+  try {
+    const { db, calls } = await run();
+    assert.equal(calls.filter((c) => c.includes("/v2/geo")).length, 0, "no geo BATCH_GET");
+    assert.equal(calls.filter((c) => c.includes("industryTaxonomyVersions")).length, 0, "no industry BATCH_GET");
+
+    const snap = snapshot(db);
+    /*
+     * With no names at all, every bucket would have become "Unknown" and drawn
+     * as "Unknown 100%". A facet whose taxonomy never answered is left out.
+     */
+    assert.equal(snap.dimensions.industry, undefined, "industry omitted, not stored as all-Unknown");
+    assert.equal(snap.dimensions.regions, undefined, "market areas omitted");
+    assert.deepEqual(snap.countries, {}, "countries omitted");
+    assert.ok(Object.keys(snap.dimensions.seniority).includes(URN_NAMES.seniority["9"]),
+      "GET_ALL taxonomies still resolve on development tier");
+    assert.ok("1 employee" in snap.dimensions.company_size, "enum facets need no lookup");
+  } finally {
+    process.env.LINKEDIN_API_TIER = "standard";
+  }
+});
+
+test("a refused taxonomy lookup does not mark a working page expired", async () => {
+  /*
+   * liGet maps every 403 to auth code 190. Propagated from a taxonomy call, it
+   * made the manual and scheduled sync set status "expired" on a page whose
+   * token had just worked for the follower statistics, telling the client to
+   * reconnect every day.
+   */
+  const { db } = await run({ refuse: { geo: 403 } });
+  const acc = db._rows("social_accounts")[0];
+  assert.equal(acc.status, "connected", "the page is not flagged for reconnection");
+  const snap = snapshot(db);
+  assert.ok(snap, "the snapshot is still written");
+  assert.deepEqual(snap.countries, {}, "the refused taxonomy's facets are omitted");
+  assert.equal(snap.dimensions.regions, undefined);
+  assert.ok(snap.dimensions.industry["Software Development"] > 0, "the taxonomies that answered still count");
+});
+
+test("a LinkedIn page is not synced again within its interval, counted from the last attempt", async () => {
+  const { linkedInNotDue } = await import("../build/sync.js");
+  const now = Date.parse("2026-09-14T12:00:00Z");
+  const db = makeDb({
+    sync_log: [
+      { account_id: "li-1", started_at: "2026-09-14T10:30:00Z", ok: false },
+      { account_id: "li-2", started_at: "2026-09-14T06:00:00Z", ok: true },
+      { account_id: "ig-1", started_at: "2026-09-14T11:59:00Z", ok: true },
+    ],
+  });
+  assert.equal(await linkedInNotDue(db, { id: "li-1", platform: "linkedin" }, now), true,
+    "90 minutes after a FAILED attempt is still too soon");
+  assert.equal(await linkedInNotDue(db, { id: "li-2", platform: "linkedin" }, now), false, "six hours later it runs");
+  assert.equal(await linkedInNotDue(db, { id: "li-3", platform: "linkedin" }, now), false, "a page never synced runs");
+  assert.equal(await linkedInNotDue(db, { id: "ig-1", platform: "instagram" }, now), false,
+    "other platforms keep the 15-minute rotation");
 });

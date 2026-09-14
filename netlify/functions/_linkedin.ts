@@ -421,6 +421,38 @@ const localized = (name: unknown): string | null => {
 };
 
 /**
+ * Which Community Management API tier the app holds: `LINKEDIN_API_TIER`.
+ *
+ * Defaults to development, because that is what every new app is granted and
+ * the mistake in the other direction is the damaging one. Development tier
+ * allows "All APIs with BATCH_GET: No API calls allowed" (Increasing Access,
+ * read 2026-09-14), and the geo and industry resolvers below are BATCH_GETs.
+ * Set it to `standard` only once LinkedIn has approved the upgrade.
+ *
+ * Read at call time, not at import, so a test can set it per case.
+ */
+export function liTier(): "development" | "standard" {
+  return process.env.LINKEDIN_API_TIER === "standard" ? "standard" : "development";
+}
+
+/**
+ * The least time between two sync ATTEMPTS of one LinkedIn page.
+ *
+ * Development tier allows 100 calls per member per 24 hours. A run costs at least
+ * four, and the cron offers each connected account a turn every 15 minutes in
+ * rotation, so with three accounts a LinkedIn page came round about 32 times a
+ * day: some 130 calls. LinkedIn's daily statistics also stop two days before the
+ * request date, so running more often buys nothing. Four hours is six runs a day.
+ *
+ * Counted from the last attempt, not the last success: `last_synced_at` is only
+ * stamped on success, so a page that keeps failing would otherwise be retried at
+ * full speed, which is exactly when calls are being wasted.
+ */
+export function liMinSyncIntervalMs(): number {
+  return Math.max(15 * 60_000, Number(process.env.LINKEDIN_MIN_SYNC_INTERVAL_MS ?? 4 * 3_600_000));
+}
+
+/**
  * Resolve `urn:li:geo:*`, in one BATCH_GET.
  *
  * `GET /v2/geo?ids=List(1,2)` -> `results: { "1": { defaultLocalizedName: { value } } }`.

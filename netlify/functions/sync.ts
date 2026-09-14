@@ -1,6 +1,7 @@
 import type { Handler } from "./_lib";
 import { admin, userIdFromToken, json, isAuthError, isThrottleError, log, writeFailed, type Db } from "./_lib";
 import { syncAccount, MAX_BACKFILL, type AccountRow } from "./_sync";
+import { liMinSyncIntervalMs } from "./_linkedin";
 
 /**
  * Minimum gap between manual syncs of one account, enforced server-side. The UI
@@ -19,6 +20,22 @@ import { syncAccount, MAX_BACKFILL, type AccountRow } from "./_sync";
  * posted should not be told to wait for a timer.
  */
 const MIN_SYNC_INTERVAL_MS = Math.max(30_000, Number(process.env.SYNC_MIN_INTERVAL_MS ?? 120_000));
+
+/**
+ * Whether a LinkedIn page's last sync ATTEMPT is too recent to run again.
+ * Always false for other platforms. See `liMinSyncIntervalMs` for the budget
+ * this protects, and for why the last attempt counts rather than the last success.
+ */
+export async function linkedInNotDue(db: Db, acc: { id: string; platform: string }, now = Date.now()): Promise<boolean> {
+  if (acc.platform !== "linkedin") return false;
+  const { data, error } = await db
+    .from("sync_log").select("started_at")
+    .eq("account_id", acc.id).order("started_at", { ascending: false }).limit(1);
+  // Unreadable history must not silently stop a page from ever syncing.
+  if (error) { log("sync.linkedin_interval_unreadable", { account: acc.id, detail: error.message }); return false; }
+  const last = data?.[0]?.started_at;
+  return Boolean(last) && now - Date.parse(last as string) < liMinSyncIntervalMs();
+}
 
 export async function runAccount(db: Db, acc: AccountRow, userId: string | null) {
   const started = new Date().toISOString();
@@ -109,14 +126,20 @@ export const handler: Handler = async (event) => {
     if (!first?.length || first[0].date > floor) backfilling.add(a.id);
   }
 
+  const notDue = new Set<string>();
+  for (const a of accounts as any[]) if (await linkedInNotDue(db, a, now)) notDue.add(a.id);
+
   const due = (accounts as any[]).filter(
-    (a) => !a.last_synced_at
+    (a) => !notDue.has(a.id) && (
+      !a.last_synced_at
       || now - Date.parse(a.last_synced_at) > MIN_SYNC_INTERVAL_MS
-      || backfilling.has(a.id)
+      || backfilling.has(a.id))
   );
   if (!due.length) {
     return json(200, {
-      message: `Just refreshed. Everything here is less than ${Math.round(MIN_SYNC_INTERVAL_MS / 60000)} minutes old, and it updates itself every 15 minutes.`,
+      message: notDue.size
+        ? `Just refreshed. LinkedIn allows only a limited number of requests a day, so a LinkedIn page updates at most every ${Math.round(liMinSyncIntervalMs() / 3_600_000)} hours; its figures already trail by two days.`
+        : `Just refreshed. Everything here is less than ${Math.round(MIN_SYNC_INTERVAL_MS / 60000)} minutes old, and it updates itself every 15 minutes.`,
       ok: 0, total: accounts.length,
     });
   }

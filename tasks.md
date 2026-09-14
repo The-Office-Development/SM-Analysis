@@ -288,13 +288,14 @@ connection.
   the page's Analytics tab, record, Standard tier). Their page super admin must
   authorise, or add the operator as super admin: `ANALYST` cannot grant
   `rw_organization_admin`.
-- [ ] 🔴 **Before Drinkat connects: BATCH_GET is forbidden on Development tier.**
-      The geo and industry resolvers are BATCH_GETs; a 403 would be read as an
-      expired login and flag their page for reconnection daily.
-      `docs/LINKEDIN-PLAN.md` Phase 3.
-- [ ] 🔴 **Before Drinkat connects: 100 calls per member per day.** The 15-minute
-      rotation spends about 130 on one LinkedIn page. Give LinkedIn its own
-      minimum sync interval.
+- [x] **BATCH_GET is forbidden on Development tier — fixed 2026-09-14.**
+      `LINKEDIN_API_TIER` (default `development`) skips the geo and industry
+      resolvers, their facets are omitted rather than drawn as "Unknown 100%", and
+      a 403 from any taxonomy no longer marks the page expired. Set
+      `LINKEDIN_API_TIER=standard` as a Cloudflare variable once upgraded.
+- [x] **100 calls per member per day — fixed 2026-09-14.** A LinkedIn page runs
+      at most every 4 hours (`LINKEDIN_MIN_SYNC_INTERVAL_MS`), counted from the
+      last attempt in `sync_log`, in both the cron and manual sync.
 - [ ] `verify/probe-live-linkedin.mjs`, the twin of `probe-live.mjs`, run on
       Drinkat's token before the sync writes anything.
 
@@ -472,18 +473,18 @@ operator to set production secrets in Netlify.
 ## 13. App Review prep — 2026-09-14
 
 Full record in `docs/APP-REVIEW-PREP.md`. Prepared now, submitted when Business
-Verification clears. Branch `review-readiness`, not deployed.
+Verification clears.
 
 - [x] Legal page placeholders replaced with proposed wording (owner + counsel to sign off)
 - [x] "Export my data" / "Delete my account" buttons built; the policy named them and they never existed
 - [x] Policy, dialog and deletion page no longer claim disconnect revokes Instagram or LinkedIn access
 - [x] Consent checkbox informs of transfer abroad (PDPL Art. 15(A)(5)); `CONSENT_VERSION` bumped
 - [x] 🔴 Meta deletion + deauthorize callbacks now handle Instagram Login identities (they matched none)
-- [ ] Owner + counsel sign-off on the wording in APP-REVIEW-PREP §2, then merge and deploy
+- [x] Wording accepted by the operator 2026-09-14 (no separate legal review); merged and deployed
 - [ ] Written Article 15(B) assessment of Supabase, Cloudflare, Anthropic
 - [ ] DPO: Article 11(A)(5) names transfer to databases outside the Kingdom
 - [ ] 🔴 Live test of the deletion callback by removing PulseBoard from `@heath_ens21`
-- [ ] Hide the per-platform Setup guide (env vars, redirect URIs) from non-operators
+- [x] Per-platform Setup guides hidden on the live site (shown in `npm run dev`)
 - [ ] Reviewer login created on submission day; screencast on `@malekismaiil`
 
 ## 11. Connecting a client — written 2026-09-11

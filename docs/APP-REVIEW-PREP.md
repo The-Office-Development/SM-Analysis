@@ -9,13 +9,11 @@ address or portfolio details while verification is pending.
 
 ---
 
-## 1. Done on branch `review-readiness` (not deployed)
+## 1. Done and deployed, 2026-09-14
 
-Push to `main` deploys to production through CI, so none of this is live until
-the branch is merged.
-
-- **The legal pages have no bracketed placeholders.** Each former placeholder now
-  holds proposed wording (section 2). The "Draft pending legal review" banner stays.
+- **The legal pages have no bracketed placeholders**, and the "Draft pending legal
+  review" banner is gone. The operator accepted the wording in section 2 without a
+  separate legal review.
 - **"Export my data" and "Delete my account" exist.** The privacy policy has
   named both since 2026-08-24, and `/api/account-data` has served both since
   then, but no button calling either was ever rendered. They are now on the
@@ -43,25 +41,29 @@ the branch is merged.
   with `{ error }`, so a refused sign-in deletion was logged as done. Now checked,
   and the user is told what remained.
 
-`npm test`: 186 tests pass, mutation score 76/76.
+- **The per-platform Setup guides are hidden on the live site.** They list
+  developer-app steps, redirect URIs and Cloudflare secrets. `npm run dev` still
+  shows them, as does a build with `VITE_SHOW_SETUP_GUIDES=true`.
 
-## 2. Wording that needs owner and counsel sign-off
+`npm test`: 189 tests pass, mutation score 80/80.
 
-These are proposals written from the primary text of Law No. 24 of 2023
-(modee.gov.jo English PDF), not legal advice.
+## 2. The legal wording, and what it rests on
+
+Written from the primary text of Law No. 24 of 2023 (modee.gov.jo English PDF)
+and accepted by the operator on 2026-09-14.
 
 | Placeholder | Proposed | Basis, and what is not settled |
 |---|---|---|
-| Statutory response period | "we respond within 30 days" | **The law sets no period.** Article 4(D) leaves the rights "to be organised in regulations". No regulation fixing a deadline was found; the 2025 regulation found concerns how the Unit works. 30 days is our own commitment. Counsel to confirm nothing shorter applies. |
+| Statutory response period | "we respond within 30 days" | **The law sets no period.** Article 4(D) leaves the rights "to be organised in regulations". No regulation fixing a deadline was found; the 2025 regulation found concerns how the Unit works. 30 days is our own commitment. If a regulation ever sets a shorter one, that wins. |
 | Regions and transfer basis | Supabase Frankfurt, Cloudflare global network, Anthropic (US company); basis Article 15(A)(5) consent | Region checked with `supabase projects list`. **Article 15(B) also requires the controller to verify each recipient's protection before transferring.** No written assessment exists, so the page does not claim one. Write it, then add the sentence back. |
 | Uptime | No commitment, no service credits | A commercial position, and true today. |
-| Liability | Exclude indirect loss and decisions made on platform figures; cap at 12 months' fees; Amman courts | Standard shape. Counsel to confirm enforceability under Jordanian civil law. |
+| Liability | Exclude indirect loss and decisions made on platform figures; cap at 12 months' fees; Amman courts | Standard shape. |
 | Complaint authority | Personal Data Protection Unit, Ministry of Digital Economy and Entrepreneurship | Article 2 of the law defines "The Unit" as the unit responsible for personal data protection "within the Ministry" of Digital Economy and Entrepreneurship. |
 
 **Open and not a wording question:** Article 11(A) requires a Data Protection
 Officer when the controller's "primary activity" is processing personal data, or
 when "transferring to databases outside the Kingdom". PulseBoard does the second
-by design. Treat a DPO as required unless counsel says otherwise.
+by design. Treat a DPO as required.
 
 ## 3. Before submitting: live checks nobody has run
 
@@ -91,10 +93,6 @@ will be rejected."
 - **An Instagram professional account to connect.** Demo mode does not exercise
   the permissions under review, so it cannot be the whole answer. The reviewer
   connects through the normal Connect button.
-- **The Connections page shows operator material to every user:** each platform's
-  "Setup guide" lists redirect URIs and Cloudflare environment variables. A
-  reviewer reads that as a developer tool. Hide the guides from non-operators
-  before submitting.
 
 ## 5. The submission itself
 

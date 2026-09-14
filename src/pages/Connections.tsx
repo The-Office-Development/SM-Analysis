@@ -12,6 +12,15 @@ import { formatDistanceToNow } from "date-fns";
 import { IcCheck, IcRefresh, IcAlert, IcLink, IcChevron } from "../lib/icons";
 import type { Platform } from "../lib/types";
 
+/*
+ * The per-platform setup guides are operator material: creating Meta and LinkedIn
+ * developer apps, redirect URIs, Cloudflare secrets. Shown to a client or an App
+ * Review reviewer they make the product read as a developer tool, so the live
+ * site hides them. `npm run dev` shows them; so does building with
+ * VITE_SHOW_SETUP_GUIDES=true.
+ */
+const SHOW_SETUP_GUIDES = import.meta.env.DEV || import.meta.env.VITE_SHOW_SETUP_GUIDES === "true";
+
 export default function Connections() {
   const dash = useDash();
   const { demo } = useDemo();
@@ -163,15 +172,17 @@ export default function Connections() {
                     </div>
                   ))}
                 </div>
-                <button className="btn btn--sm btn--ghost" aria-expanded={open} onClick={() => setGuide(open ? null : p)}>
-                  <IcChevron style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
-                  Setup guide
-                </button>
+                {SHOW_SETUP_GUIDES && (
+                  <button className="btn btn--sm btn--ghost" aria-expanded={open} onClick={() => setGuide(open ? null : p)}>
+                    <IcChevron style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+                    Setup guide
+                  </button>
+                )}
                 <button className="btn btn--primary btn--sm" onClick={() => connect(p)} disabled={connecting === p}>
                   <IcLink /> {accts.length ? "Reconnect" : "Connect"}
                 </button>
               </div>
-              {open && <SetupPanel platform={p} origin={origin} />}
+              {SHOW_SETUP_GUIDES && open && <SetupPanel platform={p} origin={origin} />}
             </div>
           );
         })}

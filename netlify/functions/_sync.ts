@@ -3,7 +3,7 @@ import { igGet, IG } from "./_instagram";
 import {
   LI, liGet, liNum, liLikes, liTime, liDayKey, type LiShareStats,
   LI_FACETS, liDemographicCount, urnTail, liEnumLabel,
-  liResolveGeo, liResolveIndustries, liResolveTaxonomy,
+  liResolveGeo, liResolveIndustries, liResolveTaxonomy, liTier,
 } from "./_linkedin";
 
 export const today = () => new Date().toISOString().slice(0, 10);
@@ -2044,20 +2044,57 @@ async function audienceLinkedIn(acc: AccountRow, token: string, c: { calls: numb
 
   /* ---- URNs into words -------------------------------------------------- */
   const labels = new Map<string, string>();
+  /*
+   * The taxonomies whose lookup actually ANSWERED. A facet whose taxonomy was
+   * never resolved is left out entirely below, rather than folded into
+   * "Unknown": with no names at all, every bucket would become Unknown and the
+   * page would show "Unknown 100%", a measurement of nothing.
+   */
+  const resolved = new Set<string>();
   const learn = async (
     kind: string, fn: () => Promise<Map<string, string>>,
   ): Promise<void> => {
     if (!ids[kind]?.size) return;
     spend(c);
-    const m = await optional(fn, new Map<string, string>(), { taxonomy: kind, platform: "linkedin" });
+    let m: Map<string, string>;
+    try { m = await fn(); }
+    catch (e) {
+      if (isThrottleError(e)) throw e;
+      /*
+       * A 403 here is NOT an expired token. The follower-statistics call just
+       * above succeeded with the same token, so a refusal on a taxonomy is a
+       * refusal of that call: exactly what development tier does to a
+       * BATCH_GET. liGet maps every 403 to auth code 190, and letting that
+       * propagate made sync.ts mark a working page "expired" and ask the client
+       * to reconnect. A 401 still propagates; that one is the token.
+       */
+      if (isAuthError(e) && (e as GraphError).status !== 403) throw e;
+      if (e instanceof CallBudgetExhausted) {
+        log("sync.call_budget_exhausted", { taxonomy: kind, platform: "linkedin", budget: callBudget() });
+        return;
+      }
+      log("sync.linkedin_taxonomy_unavailable", {
+        account: acc.id, taxonomy: kind, detail: e instanceof Error ? e.message : String(e),
+      });
+      return;
+    }
+    resolved.add(kind);
     for (const [id, name] of m) labels.set(`${kind}:${id}`, name);
   };
 
-  // One call per taxonomy, not one per value. Development Tier allows 500 calls
-  // per app per day, and this runs once a day per account (see the snapshot
-  // check in syncAccount), so the cost is four calls rather than four hundred.
-  await learn("geo", () => liResolveGeo([...ids.geo], token));
-  await learn("industry", () => liResolveIndustries([...ids.industry], token));
+  // One call per taxonomy, not one per value, once a day per account (see the
+  // snapshot check in syncAccount).
+  if (liTier() === "standard") {
+    await learn("geo", () => liResolveGeo([...ids.geo], token));
+    await learn("industry", () => liResolveIndustries([...ids.industry], token));
+  } else if (ids.geo.size || ids.industry.size) {
+    // Not attempted: development tier refuses every BATCH_GET, and a refused
+    // call still counts against 100 calls a day.
+    log("sync.linkedin_facets_skipped", {
+      account: acc.id, taxonomies: "geo,industry", tier: "development",
+      detail: "industry, countries and market areas need BATCH_GET, which development tier forbids; set LINKEDIN_API_TIER=standard once upgraded",
+    });
+  }
   await learn("seniority", () => liResolveTaxonomy(LI.SENIORITIES, token));
   await learn("function", () => liResolveTaxonomy(LI.FUNCTIONS, token));
 
@@ -2068,6 +2105,8 @@ async function audienceLinkedIn(acc: AccountRow, token: string, c: { calls: numb
   for (const f of LI_FACETS) {
     const buckets = raw[f.into];
     if (!buckets) continue;
+    // A taxonomy that never answered names nothing; see `resolved` above.
+    if (f.kind !== "enum" && !resolved.has(f.kind)) continue;
     const dist: Record<string, number> = {};
     for (const b of buckets) {
       /*
