@@ -706,10 +706,19 @@ better answer than a policy paragraph.
       connect-time audit shipped (09-07) and were NEVER audited (`scopes_checked_at`
       null). The sync now audits a never-audited token once, with the server's own
       key, so the answer lands in `social_accounts.write_scopes` within one sync and
-      shows on Connections. Read it there. **This is the one that matters** — if tokens do inherit,
+      shows on Connections. Read it there.
+      **ANSWERED 2026-09-14 by the live audit: YES, tokens inherit.**
+      `@heath_ens21` (where the dashboard's "Generate token" granted extras) holds
+      `instagram_business_content_publish` and `instagram_business_manage_messages`
+      on its OAuth token, which requested neither. `@malekismaiil` audited clean.
+      Consequences: "read-only" is true of what we REQUEST and of every call we
+      make, not automatically of the token an account hands us; it must be stated
+      per account, which the Connections page now does. Never generate dashboard
+      tokens on a client's account. **This is the one that matters** — if tokens do inherit,
       the read-only claim is wrong as stated and the design needs revisiting.
 - [ ] **Revoke the excess on `@heath_ens21`** (Instagram → Settings → Apps and
-      websites → toggles), then re-run the audit and confirm the write-gated
+      websites → toggles), then **reconnect it** so the connect-time audit re-runs
+      (the sync audits only once, and `scopes_checked_at` is now set), then re-run the audit and confirm the write-gated
       endpoints go from whatever they were to refused. That second run is the
       demonstration to give a client.
 - [ ] **Confirm nothing breaks after revoking.** (The `?? 0` half is fixed: **Verified 2026-09-14:** both paths read `comments_count ?? null`.) `comments_count` is a media
