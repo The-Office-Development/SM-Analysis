@@ -129,8 +129,8 @@ export function Privacy() {
         * of the insufficient level of protection", which is why the consent
         * checkbox on Connections now says so. Article 15(B) separately requires the
         * controller to verify each recipient's protection before transferring.
-        * That assessment has not been written down, so this page does not claim it;
-        * add the sentence back only once the record exists.
+        * That assessment is docs/TRANSFER-ASSESSMENT.md (2026-09-14), which is what
+        * makes the last sentence below true. Keep them in step.
         */}
       <p>None of our providers is in Jordan, so using this service transfers your personal data abroad:</p>
       <ul>
@@ -138,7 +138,7 @@ export function Privacy() {
         <li><b>Cloudflare</b> serves the app and runs the scheduled sync on its global network, so a request may be handled in whichever of its data centres is nearest.</li>
         <li><b>Anthropic</b>, a United States company, processes assistant requests if you use the assistant.</li>
       </ul>
-      <p>Jordan's Personal Data Protection Law No. 24 of 2023 permits a transfer abroad with your consent after you have been told the recipient's protection may be lower than Jordanian law requires (Article 15). We rely on that consent, which you give when you connect an account.</p>
+      <p>Jordan's Personal Data Protection Law No. 24 of 2023 permits a transfer abroad with your consent after you have been told the recipient's protection may be lower than Jordanian law requires (Article 15). We rely on that consent, which you give when you connect an account. Before using each provider we checked the protection it publishes, and we keep that assessment on record.</p>
 
       <h3>How long we keep it</h3>
       <p>We keep what you connect for as long as you keep it connected, and no longer. <b>Disconnecting an account deletes it immediately</b>: the access token, every daily metric, every post record, the audience breakdowns and that account's sync history are removed at once, not after a delay. There is no retention window afterwards because there is nothing left to retain. Deleting your whole account removes everything above along with your goals, your recorded consents and any report links you created.</p>

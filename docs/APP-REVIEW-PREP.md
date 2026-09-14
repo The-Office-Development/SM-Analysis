@@ -55,7 +55,7 @@ and accepted by the operator on 2026-09-14.
 | Placeholder | Proposed | Basis, and what is not settled |
 |---|---|---|
 | Statutory response period | "we respond within 30 days" | **The law sets no period.** Article 4(D) leaves the rights "to be organised in regulations". No regulation fixing a deadline was found; the 2025 regulation found concerns how the Unit works. 30 days is our own commitment. If a regulation ever sets a shorter one, that wins. |
-| Regions and transfer basis | Supabase Frankfurt, Cloudflare global network, Anthropic (US company); basis Article 15(A)(5) consent | Region checked with `supabase projects list`. **Article 15(B) also requires the controller to verify each recipient's protection before transferring.** No written assessment exists, so the page does not claim one. Write it, then add the sentence back. |
+| Regions and transfer basis | Supabase Frankfurt, Cloudflare global network, Anthropic (US company); basis Article 15(A)(5) consent | Region checked with `supabase projects list`. **Article 15(B) also requires the controller to verify each recipient's protection before transferring.** Written 2026-09-14 as `TRANSFER-ASSESSMENT.md`; the policy now says so. |
 | Uptime | No commitment, no service credits | A commercial position, and true today. |
 | Liability | Exclude indirect loss and decisions made on platform figures; cap at 12 months' fees; Amman courts | Standard shape. |
 | Complaint authority | Personal Data Protection Unit, Ministry of Digital Economy and Entrepreneurship | Article 2 of the law defines "The Unit" as the unit responsible for personal data protection "within the Ministry" of Digital Economy and Entrepreneurship. |

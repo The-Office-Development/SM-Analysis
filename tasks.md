@@ -493,7 +493,8 @@ Verification clears.
 - [x] Consent checkbox informs of transfer abroad (PDPL Art. 15(A)(5)); `CONSENT_VERSION` bumped
 - [x] 🔴 Meta deletion + deauthorize callbacks now handle Instagram Login identities (they matched none)
 - [x] Wording accepted by the operator 2026-09-14 (no separate legal review); merged and deployed
-- [ ] Written Article 15(B) assessment of Supabase, Cloudflare, Anthropic
+- [x] Written Article 15(B) assessment of Supabase, Cloudflare, Anthropic — `docs/TRANSFER-ASSESSMENT.md`, 2026-09-14
+- [ ] 🔴 Execute the Supabase DPA (offered, not automatic); confirm Cloudflare's DPA covers the account; record Anthropic's certifications
 - [ ] DPO: Article 11(A)(5) names transfer to databases outside the Kingdom
 - [ ] 🔴 Live test of the deletion callback by removing PulseBoard from `@heath_ens21`
 - [x] Per-platform Setup guides hidden on the live site (shown in `npm run dev`)
