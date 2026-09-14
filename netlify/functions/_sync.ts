@@ -1,5 +1,5 @@
 import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log, writeFailed } from "./_lib";
-import { igGet, IG } from "./_instagram";
+import { igGet, IG, auditTokenScopes } from "./_instagram";
 import {
   LI, liGet, liUrn, liNum, liLikes, liTime, liDayKey, type LiShareStats,
   LI_FACETS, liDemographicCount, urnTail, liEnumLabel,
@@ -499,6 +499,8 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     if (error) throw error;
   }
 
+  if (acc.platform === "instagram" && igLogin) await auditUnauditedToken(db, acc, token, counter);
+
   if (acc.platform === "linkedin") {
     await purgeLinkedInExpired(db, acc);
     // Once a day, with the demographics: the page name may be kept eight weeks.
@@ -514,6 +516,43 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     .from("social_accounts").update({ last_synced_at: new Date().toISOString() }).eq("id", acc.id);
   writeFailed("sync.last_synced_write_failed", stampErr, { account: acc.id, platform: acc.platform });
   return { calls: counter.calls, rowsWritten };
+}
+
+/**
+ * Audit an Instagram token that has never been audited, once.
+ *
+ * The audit runs at connect time, but it shipped on 2026-09-07 and both accounts
+ * connected before that, so neither was ever checked, and the question the audit
+ * exists to answer ("does our token hold write scopes inherited from an earlier
+ * grant?") stayed open on the only live tokens. Running it here needs no
+ * operator and no copy of TOKEN_ENC_KEY. Two GETs, once per account: after a
+ * complete audit `scopes_checked_at` is set and this returns immediately.
+ */
+export async function auditUnauditedToken(
+  db: Db, acc: { id: string; external_id: string }, token: string, c: { calls: number },
+): Promise<void> {
+  const { data, error } = await db.from("social_accounts").select("scopes_checked_at").eq("id", acc.id).maybeSingle();
+  if (error || !data || data.scopes_checked_at) return;
+  try {
+    spend(c); spend(c);
+    const held = await auditTokenScopes(acc.external_id, token);
+    if (held === null) {
+      log("sync.scope_audit_incomplete", { account: acc.id, detail: "a probe got no definitive answer; left unaudited, retried next run" });
+      return;
+    }
+    if (held.length) {
+      log("sync.token_exceeds_request", {
+        account: acc.id, scopes: held,
+        detail: "the stored token holds write-capable permissions this app never requested",
+      });
+    }
+    const { error: wErr } = await db.from("social_accounts")
+      .update({ write_scopes: held, scopes_checked_at: new Date().toISOString() }).eq("id", acc.id);
+    writeFailed("sync.scope_audit_write_failed", wErr, { account: acc.id });
+  } catch (e) {
+    if (e instanceof CallBudgetExhausted) return;   // next run
+    throw e;
+  }
 }
 
 /**

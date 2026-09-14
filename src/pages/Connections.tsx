@@ -160,6 +160,7 @@ export default function Connections() {
                       )}
                       <span>@{a.username}</span>
                       {a.last_synced_at && <span className="muted">· synced {formatDistanceToNow(new Date(a.last_synced_at), { addSuffix: true })}</span>}
+                      <ScopeNote platform={p} writeScopes={a.write_scopes} checkedAt={a.scopes_checked_at} />
                       <button className="btn btn--sm btn--danger" style={{ marginLeft: 8, height: 24 }} onClick={() => disconnect(a.id, p)}>Disconnect</button>
                       {a.status === "connected" && a.needs_reauth && (
                         <div className="muted" style={{ flexBasis: "100%", fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>
@@ -198,6 +199,41 @@ export default function Connections() {
       <YourData demo={demo} />
     </>
   );
+}
+
+/**
+ * What the stored token can do beyond reading, as audited.
+ *
+ * The OAuth callbacks have recorded this since 2026-09-07 and commented that the
+ * Connections page shows it; nothing did. A creator told "read-only" whose token
+ * in fact holds an inherited publish permission is exactly the claim the audit
+ * exists to stop us making, so the result is shown, and "not yet checked" is
+ * never shown as clean.
+ */
+function ScopeNote({ platform, writeScopes, checkedAt }: {
+  platform: Platform; writeScopes?: string[] | null; checkedAt?: string | null;
+}) {
+  const note = { flexBasis: "100%", fontSize: 11.5, marginTop: 4, lineHeight: 1.5 } as const;
+  if (platform === "linkedin") {
+    return (
+      <div className="muted" style={note}>
+        LinkedIn's reporting permission also allows managing the page. PulseBoard only ever reads.
+      </div>
+    );
+  }
+  if (platform !== "instagram") return null;
+  if (!checkedAt) {
+    return <div className="muted" style={note}>Permissions not checked yet. This happens on the next sync.</div>;
+  }
+  if (writeScopes && writeScopes.length) {
+    return (
+      <div style={{ ...note, color: "var(--warn, #b45309)" }}>
+        This connection holds more than read access, granted by this account at some earlier point. PulseBoard never
+        uses it. To remove it: {REMOVE_AT_PLATFORM.instagram}.
+      </div>
+    );
+  }
+  return <div className="muted" style={note}>Checked: this connection can read, and nothing else.</div>;
 }
 
 /**

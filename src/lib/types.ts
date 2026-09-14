@@ -21,6 +21,13 @@ export interface SocialAccount {
    * Company Page means finding an administrator. See migration 0014.
    */
   needs_reauth?: boolean;
+  /**
+   * Write-capable permissions the token was OBSERVED to hold. `[]` is a complete
+   * clean audit; null with no `scopes_checked_at` is "not audited", which must
+   * never be shown as clean.
+   */
+  write_scopes?: string[] | null;
+  scopes_checked_at?: string | null;
 }
 
 /** One day of metrics for one account (rows come from metrics_daily). */

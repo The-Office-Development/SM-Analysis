@@ -26,6 +26,8 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "an incomplete token audit recorded as clean", file: INSTA,
+    find: "return incomplete ? null : held;", replace: "return held;" },
   { name: "LinkedIn history dug in Instagram-sized chunks", file: SYNC,
     find: "addDays(today(), -(LI.MAX_HISTORY_DAYS - 1)), counter, today())", replace: "start, counter, window.end)" },
   { name: "LinkedIn sponsored dark posts stored as page posts", file: SYNC,

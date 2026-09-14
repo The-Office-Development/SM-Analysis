@@ -132,7 +132,8 @@ export const handler: Handler = async (event) => {
         // null stays null when the audit could not run: "not audited" is not
         // "clean", and the UI must be able to tell them apart.
         write_scopes: writeScopes,
-        scopes_checked_at: writeScopes ? new Date().toISOString() : null,
+        // `[]` is a complete, clean audit and IS a check; only null is not.
+        scopes_checked_at: writeScopes !== null ? new Date().toISOString() : null,
       })
       .eq("id", accountId);
     writeFailed("oauth.account_link_write_failed", linkErr, {

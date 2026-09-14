@@ -106,3 +106,48 @@ test("the token scope audit only ever READS, and reports what it observed", asyn
     globalThis.fetch = original;
   }
 });
+
+test("an audit in which a probe got no answer is incomplete, never clean", async () => {
+  /*
+   * A network failure or a throttle used to be skipped, so an audit where
+   * nothing answered returned [] and was stored as "checked, read-only".
+   */
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => { throw new Error("network down"); };
+    assert.equal(await auditTokenScopes("123", "tok"), null, "no probe answered: not audited");
+
+    globalThis.fetch = async () => new Response("{}", { status: 429 });
+    assert.equal(await auditTokenScopes("123", "tok"), null, "throttled: not audited");
+
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: "no" } }), { status: 400 });
+    assert.deepEqual(await auditTokenScopes("123", "tok"), [], "every probe refused: audited and clean");
+  } finally { globalThis.fetch = original; }
+});
+
+test("a never-audited Instagram token is audited once by the sync", async () => {
+  const { auditUnauditedToken } = await import("../build/_sync.js");
+  const { makeDb } = await import("./fake-supabase.mjs");
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (url) => {
+    calls++;
+    // This token turns out to hold a publish permission it was never asked for.
+    const ok = String(url).includes("content_publishing_limit");
+    return new Response(ok ? "{}" : JSON.stringify({ error: { message: "no" } }), { status: ok ? 200 : 400 });
+  };
+  try {
+    const db = makeDb({ social_accounts: [
+      { id: "old", external_id: "1784", scopes_checked_at: null, write_scopes: null },
+      { id: "done", external_id: "1785", scopes_checked_at: "2026-09-07T00:00:00Z", write_scopes: [] },
+    ] });
+    await auditUnauditedToken(db, { id: "old", external_id: "1784" }, "tok", { calls: 0 });
+    const old = db._rows("social_accounts").find((r) => r.id === "old");
+    assert.deepEqual(old.write_scopes, ["instagram_business_content_publish"], "what the token holds is recorded");
+    assert.ok(old.scopes_checked_at, "and the account is marked audited");
+
+    const before = calls;
+    await auditUnauditedToken(db, { id: "done", external_id: "1785" }, "tok", { calls: 0 });
+    assert.equal(calls, before, "an audited account costs no calls");
+  } finally { globalThis.fetch = original; }
+});

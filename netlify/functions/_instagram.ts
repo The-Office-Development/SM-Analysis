@@ -246,25 +246,31 @@ export function logIgConfig() {
  * clean, which is a different statement from "not audited" — the caller must
  * keep those apart, because presenting an unaudited token as safe is exactly the
  * confident claim this function exists to replace with evidence.
+ *
+ * Returns NULL when any probe did not get a definitive answer: a network failure,
+ * a throttle or a server error. Those used to be dropped silently, so an audit in
+ * which nothing actually answered returned [] and was recorded as clean.
  */
 export async function auditTokenScopes(
   externalId: string,
   token: string,
-): Promise<string[]> {
+): Promise<string[] | null> {
   const held: string[] = [];
+  let incomplete = false;
   for (const probe of IG.WRITE_GATED_PROBES) {
     try {
       const u = new URL(`${IG.GRAPH}/${externalId}/${probe.path}`);
       u.searchParams.set("access_token", token);
       const res = await fetch(u, { signal: AbortSignal.timeout(8000) });
-      // Only a clean 2xx counts as "held". A refusal, a throttle or a network
-      // failure all mean "not demonstrated", and must not be recorded as absent
-      // either — the caller decides what an incomplete audit means.
+      // A 2xx means held. A 4xx other than 429 is a refusal: not held. Anything
+      // else, a throttle or a server error, answered nothing.
       if (res.ok) held.push(probe.scope);
+      else if (res.status === 429 || res.status >= 500) incomplete = true;
     } catch {
-      // Ignore: a probe that could not complete proves nothing in either
-      // direction, and an audit must not fail a connection.
+      // A probe that could not complete proves nothing in either direction, and
+      // an audit must not fail a connection. It makes the audit incomplete.
+      incomplete = true;
     }
   }
-  return held;
+  return incomplete ? null : held;
 }

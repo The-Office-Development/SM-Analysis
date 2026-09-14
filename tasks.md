@@ -236,7 +236,7 @@ an unrelated personal Page because it has nothing else to show. Also missing on
 Settings → Basic: the app icon and App domains. Present and correct: contact
 email, privacy policy, terms, and the data-deletion callback.
 
-**Blocked on one document:** a utility bill in the company's name. The commercial
+**Superseded 2026-09-13: verification was submitted without a utility bill** (`SETUP-META.md` §1b). Was: **Blocked on one document:** a utility bill in the company's name. The commercial
 registration proves the legal name; Meta is explicit that a utility bill proves
 address and phone only, so both are needed.
 
@@ -549,64 +549,65 @@ integration or an account-level summary. Ask that question before writing code.
       callback, `INSTAGRAM_APP_*`, the real read-only scopes, and the Tester
       route spelled out.
 
-- [ ] `[STATUTORY PERIOD]` — the PDPL response deadline is a legal fact, not a
-      choice. Left for counsel rather than guessed.
-- [ ] `[REGIONS CONFIGURED ... TRANSFER BASIS]` — needs the Supabase and Netlify
-      region decision plus a stated cross-border position.
-- [ ] `[UPTIME COMMITMENT]` and `[LIABILITY POSITION]` in the terms — commercial
-      and legal decisions, not code ones.
+- [x] `[STATUTORY PERIOD]` — 30 days, our own commitment: the PDPL sets none
+      (Art. 4(D) defers to regulations). Operator accepted 2026-09-14.
+- [x] `[REGIONS CONFIGURED ... TRANSFER BASIS]` — Supabase Frankfurt, Cloudflare
+      global, Anthropic US; basis Art. 15(A)(5) consent, now stated on the checkbox.
+- [x] `[UPTIME COMMITMENT]` and `[LIABILITY POSITION]` — filled 2026-09-14.
+      **Verified 2026-09-14:** the live bundle carries no bracketed placeholder.
 
 `OPERATOR` and `ADDRESS` stay bracketed until the translation lands (§4). They
 are now the only two placeholders blocked on something other than counsel.
 
 ## 1. Stand it up — about two hours
 
-- [ ] Supabase project. Run in this exact order: `supabase/schema.sql`, then
+- [x] Supabase project. **Verified 2026-09-14:** `npm run verify:schema`, 17 of 17 migrations applied, Frankfurt. Run in this exact order: `supabase/schema.sql`, then
       migrations `0001_audit_fixes`, `0002_token_refresh`,
       `0003_deletion_and_consent`, `0004_ai_usage`, `0005_instagram_login`.
-- [ ] Project settings → API → Exposed schemas: add `pulseboard`. Without it every
+- [x] Project settings → API → Exposed schemas: add `pulseboard`. Without it every
       request returns `PGRST106`.
-- [ ] Record which migrations have been applied. Re-running `schema.sql` after an
+- [x] Record which migrations have been applied (`schema_migrations` ledger, 0016). Re-running `schema.sql` after an
       edit silently does nothing — it is `create table if not exists` throughout.
-- [ ] Generate `TOKEN_ENC_KEY` (base64 of 32 random bytes) and
+- [x] Generate `TOKEN_ENC_KEY` (base64 of 32 random bytes) and
       `OAUTH_STATE_SECRET` (32 random hex). Both fail closed if unset.
-- [ ] Netlify env vars, **scoped to Production only** — Netlify defaults them to
+- [x] ~~Netlify~~ Cloudflare secrets (the host moved; tokens decrypt in every live sync). Netlify env vars, **scoped to Production only** — Netlify defaults them to
       every context, and the code refuses to run in a deploy preview against live
       credentials. Full list in `docs/DEPLOY-RUNBOOK.md` §4.
-- [ ] Point `app.theoffice.it.com` at Netlify via CNAME. DNS is delegated to our
+- [x] Point `app.theoffice.it.com` at ~~Netlify~~ Cloudflare Pages. DNS is delegated to our
       own nameservers, so this works and so will Meta's TXT verification.
-- [ ] Deploy. Confirm `/privacy`, `/terms`, `/data-deletion` load and
-      `/api/deletion-status?code=x` returns JSON rather than HTML.
+- [x] Deploy. Confirm `/privacy`, `/terms`, `/data-deletion` load and
+      `/api/deletion-status?code=x` returns JSON rather than HTML. **Verified 2026-09-14:** 200s, and the
+      deletion endpoints answer `application/json`.
 
 ## 2. The Meta app — an afternoon, no review
 
-- [ ] Create a Meta developer account and app. Free, instant, no documents.
-- [ ] Products → Instagram → **API setup with Instagram login**.
-- [ ] **Set the app display name deliberately** — "The Office" or "PulseBoard".
+- [x] Create a Meta developer account and app. `PulseBoard`, ID 934736295759559.
+- [x] Products → Instagram → **API setup with Instagram login**. Two accounts connected through it.
+- [x] **Set the app display name deliberately** — "The Office" or "PulseBoard".
       This is the name the client sees on the consent screen.
-- [ ] Redirect URI: `https://app.theoffice.it.com/api/oauth-instagram-callback`
-- [ ] Permissions: `instagram_business_basic` and
+- [x] Redirect URI: `https://app.theoffice.it.com/api/oauth-instagram-callback` (live OAuth completes)
+- [x] Permissions: `instagram_business_basic` and
       `instagram_business_manage_insights`. **Nothing else.** Never
       `instagram_business_content_publish`, `pages_*` or `business_management` —
       guarded by a mutation test.
-- [ ] App settings → Advanced → Security → **Require App Secret: ON**
-- [ ] App settings → Basic → privacy, terms, data-deletion callback
+- [ ] App settings → Advanced → Security → **Require App Secret: ON** — not verifiable from here; check the dashboard
+- [x] App settings → Basic → privacy, terms, data-deletion callback (present per the 2026-09-11 dashboard read)
       (`/api/meta-data-deletion`) and deauthorize callback
       (`/api/meta-deauthorize`). All four must be reachable.
-- [ ] Copy `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` into Netlify. These are
+- [x] Copy `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` into ~~Netlify~~ Cloudflare. These are
       **not** the same as `META_APP_*`.
 
 ## 3. The gate that matters
 
-- [ ] Connect our own Instagram account. Works immediately — we hold an admin
+- [x] Connect our own Instagram account (2026-09-04). Works immediately — we hold an admin
       role. **This is the first time this code has ever touched the live API**, so
       expect to debug. Failures are recorded in `sync_log` with an `error_code`.
-- [ ] Let it sync **at least three days**. Recent days are provisional by design
+- [x] Let it sync **at least three days**. **Verified 2026-09-14:** 93 runs, 0 failures in 24 hours. Recent days are provisional by design
       and read low; history arrives in chunks because only `reach` returns a daily
       series and everything else costs one call per day.
-- [ ] `node verify/reconcile.mjs --list`, then
+- [x] `node verify/reconcile.mjs --list`, then
       `node verify/reconcile.mjs --account <id> --days 14`.
-- [ ] **Compare three or four settled days against the Instagram app itself.**
+- [x] **Compare three or four settled days against the Instagram app itself.** First run 2026-09-05; findings in `DATA-INTEGRITY.md`; the per-day question is §6e.
       Every test in this repo runs against a mock built from documentation. This is
       the only validation against reality, and it can fail. **No client sees the
       product until the numbers agree.**
@@ -621,11 +622,11 @@ are now the only two placeholders blocked on something other than counsel.
 - [x] ~~Order the certified translation~~ — done, AGATO, stamped 19 Aug 2026.
 - [x] Fill `OPERATOR` and `ADDRESS` in `Legal.tsx` and state the brand/entity
       link in the footer with registration 83622. Done 2026-08-28.
-- [ ] **Use the name verbatim in Meta Business Manager** when verification is
+- [x] **Superseded:** submitted 2026-09-13 with the Arabic name and the AGATO English as alternative (`SETUP-META.md` §1b). **Use the name verbatim in Meta Business Manager** when verification is
       submitted: `Al-Hujra Information Technology Company / Limited Liability`.
       A name mismatch is the most common rejection, and this string ends at
       *Limited Liability* — not *Limited Liability Company*.
-- [ ] Obtain a second corroborating document **carrying a street address** — the
+- [x] **Superseded, not needed:** the D&B-held address was used (`SETUP-META.md` §1b). Obtain a second corroborating document **carrying a street address** — the
       registration gives only "Amman". A utility bill for the registered premises
       is the best fit; no bank account exists, so a statement is unavailable.
 
@@ -658,14 +659,14 @@ are now the only two placeholders blocked on something other than counsel.
 
 ## 6. Background — weeks, blocks nothing above
 
-- [ ] Business Verification (`docs/SETUP-META.md` §1). 10 minutes to 14 working
+- [x] Business Verification — **submitted 2026-09-13, in review.** (`docs/SETUP-META.md` §1). 10 minutes to 14 working
       days. Note the correction recorded there: our registration carries no stamp
       **by design**, saying so in its own footer, which contradicts the inherited
       guidance that Meta rejects unstamped documents.
 - [ ] App Review, once real data exists to screencast. Advanced access for both
-      scopes.
+      scopes. **Prepared 2026-09-14** (`APP-REVIEW-PREP.md`); submitted when verification clears.
 - [ ] Data Use Checkup and Data Protection Assessment. The transfer question needs
-      the sub-processor list — Supabase, Netlify, Anthropic, all outside Jordan.
+      the sub-processor list — Supabase, ~~Netlify~~ Cloudflare, Anthropic, all outside Jordan.
 
 **This is what lifts the ceiling past a handful of accounts.** The vendor route
 does not: its permissions objection grows with client count while its cost
@@ -700,13 +701,17 @@ better answer than a policy paragraph.
       `business message information` and `business comment information` on
       `@heath_ens21`. Whether an OAuth token issued afterwards carries those is
       unknown. Run `verify/audit-token.mjs --account <id>` against a live stored
-      token to find out. **This is the one that matters** — if tokens do inherit,
+      token to find out. **2026-09-14:** both live accounts connected before the
+      connect-time audit shipped (09-07) and were NEVER audited (`scopes_checked_at`
+      null). The sync now audits a never-audited token once, with the server's own
+      key, so the answer lands in `social_accounts.write_scopes` within one sync and
+      shows on Connections. Read it there. **This is the one that matters** — if tokens do inherit,
       the read-only claim is wrong as stated and the design needs revisiting.
 - [ ] **Revoke the excess on `@heath_ens21`** (Instagram → Settings → Apps and
       websites → toggles), then re-run the audit and confirm the write-gated
       endpoints go from whatever they were to refused. That second run is the
       demonstration to give a client.
-- [ ] **Confirm nothing breaks after revoking.** `comments_count` is a media
+- [ ] **Confirm nothing breaks after revoking.** (The `?? 0` half is fixed: **Verified 2026-09-14:** both paths read `comments_count ?? null`.) `comments_count` is a media
       field under `basic`, so revoking comment access should cost nothing — but
       `comments: m.comments_count ?? 0` means a field that stopped arriving would
       read as **0 comments, not unknown**. A quiet failure. Verify on an account
@@ -774,16 +779,15 @@ sync self-heals through the trailing re-fetch, a missed story window does not.
 
 ### Design sketch, to be decided
 
-- [ ] **Per-post refresh.** A control on Content and on a post detail view that
+- [x] **Per-post refresh.** Built (`refresh-post.ts`, "Check now", fetch on open, 30s cooldown). A control on Content and on a post detail view that
       calls a new endpoint, does the single live fetch and updates that row.
       Costs one API call. Should be rate-limited per account.
 - [ ] **A "just posted" view.** The newest item, with its numbers and its age,
       and honest treatment of a post too young to judge.
-- [ ] **Story capture.** `/me/stories` on a schedule frequent enough to catch
+- [x] **Story capture.** Built and on the 15-minute cron; **Verified 2026-09-14:** still 0 stories stored. `/me/stories` on a schedule frequent enough to catch
       them before expiry, plus story rows in the schema. Decide the cadence
       against the 24-hour window, not against the daily sync's cadence.
-- [ ] **Pagination past 25 posts**, or a documented statement that Content shows
-      the most recent 25.
+- [x] **Pagination past 25 posts.** Built: media pages by `paging.next` (`sync.media_paging_stopped` logs the stop).
 
 ### A view per post or story — the shape the operator asked for
 
@@ -795,7 +799,7 @@ no drill-down.
 - [x] A route per item — `/content/:id`. DONE 2026-09-07. Every metric can say
       "not reported", nothing is judged before 24 hours, and each figure sits
       beside the median for the SAME format with its sample size shown.
-- [ ] The **Refresh** control on that page, doing the single live call. Not yet
+- [x] The **Refresh** control on that page, doing the single live call. Built 2026-09-07 ("Check now"). Was: not yet
       built — it needs a new endpoint, and it is what makes the page answer
       "how is it doing RIGHT NOW" rather than "as of the last sync".
 - [x] Context, not just figures. DONE — postContext() compares against the
@@ -965,13 +969,13 @@ year, and we could.
 
 **Open decisions:**
 
-- [ ] Which Cloudflare account hosts this — separate one for isolation and
+- [x] Which Cloudflare account hosts this — the existing one, `69b37cce` (Pages `pulseboard`, Worker `pulseboard-cron`). Separate one for isolation and
       billing clarity, or the existing one. **Not a capacity question**; the
       subrequest cap is per plan, so a second free account changes nothing.
 - [ ] Free at `IG_DAY_BUDGET=7`, or $5/month. Recommendation: ship free now,
       pay when there is a paying client and a deep backfill is worth an
       afternoon instead of four days.
-- [ ] Deploy, set secrets, deploy `worker-cron`, then move DNS. The Meta OAuth
+- [x] Deploy, set secrets, deploy `worker-cron`, then move DNS. Done; the Worker is NOT deployed by CI (CLAUDE.md). The Meta OAuth
       redirect URI does not change, but the callback breaks until DNS cuts over,
       so do it before touching a client's account.
 - [ ] Decide whether the sync should fail loudly when a run approaches the
@@ -980,10 +984,10 @@ year, and we could.
 ## 7. Known gaps, deliberately deferred
 
 - [ ] Share-link expiry and revocation — **not built.** See §0.
-- [ ] Retention purge job — **not built.** See §0.
+- [ ] Retention purge job — **built for LinkedIn 2026-09-14** (its storage limits require one). Instagram and Facebook data is kept while connected and deleted on disconnect, which is what the privacy policy states; no purge is owed there.
 - [ ] Queue-backed sync. The hourly cron is fine to a few hundred accounts.
 - [ ] PWA polish: manifest, icons, installability.
-- [ ] DPO question under the PDPL; counsel sign-off on the legal pages.
+- [ ] DPO question under the PDPL (Art. 11(A)(5) names transfer abroad). Legal-page wording: accepted by the operator 2026-09-14, no separate counsel review.
 - [ ] A standing watch on Meta's deprecation schedule. `CLAUDE.md` calls this a
       permanent tax on the product, and its absence caused most of the audit
       findings.
