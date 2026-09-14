@@ -304,6 +304,17 @@ P0 finding. There is a test and a mutation guarding every one.
   updating only what it read, and has **no test at all**: no handler-level test
   rig exists in this repo.
 
+### The cron Worker is NOT deployed by CI
+A push to `main` deploys the Pages app only. The scheduled sync runs in
+`worker-cron/`, which bundles `netlify/functions/sync-cron.ts` and everything
+it imports, and changes only on a manual
+`cd worker-cron && CLOUDFLARE_ACCOUNT_ID=69b37cce7d7633d2e73be9b548b8021a npx wrangler deploy`.
+**Any change to `_sync.ts`, `_linkedin.ts`, `_instagram.ts`, `_lib.ts`, `sync.ts`
+or `sync-cron.ts` needs that deploy as well.** On 2026-09-14 the Worker was
+found last deployed on 2026-09-08, so four days of sync fixes, including the
+12 September stories fix, had never run on the schedule. Check with
+`npx wrangler deployments list` in `worker-cron/`.
+
 ### Things that look wrong but are not
 - `metrics_daily` columns are nullable *on purpose*.
 - Days are re-fetched repeatedly *on purpose*; upserts are idempotent.
