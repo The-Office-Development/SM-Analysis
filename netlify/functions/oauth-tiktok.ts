@@ -1,5 +1,5 @@
 import type { Handler } from "./_lib";
-import { env, userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin, writeFailed } from "./_lib";
+import { env, userIdFromToken, signState, newNonce, setNonceCookie, startError, log, admin, writeFailed } from "./_lib";
 
 /**
  * Starts the TikTok Login Kit (v2) OAuth flow.
@@ -16,8 +16,8 @@ export const handler: Handler = async (event) => {
   try { token = JSON.parse(event.body || "{}").token; } catch { /* handled below */ }
 
   const userId = await userIdFromToken(token ?? event.headers.authorization);
-  if (!userId) return backToApp("error", "not_signed_in");
-  if (!env.TIKTOK_CLIENT_KEY) return backToApp("error", "tiktok_not_configured");
+  if (!userId) return startError(401, "not_signed_in");
+  if (!env.TIKTOK_CLIENT_KEY) return startError(503, "tiktok_not_configured");
 
   const redirectUri = `${env.SITE_URL}/api/oauth-tiktok-callback`;
   const scope = ["user.info.basic", "user.info.profile", "user.info.stats", "video.list"].join(",");

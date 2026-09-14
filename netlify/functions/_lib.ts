@@ -384,6 +384,19 @@ export function json(statusCode: number, obj: unknown) {
   return { statusCode, headers: { "content-type": "application/json" }, body: JSON.stringify(obj) };
 }
 
+/**
+ * An error from a connect START endpoint, as JSON the page can read.
+ *
+ * The start endpoints are called with fetch() and answer { url }. They used to
+ * report failure with backToApp's 302, which fetch follows silently into the
+ * Connections page's HTML, so the JSON parse failed and every cause, "not signed
+ * in" and "not set up yet" alike, reached the user as "Could not start the
+ * connection". Only the CALLBACKS, which the browser itself lands on, redirect.
+ */
+export function startError(statusCode: number, code: string) {
+  return json(statusCode, { code, message: code });
+}
+
 /** Redirect back to the Connections screen with a result flag.
  *  Only opaque codes are reflected — provider text is logged, never echoed. */
 export function backToApp(result: string, value: string, extraHeaders: Record<string, string> = {}) {

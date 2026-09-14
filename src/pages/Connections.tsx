@@ -4,6 +4,7 @@ import { useDash } from "../context/DashboardContext";
 import { useDemo } from "../context/DemoContext";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
+import { connectErrorMessage } from "../lib/connectErrors";
 import { isConfigured } from "../lib/supabase";
 import { startOAuth, disconnectAccount, exportMyData, deleteMyAccount } from "../lib/api";
 import { PLATFORMS, PLATFORM_ORDER, PLATFORM_FILL } from "../lib/platforms";
@@ -41,7 +42,7 @@ export default function Connections() {
       toast(`${label} connected.`);
       void dash.refresh();
     }
-    if (error) toast(`Connection failed: ${error}`);
+    if (error) toast(connectErrorMessage(error));
     if (ok || error) { params.delete("connected"); params.delete("error"); setParams(params, { replace: true }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

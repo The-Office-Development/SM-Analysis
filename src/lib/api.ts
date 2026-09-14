@@ -1,3 +1,4 @@
+import { connectErrorMessage } from "./connectErrors";
 import { supabase } from "./supabase";
 import type {
   SocialAccount, MetricPoint, ContentItem, AudienceSnapshot, Platform, Range, Scope, Goal,
@@ -153,7 +154,8 @@ export async function startOAuth(provider: "meta" | "tiktok" | "instagram" | "li
     body: JSON.stringify({ token: session.access_token }),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok || !body.url) throw new Error(body.message || "Could not start the connection.");
+  // The server answers a code; the words live in one place (connectErrors.ts).
+  if (!res.ok || !body.url) throw new Error(connectErrorMessage(body.code));
   return body.url as string;
 }
 

@@ -24,6 +24,8 @@
     "../netlify/functions/_tokens.ts",
     "../netlify/functions/meta-data-deletion.ts",
     "../netlify/functions/_instagram.ts",
-    "../netlify/functions/sync.ts"
+    "../netlify/functions/sync.ts",
+    "../netlify/functions/oauth-linkedin.ts",
+    "../netlify/functions/oauth-instagram.ts"
   ]
 }

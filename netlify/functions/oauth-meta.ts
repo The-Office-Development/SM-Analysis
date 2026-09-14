@@ -1,5 +1,5 @@
 import type { Handler } from "./_lib";
-import { env, userIdFromToken, signState, newNonce, setNonceCookie, redirect, backToApp, GRAPH_VERSION, log, admin, writeFailed } from "./_lib";
+import { env, userIdFromToken, signState, newNonce, setNonceCookie, redirect, startError, GRAPH_VERSION, log, admin, writeFailed } from "./_lib";
 
 /**
  * Starts the Meta (Facebook + Instagram) OAuth flow.
@@ -19,8 +19,8 @@ export const handler: Handler = async (event) => {
   try { token = JSON.parse(event.body || "{}").token; } catch { /* handled below */ }
 
   const userId = await userIdFromToken(token ?? event.headers.authorization);
-  if (!userId) return backToApp("error", "not_signed_in");
-  if (!env.META_APP_ID) return backToApp("error", "meta_not_configured");
+  if (!userId) return startError(401, "not_signed_in");
+  if (!env.META_APP_ID) return startError(503, "meta_not_configured");
 
   const redirectUri = `${env.SITE_URL}/api/oauth-meta-callback`;
 

@@ -1,5 +1,5 @@
 import type { Handler } from "./_lib";
-import { userIdFromToken, signState, newNonce, setNonceCookie, backToApp, log, admin, writeFailed } from "./_lib";
+import { userIdFromToken, signState, newNonce, setNonceCookie, startError, log, admin, writeFailed } from "./_lib";
 import { authorizeUrl, IG } from "./_instagram";
 
 /** Bump when the consent wording or the requested scopes change. */
@@ -19,10 +19,10 @@ export const handler: Handler = async (event) => {
   try { token = JSON.parse(event.body || "{}").token; } catch { /* handled below */ }
 
   const userId = await userIdFromToken(token ?? event.headers.authorization);
-  if (!userId) return backToApp("error", "not_signed_in");
+  if (!userId) return startError(401, "not_signed_in");
 
   const clientId = process.env.INSTAGRAM_APP_ID ?? "";
-  if (!clientId) return backToApp("error", "instagram_not_configured");
+  if (!clientId) return startError(503, "instagram_not_configured");
 
   const redirectUri = `${process.env.VITE_SITE_URL ?? process.env.URL ?? ""}/api/oauth-instagram-callback`;
 
