@@ -14,7 +14,12 @@ authenticated member has the following role: ADMINISTRATOR". On a page that role
 is **Super admin**. A Content admin or an **Analyst** can see the Analytics tab
 but cannot grant access; their connection finds no page.
 
-**Route A (recommended): Drinkat makes us a super admin of their page.**
+**Decided 2026-09-14: the client connects his own account himself, in the meeting.**
+His personal profile needs no admin role at all (Connect profile). His Company
+Page needs him to already be its Super admin (Connect page). Route A below is kept
+only for reference.
+
+**Route A (not used): Drinkat makes us a super admin of their page.**
 Their super admin opens the page as admin → **Admin tools → Manage admins → Add admin**, adds
 our operator's LinkedIn profile, and picks **Super admin**. We then run the probe,
 connect, sync and reconcile ourselves, on our own schedule, and remove the role
