@@ -96,9 +96,16 @@ thing the product is sold on. `@heath_ens21`, converted for testing, has 4 and 9
 sparse, as expected for a recently converted account, and a reminder that a test
 account cannot validate these.
 
-**Still zero stories, on 12 stored posts.** The working conclusion in `tasks.md`
-— that `/stories` returns only the account's own media, so a reshared post never
-appears — remains the best explanation, and the control has still not been run.
+**Story capture WORKS, proven 2026-09-14.** `@malekismaiil` posted an original
+story at 23:05 UTC and the sync stored it: `media_type` Story, 133 views, 96
+reach, 1 share, 4 replies, 112 navigation, a correct permalink, `expires_at`
+24 hours out, still being re-read at 12:00 the next day. Likes and saves are
+null, which is right: Instagram reports neither for a story.
+
+**And it settles the old question.** Every earlier attempt was against RESHARED
+stories, and the working conclusion was that `/stories` returns only the
+account's own media. An original story is exactly the control that was missing,
+and it appeared. Reshares are excluded; own stories are not.
 
 The mock is still the only oracle the tests have. Until a months-old
 professional account is connected, correctness of the day windows, the discovery

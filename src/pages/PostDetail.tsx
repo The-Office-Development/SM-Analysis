@@ -41,6 +41,14 @@ export default function PostDetail() {
   return <RequireData><PostDetailInner key={id} /></RequireData>;
 }
 
+/*
+ * A story is not a post. Instagram reports replies and navigation (taps forward,
+ * back, out) for one and never reports likes or saves, so showing a story through
+ * the post metrics printed "n/a" four times and hid the two figures that exist.
+ * Stories also vanish 24 hours after posting; what was read before then is kept.
+ */
+const STORY_METRIC_KEYS = ["views", "reach", "replies", "navigation", "shares"] as const;
+
 const METRICS = [
   { key: "views", label: "Views", hint: "Times it was played or displayed" },
   { key: "reach", label: "Reach", hint: "Distinct accounts that saw it" },
@@ -48,7 +56,16 @@ const METRICS = [
   { key: "comments", label: "Comments", hint: null },
   { key: "shares", label: "Shares", hint: "Sent to someone else. The strongest sign a post is spreading" },
   { key: "saves", label: "Saves", hint: "Kept for later. Someone meant to come back to it" },
+  { key: "replies", label: "Replies", hint: "Messages sent back in response to the story" },
+  { key: "navigation", label: "Navigation", hint: "Taps forward, back, or away while it was on screen" },
 ] as const;
+
+/** The metrics this item's format actually has. */
+function metricsFor(mediaType: string) {
+  return mediaType === "Story"
+    ? METRICS.filter((m) => (STORY_METRIC_KEYS as readonly string[]).includes(m.key))
+    : METRICS.filter((m) => m.key !== "replies" && m.key !== "navigation");
+}
 
 /*
  * What each column means ON THIS PLATFORM. The content table is shared, and a
@@ -159,7 +176,7 @@ function PostDetailInner() {
   // page reflects the refresh without waiting for a full reload of the dashboard.
   const view = fresh ? ({ ...post, ...fresh } as typeof post) : post;
   const hours = ageHours(post.published_at);
-  const young = tooEarly(post.published_at);
+  const young = tooEarly(post.published_at, post.media_type);
   // When these figures were read, including by the automatic read above.
   const checked = timeAgo(checkedAt);
   // Computed across every post so the divisor is the follower count on THIS
@@ -174,7 +191,14 @@ function PostDetailInner() {
    */
   const platform = PLATFORMS[post.platform].name;
   const demo = isDemoMode();
-  const engagement = sumKnown(view.likes, view.comments, view.shares, view.saves);
+  // What this format actually reports; a story has replies and navigation, and
+  // never likes or saves.
+  const shown = metricsFor(post.media_type);
+  const story = post.media_type === "Story";
+  const expired = story && post.expires_at ? Date.parse(post.expires_at) < Date.now() : false;
+  const engagement = story
+    ? sumKnown(view.replies, view.shares)
+    : sumKnown(view.likes, view.comments, view.shares, view.saves);
   // A rate needs a denominator that exists. Reach of null gives no rate at all
   // rather than a rate computed against a fabricated zero.
   const engRate = engagement !== null && view.reach !== null && view.reach > 0
@@ -190,6 +214,17 @@ function PostDetailInner() {
               {post.media_type} · {shortDate(post.published_at)} ·{" "}
               {hours < 48 ? `${Math.round(hours)}h old` : `${Math.round(hours / 24)} days old`}
             </span>
+            {story && (
+              /*
+               * A story is gone from Instagram 24 hours after it is posted, and
+               * its figures stop moving then. Saying which side of that it is on
+               * is the difference between "these numbers are final" and "these
+               * are still climbing".
+               */
+              <span className={`chip ${expired ? "" : "chip--ok"}`} style={{ fontSize: 11 }}>
+                {expired ? "Expired, figures final" : "Live on Instagram for now"}
+              </span>
+            )}
             {post.permalink && (
               <a href={post.permalink} target="_blank" rel="noopener noreferrer"
                  className="muted" style={{ fontSize: 12 }}>
@@ -286,8 +321,10 @@ function PostDetailInner() {
             <p className="muted" style={{ margin: 0, fontSize: 12.5, padding: "8px 10px",
                  border: "1px solid var(--border)", borderRadius: 8 }}>
               <strong>Too early to judge.</strong> {platform} is still counting, and reports
-              nothing at all for the first stretch after publishing. Numbers below will keep
-              climbing for a day or more, so a low figure now is not a verdict.
+              nothing at all for the first stretch after publishing.{" "}
+              {story
+                ? "A story's figures settle within the hour, and stop when it expires 24 hours after posting."
+                : "Numbers below will keep climbing for a day or more, so a low figure now is not a verdict."}
             </p>
           )}
         </div>
@@ -300,7 +337,7 @@ function PostDetailInner() {
         </div>
         <div className="panel__body">
           <div className="bars">
-            {METRICS.map((m) => {
+            {shown.map((m) => {
               const value = view[m.key];
               const ctx = postContext(view, dash.content, m.key);
               const rk = postRank(view, dash.content, m.key);
@@ -340,7 +377,7 @@ function PostDetailInner() {
                         </div>
                       )}
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11.5 }} className="muted">
-                        {rk.rank !== null && <span><strong>#{rk.rank}</strong> of {rk.of} posts</span>}
+                        {rk.rank !== null && <span><strong>#{rk.rank}</strong> of {rk.of} {story ? (rk.of === 1 ? "story" : "stories") : rk.of === 1 ? "post" : "posts"}</span>}
                         {ctx.vsMedian !== null && (
                           <span>
                             {ctx.vsMedian >= 1
@@ -357,7 +394,7 @@ function PostDetailInner() {
               );
             })}
           </div>
-          {post.platform === "instagram" && METRICS.some((m) => post[m.key] === null) && (
+          {post.platform === "instagram" && post.media_type !== "Story" && shown.some((m) => post[m.key] === null) && (
             <p className="muted" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
               "n/a" means Instagram did not give us that figure. Most often the post was
               published before this account became a professional account, in which case
@@ -382,7 +419,7 @@ function PostDetailInner() {
               <h3>Where it sits</h3>
               <span className="sub">this post against every post we hold</span>
               <span style={{ marginLeft: "auto", display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {METRICS.map((m) => (
+                {shown.map((m) => (
                   <button key={m.key} type="button"
                           className={`btn btn--sm${stripKey === m.key ? " btn--on" : ""}`}
                           onClick={() => setStripKey(m.key)}>{metricLabel(m.key, post.platform)}</button>

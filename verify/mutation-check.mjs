@@ -34,6 +34,10 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "a story ranked among posts, so it always comes last", file: INSIGHTS,
+    find: "fmt(c) === fmt(post) && c[key] !== null", replace: "c[key] !== null" },
+  { name: "a story called too early to judge for its whole life", file: INSIGHTS,
+    find: '(mediaType === "Story" ? 1 : 24)', replace: "24" },
   { name: "a LinkedIn profile connection stored as a Company Page", file: "verify/build/oauth-linkedin-callback.js",
     find: 'if (state.k === "profile") {', replace: 'if (false) {' },
   { name: "a LinkedIn profile's follower count dropped", file: SYNC,

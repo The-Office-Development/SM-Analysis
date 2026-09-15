@@ -254,10 +254,13 @@ export interface PostContext {
  * a baseline, and the UI must be able to say so instead of implying authority it
  * does not have.
  */
+/** Every per-post figure that can be compared or ranked, stories included. */
+export type PostMetricKey = "views" | "reach" | "likes" | "comments" | "shares" | "saves" | "replies" | "navigation";
+
 export function postContext(
   post: ContentItem,
   all: ContentItem[],
-  key: "views" | "reach" | "likes" | "comments" | "shares" | "saves",
+  key: PostMetricKey,
 ): PostContext {
   const peers = all
     .filter((c) => c.id !== post.id && c.platform === post.platform && (c.media_type || "Post") === (post.media_type || "Post"))
@@ -287,8 +290,14 @@ export function ageHours(publishedAt: string): number {
  * Judging a post at two hours is judging noise, and the product should say so
  * rather than let someone delete a post that was doing fine.
  */
-export function tooEarly(publishedAt: string): boolean {
-  return ageHours(publishedAt) < 24;
+export function tooEarly(publishedAt: string, mediaType?: string): boolean {
+  /*
+   * A story's whole life is 24 hours, so the post rule would call it "too early
+   * to judge" until the moment it expires, and promise figures that "keep
+   * climbing for a day or more" to something with hours left. Instagram reports
+   * a story's figures within minutes; an hour is the honest quiet period.
+   */
+  return ageHours(publishedAt) < (mediaType === "Story" ? 1 : 24);
 }
 
 export interface PostRank {
@@ -314,9 +323,16 @@ export interface PostRank {
 export function postRank(
   post: ContentItem,
   all: ContentItem[],
-  key: "views" | "reach" | "likes" | "comments" | "shares" | "saves",
+  key: PostMetricKey,
 ): PostRank {
-  const pool = all.filter((c) => c.platform === post.platform && c[key] !== null);
+  /*
+   * Ranked against the SAME FORMAT, as the median beside it already is.
+   * Ranking a story among posts compared things Instagram measures differently:
+   * a story reaches a fraction of a reel's audience by nature, so "#9 of 9" said
+   * nothing about the story and read as failure. Same rule for the bar's scale.
+   */
+  const fmt = (c: ContentItem) => c.media_type || "Post";
+  const pool = all.filter((c) => c.platform === post.platform && fmt(c) === fmt(post) && c[key] !== null);
   const values = pool.map((c) => c[key] as number).sort((a, b) => b - a);
   const own = post[key];
   return {

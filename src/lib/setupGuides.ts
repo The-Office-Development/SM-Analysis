@@ -112,7 +112,7 @@ export const SETUP_GUIDES: Record<Platform, SetupGuide> = {
        * and the consequence lands on the client's account rather than ours.
        */
       "Real data flows with no App Review, but Meta describes Development Mode as internal testing only. Running a paying client on it is a Platform Terms problem, so treat this as a way to pilot WHILE review is queued, not instead of it.",
-      "Stories have never once been captured by this product. The /stories edge returns an empty list even with a story live, and reshared posts appear to be excluded outright. Do not promise story analytics.",
+      "Stories are captured, with views, reach, replies and navigation, and kept after they expire (first captured 2026-09-14). A story that RESHARES another post has never appeared: /stories returns only the account's own media.",
     ],
   },
 

@@ -208,8 +208,36 @@ export const demoContent: ContentItem[] = (() => {
         // the freshness line too, since that line is half of what stops a client
         // reading a difference against Instagram as an error.
         checked_at: new Date(Date.now() - Math.round(r() * 12 + 1) * 60_000).toISOString(),
+        // Posts are not stories: Instagram reports neither of these for them.
+        replies: null, navigation: null, expires_at: null,
       });
     });
+    /*
+     * One live story, for Instagram only.
+     *
+     * Stories were captured for the first time on 2026-09-14 (@malekismaiil), so
+     * the demo may now show one: real for Instagram, and nothing like it exists
+     * for a Facebook Page, a LinkedIn page or TikTok here. Likes and saves stay
+     * null because Instagram reports neither for a story, and it carries an
+     * expiry so the "live now, final later" state is visible in the preview.
+     */
+    if (a.platform === "instagram") {
+      const posted = Date.now() - 6 * 3_600_000;
+      const views = Math.round((last.reach ?? 0) * 0.45);
+      items.push({
+        id: `${a.id}-story`, account_id: a.id, platform: a.platform, external_id: `${a.id}-story`,
+        title: "Story", media_type: "Story",
+        permalink: null,
+        published_at: new Date(posted).toISOString(),
+        views, likes: null, comments: null,
+        shares: Math.round(views * 0.01), saves: null,
+        reach: Math.round(views * 0.72),
+        avg_watch_seconds: null, retention_pct: null,
+        replies: Math.round(views * 0.03), navigation: Math.round(views * 0.84),
+        expires_at: new Date(posted + 24 * 3_600_000).toISOString(),
+        checked_at: new Date(Date.now() - 7 * 60_000).toISOString(),
+      });
+    }
   }
   return items.sort((x, y) => (y.views ?? 0) - (x.views ?? 0));
 })();

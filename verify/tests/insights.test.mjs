@@ -343,3 +343,49 @@ test("another platform's heatmap is not borrowed for the one in scope", async ()
   assert.deepEqual(bestTimes(audience, ["linkedin"], 5), []);
   assert.equal(bestTimes(audience, ["instagram"], 5)[0].hour, 20);
 });
+
+/* ---- stories are not posts ------------------------------------------------- */
+
+const { postRank, postContext, tooEarly } = await import("../build-lib/insights.js");
+
+const item = (id, media_type, views, extra = {}) => ({
+  id, account_id: "a", platform: "instagram", external_id: id, title: id,
+  media_type, permalink: null, published_at: "2026-09-14T12:00:00Z",
+  views, likes: null, comments: null, shares: null, saves: null, reach: null,
+  avg_watch_seconds: null, retention_pct: null, replies: null, navigation: null,
+  expires_at: null, checked_at: null, ...extra,
+});
+
+test("a story is ranked among stories, never among posts", () => {
+  /*
+   * Instagram measures a story and a reel differently: a story reaches a
+   * fraction of a reel's audience by nature. Ranked together, the first story
+   * ever captured (@malekismaiil, 2026-09-14, 133 views) came last of nine and
+   * read as a failure, beside a median line that already compared it with
+   * stories only.
+   */
+  const all = [
+    item("reel-1", "Reel", 4_800_000), item("reel-2", "Reel", 9_000),
+    item("photo", "Photo", 1_400), item("story-1", "Story", 133), item("story-2", "Story", 90),
+  ];
+  const r = postRank(all[3], all, "views");
+  assert.deepEqual({ rank: r.rank, of: r.of }, { rank: 1, of: 2 }, "best of the two stories");
+  assert.equal(r.best, 133, "and the bar is drawn against the best STORY, not a viral reel");
+
+  const p = postRank(all[1], all, "views");
+  assert.deepEqual({ rank: p.rank, of: p.of }, { rank: 2, of: 2 }, "a reel is still ranked among reels");
+});
+
+test("a story is not called too early for its whole life", () => {
+  // The post rule (24 hours) covers a story's entire 24-hour life, so it would
+  // always say "too early" and promise figures climbing "for a day or more".
+  const hoursAgo = (h) => new Date(Date.now() - h * 3_600_000).toISOString();
+  assert.equal(tooEarly(hoursAgo(6), "Story"), false, "six hours in, a story is judgeable");
+  assert.equal(tooEarly(hoursAgo(0.2), "Story"), true, "in its first minutes it is not");
+  assert.equal(tooEarly(hoursAgo(6)), true, "an ordinary post is still settling at six hours");
+});
+
+test("a story's median is a story median", () => {
+  const all = [item("story-1", "Story", 100), item("story-2", "Story", 200), item("story-3", "Story", 300), item("reel", "Reel", 90_000)];
+  assert.equal(postContext(all[0], all, "views").median, 250, "peers are the other stories");
+});

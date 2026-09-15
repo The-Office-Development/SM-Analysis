@@ -72,7 +72,10 @@ behind them. That silence is deliberate, not a fault.
 
 ## What not to promise
 
-- **Stories.** Built, never once captured. Do not describe it as working.
+- **Reshared stories.** An original story is captured and shown (first one
+  2026-09-14, with views, reach, replies and navigation). A story that reshares
+  someone else's post has never appeared: Instagram's `/stories` returns only the
+  account's own media. Promise original stories only.
 - **Anything about a day-by-day match** with the Instagram app. See above.
 - **Other clients joining quickly.** Tester roles cap at about five and each one
   needs this whole ceremony. That is what App Review fixes.

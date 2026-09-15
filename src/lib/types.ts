@@ -76,6 +76,15 @@ export interface ContentItem {
   reach: number | null;
   avg_watch_seconds: number | null;
   retention_pct: number | null;
+  /*
+   * Stories only (migration 0010). Instagram reports replies and navigation for
+   * a story and nothing for likes or saves, so those stay null here — absence of
+   * a figure a platform never reports, not a zero.
+   */
+  replies: number | null;
+  navigation: number | null;
+  /** When a story stops being retrievable: 24 hours after it was posted. */
+  expires_at: string | null;
   // When these figures were last read from the platform, by the sync or by an
   // on-demand check. null for rows written before migration 0013. Shown to the
   // client so a gap against Instagram's own app reads as a timing difference

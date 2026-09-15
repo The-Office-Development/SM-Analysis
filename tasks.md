@@ -67,10 +67,14 @@ as work. Migrations 0001-0012 are all applied.
 
    ### UNFINISHED — carried into the drinkat pilot
 
-   As of 2026-09-08, **zero stories have ever been captured**. The code path is
-   built and no longer competes for budget (stories are fetched first in a run,
-   before the day metrics), but Instagram has not yet handed us a single story,
-   so nothing about it has been exercised end to end.
+   ~~As of 2026-09-08, zero stories have ever been captured.~~
+   **DONE 2026-09-14: the first story was captured**, end to end. An ORIGINAL
+   story by `@malekismaiil` (23:05 UTC) was stored with 133 views, 96 reach, 4
+   replies, 112 navigation and its 24-hour expiry. The working conclusion holds:
+   `/stories` returns the account's own media, so every earlier attempt failed
+   because it was a reshare. The story path also gained its own view on
+   2026-09-15 — replies and navigation shown, ranked among stories rather than
+   among posts, and "too early to judge" cut to an hour for a 24-hour item.
 
    Deliberately left to the pilot rather than forced now: a month of a real
    creator's output is a better experiment than anything that can be staged. He
@@ -216,8 +220,9 @@ as work. Migrations 0001-0012 are all applied.
          last audit. It is the most sponsor-relevant number in the product, and
          the summary line in the export quotes it.
 
-**Carried into the pilot:** story capture (§6c) — built, never once verified,
-zero stories captured to date.
+**Story capture is verified** (§6c): the first one landed 2026-09-14 and is
+rendered with its own metrics. What is still unproven is a RESHARED story, which
+the evidence says is excluded by Instagram rather than by us.
 
 **Parallel, and no longer "blocking nothing".** Business Verification and App
 Review were parked on the reasoning that Tester roles cover client one. That is
@@ -465,7 +470,9 @@ already in this repo rather than from memory:
   how a guide fails in front of somebody. Added with it: the ~5 tester cap, that
   Development Mode is *internal testing only* so the tester route runs a pilot
   **while** review is queued rather than instead of it, and that stories have
-  never once been captured so they must not be promised.
+  never once been captured so they must not be promised. **Superseded
+  2026-09-14: an original story WAS captured and stored; only reshares are
+  missing. The guides and the client note were corrected the same day.**
 - **Facebook.** A Page connected after **14 March 2024 gets no demographics at
   all** — no age, gender, countries or activity hours. `audienceFacebook` has said
   so in a code comment for weeks while the guide did not, and it is the cause of
