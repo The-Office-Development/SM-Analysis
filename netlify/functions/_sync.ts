@@ -1,5 +1,5 @@
 import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log, writeFailed } from "./_lib";
-import { igGet, IG, auditTokenScopes } from "./_instagram";
+import { igGet, IG, auditTokenScopes, STORY_METRIC_LADDER } from "./_instagram";
 import {
   LI, liGet, liUrn, liNum, liLikes, liTime, liDayKey, type LiShareStats,
   LI_FACETS, liDemographicCount, urnTail, liEnumLabel,
@@ -193,10 +193,17 @@ const UNAVAILABLE: Series = { available: false, byDate: {} };
  * swallowing them is what caused a rate-limited sync to write zeros over good
  * data and then mark the day complete.
  */
-async function optional<T>(fn: () => Promise<T>, fallback: T, ctx: Record<string, unknown>): Promise<T> {
+async function optional<T>(
+  fn: () => Promise<T>,
+  fallback: T,
+  ctx: Record<string, unknown>,
+  /** Handed the platform's own message, for a caller that needs the text itself. */
+  onRefusal?: (e: unknown) => void,
+): Promise<T> {
   try { return await fn(); }
   catch (e) {
     if (isThrottleError(e) || isAuthError(e)) throw e;
+    onRefusal?.(e);
     // A budget stop is not the platform declining to report something. Logging
     // them the same way would hide a self-inflicted gap among genuine ones.
     if (e instanceof CallBudgetExhausted) {
@@ -379,6 +386,17 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
   const liMember = (secretRow?.extra as any)?.kind === "li_member";
 
   /*
+   * Which story metric list this account answers, learned on a previous run.
+   * Null asks for everything; see migration 0020 and rememberStoryMetrics.
+   */
+  let storyMetrics: string | null = null;
+  if (acc.platform === "instagram") {
+    const { data: pref } = await db.from("social_accounts").select("story_metrics").eq("id", acc.id).maybeSingle();
+    const v = (pref as any)?.story_metrics;
+    storyMetrics = typeof v?.metrics === "string" ? v.metrics : null;
+  }
+
+  /*
    * Demographics run BEFORE the day metrics, not after.
    *
    * They are a once-a-day snapshot costing four calls, and they were queued
@@ -462,8 +480,8 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
     /* audience insights are otherwise optional and permission-gated */
   }
 
-  if (acc.platform === "instagram" && igLogin) ({ days, posts } = await syncInstagramLogin(acc, token, start, counter, window.end, anchor));
-  else if (acc.platform === "instagram") ({ days, posts } = await syncInstagram(acc, token, start, counter, window.end, anchor));
+  if (acc.platform === "instagram" && igLogin) ({ days, posts } = await syncInstagramLogin(db, acc, token, start, counter, window.end, anchor, storyMetrics));
+  else if (acc.platform === "instagram") ({ days, posts } = await syncInstagram(db, acc, token, start, counter, window.end, anchor, storyMetrics));
   else if (acc.platform === "facebook") ({ days, posts } = await syncFacebook(acc, token, start, counter));
   else if (acc.platform === "tiktok") ({ days, posts } = await syncTiktok(acc, token, counter));
   /*
@@ -751,7 +769,7 @@ async function mergeWithStored(db: Db, acc: AccountRow, days: DayRow[]) {
 }
 
 /* ------------------------------ Instagram -------------------------------- */
-async function syncInstagram(acc: AccountRow, token: string, start: string, c: { calls: number }, end: string, anchor: FollowerAnchor | null): Promise<{ days: DayRow[]; posts: Post[] }> {
+async function syncInstagram(db: Db, acc: AccountRow, token: string, start: string, c: { calls: number }, end: string, anchor: FollowerAnchor | null, storyMetrics: string | null): Promise<{ days: DayRow[]; posts: Post[] }> {
   const get = (path: string, params: Record<string, string>) => { spend(c); return graphGet(path, params, token); };
   const prof = await get(`/${acc.external_id}`, { fields: "followers_count,media_count" });
   const now = today();
@@ -775,11 +793,14 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
    * expensive-but-durable absorbs any shortfall.
    */
   const media = await fetchMedia(get, `/${acc.external_id}/media`, { account: acc.id });
-  const stories = await captureStories(
+  const storyCapture = await captureStories(
     (path, params) => get(path, params ?? {}),
     acc.external_id,
     { account: acc.id },
+    storyMetrics,
   );
+  const stories = storyCapture.posts;
+  await rememberStoryMetrics(db, acc, storyMetrics, storyCapture);
 
   const allDates = enumerateDays(start, end);
   /*
@@ -928,7 +949,7 @@ async function syncInstagram(acc: AccountRow, token: string, start: string, c: {
  * appsecret_proof. Every endpoint and field name lives in the IG block in
  * _instagram.ts; correct it there, not here.
  */
-async function syncInstagramLogin(acc: AccountRow, token: string, start: string, c: { calls: number }, end: string, anchor: FollowerAnchor | null): Promise<{ days: DayRow[]; posts: Post[] }> {
+async function syncInstagramLogin(db: Db, acc: AccountRow, token: string, start: string, c: { calls: number }, end: string, anchor: FollowerAnchor | null, storyMetrics: string | null): Promise<{ days: DayRow[]; posts: Post[] }> {
   const get = (path: string, params: Record<string, string>) => { spend(c); return igGet(path, params, token); };
   const prof = await get("/me", { fields: IG.ME_FIELDS });
   const now = today();
@@ -957,11 +978,14 @@ async function syncInstagramLogin(acc: AccountRow, token: string, start: string,
    * left for the next run may not exist by then.
    */
   const media = await fetchMedia(get, "/me/media", { account: acc.id });
-  const stories = await captureStories(
+  const storyCapture = await captureStories(
     (path, params) => get(path, params ?? {}),
     acc.external_id,
     { account: acc.id },
+    storyMetrics,
   );
+  const stories = storyCapture.posts;
+  await rememberStoryMetrics(db, acc, storyMetrics, storyCapture);
 
   const allDates = enumerateDays(start, end);
   /*
@@ -1636,7 +1660,21 @@ async function captureStories(
   get: (path: string, params?: Record<string, string>) => Promise<any>,
   externalId: string,
   ctx: Record<string, unknown>,
-): Promise<Post[]> {
+  /** The metric list that answered last time for this account, if any. */
+  preferred?: string | null,
+): Promise<{ posts: Post[]; metrics: string | null; detail: string | null }> {
+  /*
+   * Widest first, unless this account has already refused it.
+   *
+   * Retrying the full thirteen every fifteen minutes on an account that will
+   * never serve them spends a call per story per run to learn what is already
+   * known, and a story is re-read for its whole 24 hours.
+   */
+  const ladder = preferred && (STORY_METRIC_LADDER as readonly string[]).includes(preferred)
+    ? (STORY_METRIC_LADDER as readonly string[]).slice((STORY_METRIC_LADDER as readonly string[]).indexOf(preferred))
+    : [...STORY_METRIC_LADDER];
+  let used: string | null = null;
+  let refusal: string | null = null;
   /*
    * The LIST first, with no insights attached.
    *
@@ -1673,41 +1711,39 @@ async function captureStories(
   if (stories.length) {
     const batch = await optional(
       () => get(`/${externalId}/${IG.STORIES_EDGE}`, {
-        fields: `id,insights.metric(${IG.STORY_INSIGHT_METRICS})`,
+        fields: `id,insights.metric(${ladder[0]})`,
       }),
       null as any,
       { ...ctx, call: "stories_insights" },
     );
+    if (batch?.data?.length) used = ladder[0];
     for (const m of batch?.data ?? []) {
       if (m?.id && Array.isArray(m.insights?.data)) insightsById.set(m.id, m.insights.data);
     }
     for (const st of stories) {
       if (!st?.id || insightsById.has(st.id)) continue;
-      const one = await optional(
-        () => get(`/${st.id}/insights`, { metric: IG.STORY_INSIGHT_METRICS }),
-        null as any,
-        { ...ctx, call: "story_insights", story: st.id },
-      );
-      if (Array.isArray(one?.data)) { insightsById.set(st.id, one.data); continue; }
       /*
-       * The full list was refused; try the six that are proven.
+       * Down the ladder until one answers.
        *
-       * An insights request is all-or-nothing, so one metric Meta will not serve
-       * for this story — a name it retires, or one that needs something this
-       * story does not have — would otherwise cost every figure the story has,
-       * permanently: after 24 hours there is nothing left to ask about.
+       * Everything wide is tried before everything narrow, because the four
+       * creator metrics (profile visits, follows, link taps, profile actions)
+       * are worth a second call and cannot be recovered once the story expires.
+       * Meta's refusal text names the metric it objects to, and it is kept.
        */
-      const core = await optional(
-        () => get(`/${st.id}/insights`, { metric: IG.STORY_INSIGHT_METRICS_CORE }),
-        null as any,
-        { ...ctx, call: "story_insights_core", story: st.id },
-      );
-      if (Array.isArray(core?.data)) {
-        insightsById.set(st.id, core.data);
-        log("sync.story_metrics_narrowed", {
-          ...ctx, story: st.id,
-          detail: "the full story metric list was refused and the core six answered; a metric name in IG.STORY_INSIGHT_METRICS may have been retired",
-        });
+      for (const metrics of ladder) {
+        let detail: string | null = null;
+        const answer = await optional(
+          () => get(`/${st.id}/insights`, { metric: metrics }),
+          null as any,
+          { ...ctx, call: "story_insights", story: st.id, metrics: metrics.split(",").length },
+          (e: unknown) => { detail = e instanceof Error ? e.message : String(e); },
+        );
+        if (Array.isArray(answer?.data)) {
+          insightsById.set(st.id, answer.data);
+          used = used ?? metrics;
+          break;
+        }
+        refusal = detail ?? refusal;
       }
     }
 
@@ -1764,7 +1800,7 @@ async function captureStories(
         : undefined,
   });
 
-  return stories.map((m: any): Post => {
+  const posts: Post[] = stories.map((m: any): Post => {
     const ins = normInsights(insightsById.get(m.id) ?? []);
     const published = m.timestamp ?? new Date().toISOString();
     return {
@@ -1799,6 +1835,7 @@ async function captureStories(
       expires_at: new Date(Date.parse(published) + IG.STORY_LIFETIME_MS).toISOString(),
     };
   });
+  return { posts, metrics: used, detail: refusal };
 }
 
 /**
@@ -2059,6 +2096,28 @@ function normInsights(rows: any[]): Record<string, number> {
   }
   return out;
 }
+/**
+ * Record which story metric list this account actually answers.
+ *
+ * Only on a change, so a steady account costs no write. The refusal text is
+ * kept with it: Meta names the metric it objects to, and that sentence is the
+ * only lasting evidence of why a figure is missing once the logs rotate.
+ */
+async function rememberStoryMetrics(
+  db: Db, acc: AccountRow, previous: string | null,
+  capture: { metrics: string | null; detail: string | null },
+): Promise<void> {
+  if (!capture.metrics || capture.metrics === previous) return;
+  const { error } = await db.from("social_accounts").update({
+    story_metrics: { metrics: capture.metrics, detail: capture.detail, checked_at: new Date().toISOString() },
+  }).eq("id", acc.id);
+  writeFailed("sync.story_metrics_write_failed", error, { account: acc.id });
+  log("sync.story_metrics_narrowed", {
+    account: acc.id, metrics: capture.metrics.split(",").length, was: previous ? previous.split(",").length : "full",
+    detail: capture.detail ?? "no refusal text captured",
+  });
+}
+
 /**
  * The story navigation split, as {tap_forward, tap_back, tap_exit, swipe_forward}.
  *

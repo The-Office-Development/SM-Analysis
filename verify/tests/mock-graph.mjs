@@ -191,7 +191,14 @@ export function installGraphMock(opts) {
        * that have worked on a live story.
        */
       const asked = (q.get("metric") ?? "").split(",");
+      /*
+       * How much this account will serve:
+       *   "core" — only the six proven metrics
+       *   "plus" — those plus the four creator ones; the widest list is refused,
+       *            which is what a live account did on 2026-09-15
+       */
       if (opts.storyMetrics === "core" && asked.length > 6) return err("(#100) metric total_views is not supported");
+      if (opts.storyMetrics === "plus" && asked.length > 10) return err("(#100) metric facebook_views is not supported");
       return ok({ data: STORY_INSIGHTS.filter((m) => asked.includes(m.name)) });
     }
 
@@ -233,7 +240,7 @@ export function installGraphMock(opts) {
         timestamp: `${to}T08:00:00+0000`,
       };
       if ((q.get("fields") ?? "").includes("insights")) {
-        if (storyInsights !== "ok" || opts.storyMetrics === "core") return tooFewViewers();
+        if (storyInsights !== "ok" || opts.storyMetrics) return tooFewViewers();
         return ok({ data: [{ id: story.id, insights: { data: STORY_INSIGHTS } }] });
       }
       return ok({ data: [story] });

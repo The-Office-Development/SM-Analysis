@@ -263,6 +263,30 @@ test("every figure Instagram reports for a story is stored, not just the six we 
     { tap_forward: 61, tap_back: 9, tap_exit: 14, swipe_forward: 4 });
 });
 
+test("the four creator metrics survive a refusal of the widest list", async () => {
+  /*
+   * Measured on a live story, 2026-09-15: asking for all thirteen was refused
+   * and the capture dropped to the proven six, losing profile visits, follows,
+   * link taps and profile actions — the figures a creator posts a story FOR.
+   * The ladder tries the middle rung before giving those up.
+   */
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [addDays(TODAY, -29), TODAY], storyMetrics: "plus" });
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+
+  assert.equal(story.profile_visits, 17, "kept");
+  assert.equal(story.follows, 5);
+  assert.equal(story.link_clicks, 9);
+  assert.equal(story.profile_activity, 3);
+  assert.equal(story.facebook_views, null, "and what this account will not serve stays unknown");
+
+  // And the account remembers, so the next run does not spend a call rediscovering it.
+  const acc = db._rows("social_accounts").find((r) => r.id === account.id);
+  assert.ok(acc.story_metrics?.metrics.includes("profile_visits"), "the working list is recorded");
+  assert.ok(!acc.story_metrics.metrics.includes("facebook_views"));
+  assert.match(acc.story_metrics.detail ?? "", /facebook_views/, "with Meta's own refusal text, which names the metric");
+});
+
 test("a story keeps its figures when Meta refuses the full metric list", async () => {
   /*
    * An insights request is all-or-nothing. If one name in the list is retired,

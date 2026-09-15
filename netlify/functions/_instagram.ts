@@ -108,6 +108,14 @@ export const IG = {
    * figures. A story's figures cannot be re-fetched after 24 hours.
    */
   STORY_INSIGHT_METRICS_CORE: "reach,views,replies,navigation,shares,total_interactions",
+  /*
+   * The middle rung: the six proven metrics plus the four that answer "did this
+   * story do anything?" for a creator. Measured 2026-09-15: the full thirteen
+   * were refused for a live account, and everything beyond the core six was lost
+   * with them. Trying this before giving up keeps the four that matter most when
+   * what Meta objects to is one of total_views, reposts or facebook_views.
+   */
+  STORY_INSIGHT_METRICS_PLUS: "reach,views,replies,navigation,shares,total_interactions,profile_visits,follows,link_clicks,profile_activity",
   /**
    * The only breakdown a story's navigation accepts: TAP_FORWARD, TAP_BACK,
    * TAP_EXIT, SWIPE_FORWARD. It answers what the total cannot — whether people
@@ -141,6 +149,19 @@ export const IG = {
  * decision to revisit on a schedule, not a default to drift. v26.0 is the latest
  * documented version as of 2026-08-26.
  */
+/**
+ * The story metric lists, widest first.
+ *
+ * An insights request is all-or-nothing, and a story cannot be re-read after 24
+ * hours, so the capture walks down this ladder until one answers rather than
+ * losing every figure to a single metric Meta will not serve for this account.
+ */
+export const STORY_METRIC_LADDER = [
+  IG.STORY_INSIGHT_METRICS,
+  IG.STORY_INSIGHT_METRICS_PLUS,
+  IG.STORY_INSIGHT_METRICS_CORE,
+] as const;
+
 export const IG_VERSION = process.env.IG_API_VERSION ?? "v26.0";
 
 function base(): string { return `${IG.GRAPH}/${IG_VERSION}`; }

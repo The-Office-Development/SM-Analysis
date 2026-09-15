@@ -34,8 +34,11 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "the middle rung skipped, losing the four creator story metrics", file: SYNC,
+    find: "const ladder = preferred && STORY_METRIC_LADDER.includes(preferred)",
+    replace: "const ladder = [STORY_METRIC_LADDER[0], STORY_METRIC_LADDER[2]]; const _unused = preferred && STORY_METRIC_LADDER.includes(preferred)" },
   { name: "no fallback when Meta refuses the full story metric list", file: SYNC,
-    find: "{ metric: IG.STORY_INSIGHT_METRICS_CORE }", replace: "{ metric: IG.STORY_INSIGHT_METRICS }" },
+    find: "for (const metrics of ladder) {", replace: "for (const metrics of ladder.slice(0, 1)) {" },
   { name: "a story's total_interactions requested and thrown away again", file: SYNC,
     find: "interactions: ins.total_interactions ?? null,", replace: "interactions: null," },
   { name: "the story navigation split stored under unreadable keys", file: SYNC,
