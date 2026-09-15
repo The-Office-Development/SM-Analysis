@@ -65,6 +65,24 @@ as work. Migrations 0001-0012 are all applied.
    asking "how did my campaign story perform?" is asking about exactly the
    category that would be invisible.
 
+   ### Story metrics we do not read, and one we read and discard
+
+   Verified against Meta's IG Media Insights reference, 2026-09-15. A story
+   supports: `views`, `total_views`, `reach`, `replies`, `navigation`, `shares`,
+   `reposts`, `profile_visits`, `profile_activity`, `follows`, `link_clicks`,
+   `facebook_views`, `total_interactions`. **"Stories do not support likes, saves,
+   or comments metrics"** — which is why those three columns are null for a story,
+   and must stay null rather than 0.
+
+   - [ ] `total_interactions` is REQUESTED and then thrown away (`STORY_INSIGHT_METRICS`
+         asks for it; the story row never stores it). Either store it or stop asking.
+   - [ ] `profile_visits`, `follows` and `link_clicks` are the creator-facing
+         answer to "did this story do anything?" and are not requested at all.
+         They need columns (a migration) before they can be stored.
+   - [ ] Whether an emoji reaction to a story counts in `replies` is undocumented.
+         Settle it against a live story: compare our stored `replies` with what
+         the Instagram app shows for the same story.
+
    ### UNFINISHED — carried into the drinkat pilot
 
    ~~As of 2026-09-08, zero stories have ever been captured.~~
