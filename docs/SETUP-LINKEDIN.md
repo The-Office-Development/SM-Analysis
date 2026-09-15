@@ -22,6 +22,9 @@ new app and a new form. Have every item in step 0 ready before submitting.
 | 🔴 **Our own company's LinkedIn Page**, with a super admin who can verify the app | **Not confirmed to exist.** The app must be "verified by LinkedIn Page associated with same organization". Drinkat's page cannot do this; it has to be The Office's |
 | An app name with no part of "LinkedIn" or "Microsoft" | `PulseBoard` |
 
+**The wording for all of it is `LINKEDIN-APPLICATION.md`**: the page's name, about
+text and specialties, the app's fields, and every answer the access form asks for.
+
 ## 1. Create the app
 
 1. `linkedin.com/developers/apps` → **Create app**, signed in as a super admin of
