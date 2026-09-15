@@ -34,6 +34,12 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "no fallback when Meta refuses the full story metric list", file: SYNC,
+    find: "{ metric: IG.STORY_INSIGHT_METRICS_CORE }", replace: "{ metric: IG.STORY_INSIGHT_METRICS }" },
+  { name: "a story's total_interactions requested and thrown away again", file: SYNC,
+    find: "interactions: ins.total_interactions ?? null,", replace: "interactions: null," },
+  { name: "the story navigation split stored under unreadable keys", file: SYNC,
+    find: 'String((r.dimension_values ?? []).join("_")).toLowerCase()', replace: 'String((r.dimension_values ?? []).join("_"))' },
   { name: "a story ranked among posts, so it always comes last", file: INSIGHTS,
     find: "fmt(c) === fmt(post) && c[key] !== null", replace: "c[key] !== null" },
   { name: "a story called too early to judge for its whole life", file: INSIGHTS,

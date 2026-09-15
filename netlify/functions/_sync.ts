@@ -156,8 +156,12 @@ interface Post {
   views: number | null; likes: number | null; comments: number | null;
   shares: number | null; saves: number | null; reach: number | null;
   avg_watch_seconds: number | null; retention_pct: number | null;
-  // Story-only. Null on posts, which have neither. See migration 0010.
+  // Story-only. Null on posts, which have none of them. Migrations 0010 and 0019.
   replies?: number | null; navigation?: number | null; expires_at?: string | null;
+  navigation_breakdown?: Record<string, number> | null;
+  total_views?: number | null; reposts?: number | null; interactions?: number | null;
+  profile_visits?: number | null; profile_activity?: number | null;
+  follows?: number | null; link_clicks?: number | null; facebook_views?: number | null;
 }
 interface Audience {
   age: Record<string, number>;
@@ -646,6 +650,15 @@ async function storedFollowerAnchor(
 const CONTENT_FIGURES = [
   "views", "likes", "comments", "shares", "saves", "reach",
   "avg_watch_seconds", "retention_pct", "replies", "navigation",
+  /*
+   * Every story figure belongs here too (migration 0019). A story is
+   * re-read all through its 24 hours and then never again: if a later run cannot
+   * read one of these, the stored number must survive, or the story's permanent
+   * record is whatever its last failed read said. navigation_breakdown is an
+   * object rather than a number and is kept by the same rule.
+   */
+  "total_views", "reposts", "interactions", "profile_visits", "profile_activity",
+  "follows", "link_clicks", "facebook_views", "navigation_breakdown",
 ] as const;
 
 /**
@@ -1656,6 +1669,7 @@ async function captureStories(
    * the trailing re-fetch recovers and a story's 24 hours do not.
    */
   const insightsById = new Map<string, any[]>();
+  const navigationById = new Map<string, Record<string, number>>();
   if (stories.length) {
     const batch = await optional(
       () => get(`/${externalId}/${IG.STORIES_EDGE}`, {
@@ -1674,7 +1688,46 @@ async function captureStories(
         null as any,
         { ...ctx, call: "story_insights", story: st.id },
       );
-      if (Array.isArray(one?.data)) insightsById.set(st.id, one.data);
+      if (Array.isArray(one?.data)) { insightsById.set(st.id, one.data); continue; }
+      /*
+       * The full list was refused; try the six that are proven.
+       *
+       * An insights request is all-or-nothing, so one metric Meta will not serve
+       * for this story — a name it retires, or one that needs something this
+       * story does not have — would otherwise cost every figure the story has,
+       * permanently: after 24 hours there is nothing left to ask about.
+       */
+      const core = await optional(
+        () => get(`/${st.id}/insights`, { metric: IG.STORY_INSIGHT_METRICS_CORE }),
+        null as any,
+        { ...ctx, call: "story_insights_core", story: st.id },
+      );
+      if (Array.isArray(core?.data)) {
+        insightsById.set(st.id, core.data);
+        log("sync.story_metrics_narrowed", {
+          ...ctx, story: st.id,
+          detail: "the full story metric list was refused and the core six answered; a metric name in IG.STORY_INSIGHT_METRICS may have been retired",
+        });
+      }
+    }
+
+    /*
+     * The navigation breakdown, one call per measured story.
+     *
+     * `navigation` alone is a count of actions; the split says whether people
+     * tapped on to the next story or tapped away, which is the difference
+     * between a story that held attention and one that lost it. Optional by
+     * construction: a story with no navigation figure has no breakdown either.
+     */
+    for (const st of stories) {
+      if (!st?.id || !insightsById.has(st.id)) continue;
+      const nav = await optional(
+        () => get(`/${st.id}/insights`, { metric: "navigation", breakdown: IG.STORY_NAV_BREAKDOWN }),
+        null as any,
+        { ...ctx, call: "story_navigation_breakdown", story: st.id },
+      );
+      const split = storyNavigation(nav);
+      if (split) navigationById.set(st.id, split);
     }
   }
 
@@ -1732,6 +1785,17 @@ async function captureStories(
       avg_watch_seconds: null, retention_pct: null,
       replies: ins.replies ?? null,
       navigation: ins.navigation ?? null,
+      navigation_breakdown: navigationById.get(m.id) ?? null,
+      // The rest of what a story reports. Every one of these was documented and
+      // unread until 2026-09-15; see migration 0019.
+      total_views: ins.total_views ?? null,
+      reposts: ins.reposts ?? null,
+      interactions: ins.total_interactions ?? null,
+      profile_visits: ins.profile_visits ?? null,
+      profile_activity: ins.profile_activity ?? null,
+      follows: ins.follows ?? null,
+      link_clicks: ins.link_clicks ?? null,
+      facebook_views: ins.facebook_views ?? null,
       expires_at: new Date(Date.parse(published) + IG.STORY_LIFETIME_MS).toISOString(),
     };
   });
@@ -1995,6 +2059,25 @@ function normInsights(rows: any[]): Record<string, number> {
   }
   return out;
 }
+/**
+ * The story navigation split, as {tap_forward, tap_back, tap_exit, swipe_forward}.
+ *
+ * Returns null when Meta reported no breakdown at all, rather than an object of
+ * zeros: a story under five views reports nothing, and "nobody tapped away" is a
+ * very different claim from "we do not know".
+ */
+export function storyNavigation(json: any): Record<string, number> | null {
+  const breakdowns = json?.data?.[0]?.total_value?.breakdowns ?? [];
+  const out: Record<string, number> = {};
+  for (const b of breakdowns) {
+    for (const r of b.results ?? []) {
+      const key = String((r.dimension_values ?? []).join("_")).toLowerCase();
+      if (key && typeof r.value === "number" && Number.isFinite(r.value)) out[key] = r.value;
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** Newer IG follower_demographics: data[0].total_value.breakdowns[0].results[]. */
 function parseDemographics(j: any): Record<string, number> {
   const out: Record<string, number> = {};

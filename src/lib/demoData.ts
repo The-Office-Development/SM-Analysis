@@ -210,6 +210,10 @@ export const demoContent: ContentItem[] = (() => {
         checked_at: new Date(Date.now() - Math.round(r() * 12 + 1) * 60_000).toISOString(),
         // Posts are not stories: Instagram reports neither of these for them.
         replies: null, navigation: null, expires_at: null,
+        // A post has none of the story figures; migration 0019.
+        total_views: null, reposts: null, interactions: null, profile_visits: null,
+        profile_activity: null, follows: null, link_clicks: null, facebook_views: null,
+        navigation_breakdown: null,
       });
     });
     /*
@@ -234,6 +238,26 @@ export const demoContent: ContentItem[] = (() => {
         reach: Math.round(views * 0.72),
         avg_watch_seconds: null, retention_pct: null,
         replies: Math.round(views * 0.03), navigation: Math.round(views * 0.84),
+        /*
+         * Everything else Instagram reports for a story. Shown in the demo
+         * because a real story reports them too (verified against Meta's media
+         * insights reference, 2026-09-15) — the demo must not promise less than
+         * the product delivers, any more than more.
+         */
+        total_views: Math.round(views * 1.08),
+        reposts: Math.round(views * 0.004),
+        interactions: Math.round(views * 0.05),
+        profile_visits: Math.round(views * 0.04),
+        profile_activity: Math.round(views * 0.006),
+        follows: Math.round(views * 0.008),
+        link_clicks: Math.round(views * 0.02),
+        facebook_views: Math.round(views * 0.05),
+        navigation_breakdown: {
+          tap_forward: Math.round(views * 0.55),
+          tap_back: Math.round(views * 0.07),
+          tap_exit: Math.round(views * 0.16),
+          swipe_forward: Math.round(views * 0.06),
+        },
         expires_at: new Date(posted + 24 * 3_600_000).toISOString(),
         checked_at: new Date(Date.now() - 7 * 60_000).toISOString(),
       });

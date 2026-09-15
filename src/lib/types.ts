@@ -83,6 +83,21 @@ export interface ContentItem {
    */
   replies: number | null;
   navigation: number | null;
+  /*
+   * The rest of what Instagram reports for a story (migration 0019). Every one
+   * is null on a post, which has none of them, and null on a story Instagram has
+   * not measured yet. `interactions` is Meta's own total_interactions.
+   */
+  total_views: number | null;
+  reposts: number | null;
+  interactions: number | null;
+  profile_visits: number | null;
+  profile_activity: number | null;
+  follows: number | null;
+  link_clicks: number | null;
+  facebook_views: number | null;
+  /** The story_navigation_action_type split: tap_forward, tap_back, tap_exit, swipe_forward. */
+  navigation_breakdown: Record<string, number> | null;
   /** When a story stops being retrievable: 24 hours after it was posted. */
   expires_at: string | null;
   // When these figures were last read from the platform, by the sync or by an

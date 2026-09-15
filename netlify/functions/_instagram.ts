@@ -90,7 +90,31 @@ export const IG = {
    */
   STORIES_EDGE: "stories",
   STORY_FIELDS: "id,caption,media_type,media_product_type,permalink,timestamp",
-  STORY_INSIGHT_METRICS: "reach,views,replies,navigation,shares,total_interactions",
+  /*
+   * EVERY metric Meta documents for a STORY, checked one by one against the
+   * media-type list on each metric in the IG Media Insights reference
+   * (2026-09-15). Stories do NOT support likes, saves or comments — those are
+   * FEED and REELS only — so a story's like, save and comment columns stay null.
+   *
+   * `impressions` is deliberately absent: "Deprecated for media created after
+   * July 2, 2024", so asking for it on a story posted today invites an error on
+   * a call that is all-or-nothing.
+   */
+  STORY_INSIGHT_METRICS: "reach,views,total_views,replies,navigation,shares,reposts,total_interactions,profile_visits,profile_activity,follows,link_clicks,facebook_views",
+  /*
+   * The six that have answered on a live story (2026-09-14). If the full list
+   * above is refused — one unsupported metric fails the whole request — the
+   * capture retries with these, so a new metric name can never cost a story its
+   * figures. A story's figures cannot be re-fetched after 24 hours.
+   */
+  STORY_INSIGHT_METRICS_CORE: "reach,views,replies,navigation,shares,total_interactions",
+  /**
+   * The only breakdown a story's navigation accepts: TAP_FORWARD, TAP_BACK,
+   * TAP_EXIT, SWIPE_FORWARD. It answers what the total cannot — whether people
+   * moved on or left — and needs its own call, since a breakdown applies to the
+   * whole request and no other story metric accepts one.
+   */
+  STORY_NAV_BREAKDOWN: "story_navigation_action_type",
   /**
    * Endpoints gated behind write-capable permissions, used to AUDIT a token.
    *

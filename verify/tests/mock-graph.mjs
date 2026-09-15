@@ -152,13 +152,47 @@ export function installGraphMock(opts) {
       { name: "navigation", values: [{ value: 88 }] },
       // Present with no value. normInsights once turned this into 0.
       { name: "shares", values: [{}] },
+      // The rest of what Meta documents for a story (2026-09-15). Never likes,
+      // saves or comments: those are FEED and REELS only.
+      { name: "total_views", values: [{ value: 455 }] },
+      { name: "reposts", values: [{ value: 2 }] },
+      { name: "total_interactions", values: [{ value: 21 }] },
+      { name: "profile_visits", values: [{ value: 17 }] },
+      { name: "profile_activity", values: [{ value: 3 }] },
+      { name: "follows", values: [{ value: 5 }] },
+      { name: "link_clicks", values: [{ value: 9 }] },
+      { name: "facebook_views", values: [{ value: 12 }] },
     ];
+    /** The story_navigation_action_type split of `navigation`. */
+    const STORY_NAVIGATION = { data: [{ name: "navigation", total_value: { breakdowns: [{
+      dimension_keys: ["story_navigation_action_type"],
+      results: [
+        { dimension_values: ["TAP_FORWARD"], value: 61 },
+        { dimension_values: ["TAP_BACK"], value: 9 },
+        { dimension_values: ["TAP_EXIT"], value: 14 },
+        { dimension_values: ["SWIPE_FORWARD"], value: 4 },
+      ],
+    }] } }] };
 
     // Per-story insights. Above the account /insights branch, which would
     // otherwise swallow this URL.
     if (u.includes("/story_live/insights")) {
       if (storyInsights === "refuse_all") return tooFewViewers();
-      return ok({ data: STORY_INSIGHTS });
+      // The breakdown is its own request: a breakdown applies to the whole call
+      // and only `navigation` accepts one.
+      if (q.get("breakdown")) {
+        return q.get("breakdown") === "story_navigation_action_type" && q.get("metric") === "navigation"
+          ? ok(STORY_NAVIGATION)
+          : err("(#100) breakdown not supported for this metric");
+      }
+      /*
+       * "storyMetrics: core" models Meta refusing the full list — one retired or
+       * unsupported name fails an all-or-nothing request — and answering the six
+       * that have worked on a live story.
+       */
+      const asked = (q.get("metric") ?? "").split(",");
+      if (opts.storyMetrics === "core" && asked.length > 6) return err("(#100) metric total_views is not supported");
+      return ok({ data: STORY_INSIGHTS.filter((m) => asked.includes(m.name)) });
     }
 
     if (u.includes("/insights")) {
@@ -199,7 +233,7 @@ export function installGraphMock(opts) {
         timestamp: `${to}T08:00:00+0000`,
       };
       if ((q.get("fields") ?? "").includes("insights")) {
-        if (storyInsights !== "ok") return tooFewViewers();
+        if (storyInsights !== "ok" || opts.storyMetrics === "core") return tooFewViewers();
         return ok({ data: [{ id: story.id, insights: { data: STORY_INSIGHTS } }] });
       }
       return ok({ data: [story] });

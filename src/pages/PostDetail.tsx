@@ -7,6 +7,7 @@ import { postContext, postRank, engagementSplit, ageHours, tooEarly, reachMultip
 import { PlatformBadge } from "../components/PlatformTile";
 import RequireData from "../components/RequireData";
 import DistributionStrip from "../components/charts/DistributionStrip";
+import BarList from "../components/BarList";
 import { useEffect, useRef, useState } from "react";
 import { refreshPost } from "../lib/api";
 import { isDemoMode } from "../lib/demoData";
@@ -404,6 +405,8 @@ function PostDetailInner() {
         </div>
       </div>
 
+      {story && <StorySection post={view} />}
+
       {(() => {
         /*
          * The rank as a picture. "#1 of 12" cannot distinguish topping a tight
@@ -513,3 +516,106 @@ function Derived({ label, value, why }: { label: string; value: string | null; w
 }
 
 export type { ContentItem };
+
+/*
+ * Everything Instagram reports for a story, in one place.
+ *
+ * Checked metric by metric against Meta's IG Media Insights reference on
+ * 2026-09-15, including each one's media-type list. A story supports thirteen
+ * figures; the product asked for six and showed five. It does NOT support likes,
+ * saves or comments, which are FEED and REELS only, so those are named as absent
+ * here rather than left for a client to wonder about.
+ *
+ * Grouped by the question each one answers, because a flat list of thirteen
+ * numbers is not more informative than five.
+ */
+const STORY_GROUPS: { title: string; note?: string; rows: { key: keyof ContentItem; label: string; hint: string }[] }[] = [
+  {
+    title: "Who saw it",
+    rows: [
+      { key: "views", label: "Views", hint: "Times it was played on Instagram" },
+      { key: "total_views", label: "Views everywhere", hint: "Including Facebook and any promotion" },
+      { key: "reach", label: "Reach", hint: "Distinct accounts that saw it" },
+      { key: "facebook_views", label: "Views on Facebook", hint: "Plays on Facebook, counted separately" },
+    ],
+  },
+  {
+    title: "What they did with it",
+    note: "Instagram reports no likes, saves or comments for a story. They are not zero; they do not exist.",
+    rows: [
+      { key: "replies", label: "Replies", hint: "Messages sent back in response" },
+      { key: "shares", label: "Shares", hint: "Sent on to someone else" },
+      { key: "reposts", label: "Reposts", hint: "Reshared to another account's story, minus any deleted" },
+      { key: "interactions", label: "Interactions", hint: "Instagram's own combined total for this story" },
+    ],
+  },
+  {
+    title: "Where it sent them",
+    note: "The half a story is usually posted for, and the half this product could not show until now.",
+    rows: [
+      { key: "profile_visits", label: "Profile visits", hint: "Times your profile was opened from it" },
+      { key: "follows", label: "Follows", hint: "Accounts that followed you after it" },
+      { key: "link_clicks", label: "Link taps", hint: "Taps on a link in the story" },
+      { key: "profile_activity", label: "Profile actions", hint: "Calls, emails, directions and bio-link taps after a visit" },
+    ],
+  },
+];
+
+/** TAP_EXIT is the one that matters; the rest are people moving on. */
+const NAV_LABELS: Record<string, string> = {
+  tap_forward: "Tapped forward",
+  tap_back: "Tapped back",
+  tap_exit: "Tapped away",
+  swipe_forward: "Swiped to the next account",
+};
+
+function StorySection({ post }: { post: ContentItem }) {
+  const nav = post.navigation_breakdown ?? null;
+  const navTotal = nav ? Object.values(nav).reduce((s, v) => s + v, 0) : null;
+  return (
+    <div className="panel">
+      <div className="panel__head" style={{ gap: 8, flexWrap: "wrap" }}>
+        <h3>Everything Instagram reports for a story</h3>
+        <span className="sub">a story is measured differently from a post</span>
+      </div>
+      <div className="panel__body stack" style={{ gap: 18 }}>
+        {STORY_GROUPS.map((g) => (
+          <div key={g.title} className="stack" style={{ gap: 8 }}>
+            <b style={{ fontSize: 13 }}>{g.title}</b>
+            {g.note && <p className="muted" style={{ margin: 0, fontSize: 12, lineHeight: 1.5 }}>{g.note}</p>}
+            <div className="kpis">
+              {g.rows.map((r) => (
+                <div className="kpi" key={String(r.key)}>
+                  <div className="kpi__label">{r.label}</div>
+                  <div className="kpi__value tnum">{metric(post[r.key] as number | null)}</div>
+                  <div className="kpi__foot"><span className="muted" style={{ fontSize: 11, lineHeight: 1.4 }}>{r.hint}</span></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div className="stack" style={{ gap: 8 }}>
+          <b style={{ fontSize: 13 }}>How they left it</b>
+          <p className="muted" style={{ margin: 0, fontSize: 12, lineHeight: 1.5 }}>
+            {metric(post.navigation)} actions in total.{" "}
+            {nav
+              ? "Tapping away is the one to watch: the rest carried on through."
+              : "Instagram reported no split for this story, which it does not do below five viewers."}
+          </p>
+          {nav && navTotal ? (
+            <BarList keyWidth={190} rows={Object.entries(nav)
+              .sort((a, b) => b[1] - a[1])
+              .map(([k, v]) => ({
+                key: k,
+                label: NAV_LABELS[k] ?? k.replace(/_/g, " "),
+                value: v / navTotal,
+                display: full(v),
+                color: k === "tap_exit" ? "var(--neg)" : "var(--text)",
+              }))} />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}

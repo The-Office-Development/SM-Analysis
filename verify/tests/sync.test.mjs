@@ -237,6 +237,49 @@ test("an active story is captured, with the metrics it has and nulls for the res
   assert.ok(Date.parse(story.expires_at) > Date.parse(story.published_at));
 });
 
+test("every figure Instagram reports for a story is stored, not just the six we used to ask for", async () => {
+  /*
+   * Meta documents thirteen metrics for a story. The sync asked for six and
+   * stored five: total_interactions was requested and discarded, and
+   * profile_visits, follows and link_clicks — the creator's answer to "did this
+   * story do anything?" — were never requested. Migration 0019.
+   */
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [addDays(TODAY, -29), TODAY] });
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+
+  assert.equal(story.total_views, 455);
+  assert.equal(story.reposts, 2);
+  assert.equal(story.interactions, 21, "total_interactions is stored rather than thrown away");
+  assert.equal(story.profile_visits, 17);
+  assert.equal(story.profile_activity, 3);
+  assert.equal(story.follows, 5);
+  assert.equal(story.link_clicks, 9);
+  assert.equal(story.facebook_views, 12);
+
+  // The navigation split: what the total cannot say, which is whether people
+  // moved on or left.
+  assert.deepEqual(story.navigation_breakdown,
+    { tap_forward: 61, tap_back: 9, tap_exit: 14, swipe_forward: 4 });
+});
+
+test("a story keeps its figures when Meta refuses the full metric list", async () => {
+  /*
+   * An insights request is all-or-nothing. If one name in the list is retired,
+   * asking for all thirteen would cost the story every figure it has — and after
+   * 24 hours there is nothing left to ask. The capture falls back to the six
+   * that are proven.
+   */
+  const db = seedDb();
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [addDays(TODAY, -29), TODAY], storyMetrics: "core" });
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+
+  assert.ok(story, "the story is still stored");
+  assert.equal(story.views, 410, "and the core figures survive");
+  assert.equal(story.replies, 4);
+  assert.equal(story.profile_visits, null, "what the narrowed list cannot carry stays unknown, not 0");
+});
+
 test("a story Meta will not measure yet is still captured, not lost with the rest", async () => {
   /*
    * Meta: "Story media metrics with values less than 5 return an error code 10".

@@ -155,6 +155,37 @@ Meta's own "no data" into a client's "you reached nobody". The rule in
 
 ---
 
+## 5b. Story metrics: the complete list, verified 2026-09-15
+
+Read metric by metric from Meta's IG Media Insights reference, including the
+media-type list on each one, after the first story was captured (2026-09-14).
+
+**A STORY supports thirteen metrics:** `views`, `total_views`, `reach`,
+`replies`, `navigation`, `shares`, `reposts`, `total_interactions`,
+`profile_visits`, `profile_activity`, `follows`, `link_clicks`, `facebook_views`.
+`impressions` also appears, "Deprecated for media created after July 2, 2024",
+and is deliberately never requested.
+
+**A STORY does not support `likes`, `saves` or `comments`.** Each of those three
+lists FEED and REELS only. That is why those columns are null on a story row and
+must never become 0.
+
+**Two breakdowns exist**, each tied to one metric:
+`story_navigation_action_type` on `navigation` (TAP_FORWARD, TAP_BACK, TAP_EXIT,
+SWIPE_FORWARD), and `action_type` on `profile_activity` (BIO_LINK_CLICKED, CALL,
+DIRECTION, EMAIL, OTHER, TEXT). A breakdown applies to the whole request, so the
+navigation split is its own call. The `action_type` split is not read yet.
+
+**Caveats carried into the code:**
+- "Story media metrics with values less than 5 return an error code 10", so a
+  fresh story reports nothing and is stored with null figures.
+- `replies` "returns 0 for stories created by users in Europe (since December 1,
+  2020) and Japan (since April 14, 2021)". Jordan is unaffected, but a client in
+  either region would see a true 0 that means "not counted".
+- Story media is only available for 24 hours after creation; what was read before
+  then is the permanent record, which is why `mergeContentWithStored` protects
+  every one of these columns.
+
 ## 6. First contact with the live API — 2026-09-04
 
 The probe in `verify/probe-live.mjs` made the first real Instagram calls this

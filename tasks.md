@@ -74,11 +74,14 @@ as work. Migrations 0001-0012 are all applied.
    or comments metrics"** — which is why those three columns are null for a story,
    and must stay null rather than 0.
 
-   - [ ] `total_interactions` is REQUESTED and then thrown away (`STORY_INSIGHT_METRICS`
-         asks for it; the story row never stores it). Either store it or stop asking.
-   - [ ] `profile_visits`, `follows` and `link_clicks` are the creator-facing
-         answer to "did this story do anything?" and are not requested at all.
-         They need columns (a migration) before they can be stored.
+   - [x] **DONE 2026-09-15: all thirteen are requested, stored and shown.**
+         Migration `0019` adds `total_views`, `reposts`, `interactions`,
+         `profile_visits`, `profile_activity`, `follows`, `link_clicks`,
+         `facebook_views` and `navigation_breakdown` (the
+         story_navigation_action_type split). The post page has a section
+         grouping them by the question each answers, and the capture falls back
+         to the proven six if Meta ever refuses the full list — an insights
+         request is all-or-nothing and a story cannot be re-read after 24 hours.
    - [ ] Whether an emoji reaction to a story counts in `replies` is undocumented.
          Settle it against a live story: compare our stored `replies` with what
          the Instagram app shows for the same story.
