@@ -79,6 +79,47 @@ export function momentum(series: { value: number }[]): number {
 }
 
 /** Growth of a stock series (last vs first). */
+/**
+ * Follower growth in percent, measured PER ACCOUNT and only across accounts that
+ * were measured at both ends. Null when no account was.
+ *
+ * The combined follower line adds up whichever accounts reported on each day, so
+ * an account that starts reporting mid-window lifts the end of the line without
+ * being in its start. Taking first-vs-last of that line reported the arrival of
+ * an account as follower growth. Every LinkedIn page and profile starts that way:
+ * LinkedIn gives no follower history, only today's total, so connecting one
+ * showed its entire following as gained followers on the Overview, the
+ * Platforms tile, the assistant and the sponsor report.
+ *
+ * `fromDate` narrows the start: an account counts only if it has a value on or
+ * before that date (periodCompare's midpoint). Absent, each account's own first
+ * reported day is its start.
+ */
+export function followerGrowth(
+  rows: MetricPoint[], scope: Scope, fromDate?: string,
+): { pct: number; from: number; to: number } | null {
+  const byAccount = new Map<string, { date: string; value: number }[]>();
+  for (const r of scoped(rows, scope)) {
+    if (r.followers === null || r.followers === undefined) continue;
+    const list = byAccount.get(r.account_id) ?? [];
+    list.push({ date: r.date, value: r.followers });
+    byAccount.set(r.account_id, list);
+  }
+  let from = 0, to = 0, counted = 0;
+  for (const list of byAccount.values()) {
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    const start = fromDate
+      ? [...list].reverse().find((p) => p.date <= fromDate)
+      : list[0];
+    const end = list[list.length - 1];
+    // One measurement is a level, not a change.
+    if (!start || start.date >= end.date) continue;
+    from += start.value; to += end.value; counted++;
+  }
+  if (!counted || from <= 0) return null;
+  return { pct: ((to - from) / from) * 100, from, to };
+}
+
 export function stockDelta(series: { value: number }[]): number {
   if (series.length < 2) return 0;
   const first = series[0].value, last = series[series.length - 1].value;

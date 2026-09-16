@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
 import {
-  seriesByDay, followersByDay, sum, latest, stockDelta, momentum, engagementRate,
+  seriesByDay, followersByDay, sum, latest, followerGrowth, momentum, engagementRate,
 } from "../lib/api";
 import { compact, metric, sumKnown, full, pctPlain, ratioPct, shortDate } from "../lib/format";
 import { bestTimes, DOW_SHORT, fmtHour, totalReported } from "../lib/insights";
@@ -131,7 +131,7 @@ export default function Overview() {
   return (
     <>
       <div className="kpis">
-        <StatCard label="Followers" value={compact(latest(follSeries))} delta={stockDelta(follSeries)} spark={follSeries.map((d) => d.value)} color="var(--text-2)" />
+        <StatCard label="Followers" value={compact(latest(follSeries))} delta={followerGrowth(metrics, scope)?.pct} spark={follSeries.map((d) => d.value)} color="var(--text-2)" />
         {/*
           * metric(totalReported(...)), not compact(sum(...)).
           *

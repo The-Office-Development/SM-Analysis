@@ -34,6 +34,10 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "a newly connected account counted as follower growth", file: "verify/build-lib/series.js",
+    find: "if (!start || start.date >= end.date)", replace: "if (!start)" },
+  { name: "an unmeasurable follower trend presented as a measured one", file: ANALYTICS,
+    find: "deltaKnown: g !== null", replace: "deltaKnown: true" },
   { name: "a stale story-metric narrowing obeyed after the ladder changed", file: SYNC,
     find: "storyMetrics = v?.v === STORY_METRIC_LADDER_VERSION && typeof v?.metrics === \"string\" ? v.metrics : null;",
     replace: "storyMetrics = typeof v?.metrics === \"string\" ? v.metrics : null;" },

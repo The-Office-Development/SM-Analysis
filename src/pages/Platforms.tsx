@@ -1,6 +1,6 @@
 import { useDash } from "../context/DashboardContext";
 import { PLATFORMS } from "../lib/platforms";
-import { followersByDay, seriesByDay, sum, latest, stockDelta, engagementRate } from "../lib/api";
+import { followersByDay, seriesByDay, sum, latest, followerGrowth, engagementRate } from "../lib/api";
 import { compact, metric, pctPlain } from "../lib/format";
 import { totalReported } from "../lib/insights";
 import PlatformTile from "../components/PlatformTile";
@@ -30,7 +30,9 @@ function PlatformsInner() {
           const foll = followersByDay(dash.metrics, p);
           const acct = dash.accounts.find((a) => a.platform === p && a.status === "connected");
           const stat = [
-            { k: "Followers", v: compact(latest(foll)), delta: stockDelta(foll) },
+            // Per account; the combined line's first-vs-last read a newly connected
+            // account as gained followers. See followerGrowth.
+            { k: "Followers", v: compact(latest(foll)), delta: followerGrowth(dash.metrics, p)?.pct },
             { k: "Eng. rate", v: pctPlain(engagementRate(dash.metrics, p)) },
             /*
              * metric(), not compact(). A platform that does not report a figure

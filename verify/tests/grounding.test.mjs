@@ -123,3 +123,56 @@ test("the report says which platform its figures came from", () => {
   // be asserted of a platform nothing has ever been reconciled against.
   assert.ok(!/Instagram app/.test(buildSnapshot(input()).provenance));
 });
+
+/* ---- connecting an account is not follower growth --------------------------- */
+
+const { followerGrowth } = await import("../build-lib/series.js");
+
+const fgDay = (n) => new Date(Date.UTC(2026, 8, 1 + n)).toISOString().slice(0, 10);
+const fgPoint = (account_id, platform, date, followers) => ({
+  account_id, platform, date, followers, reach: null, impressions: null, views: null,
+  engagements: null, follows: null, unfollows: null, reach_followers: null, reach_non_followers: null,
+});
+
+test("an account that starts reporting mid-window is not counted as gained followers", () => {
+  /*
+   * LinkedIn gives no follower history, only today's total, so every page or
+   * profile arrives as a single day at the end of the window. The combined line's
+   * first-vs-last read that arrival as growth: an Instagram account going from
+   * 1,000 to 1,100 beside a LinkedIn page of 5,000 connected on the last day was
+   * reported as +510%.
+   */
+  const rows = [
+    ...Array.from({ length: 30 }, (_, i) => fgPoint("ig", "instagram", fgDay(i), 1000 + Math.round(i * 100 / 29))),
+    fgPoint("li", "linkedin", fgDay(29), 5000),
+  ];
+  const g = followerGrowth(rows, "all");
+  assert.ok(g, "growth is measurable from the account that was there all along");
+  assert.ok(Math.abs(g.pct - 10) < 1e-9, `expected +10%, got ${g.pct}`);
+
+  assert.equal(followerGrowth(rows, "linkedin"), null,
+    "a single day of LinkedIn is a level, not a change, so its growth is unknown");
+
+  const cmp = periodCompare(rows, "all").find((c) => c.key === "followers");
+  assert.equal(cmp.deltaKnown, true);
+  assert.ok(cmp.deltaPct > 0 && cmp.deltaPct < 10, `the trend ignores the arrival: ${cmp.deltaPct}`);
+  assert.equal(cmp.current, 6100, "while the total shown still includes every account");
+});
+
+test("a follower trend nobody can measure is said to be unmeasurable, never +0%", () => {
+  /*
+   * Six days in the window, so halves can be compared. Account A was measured
+   * only before the midpoint and stopped; account B only after it. Neither has a
+   * start and an end, so no change was measured by anyone.
+   */
+  const rows = [
+    fgPoint("a", "instagram", fgDay(0), 400), fgPoint("a", "instagram", fgDay(1), 400), fgPoint("a", "instagram", fgDay(2), 400),
+    fgPoint("b", "instagram", fgDay(3), 900), fgPoint("b", "instagram", fgDay(4), 900), fgPoint("b", "instagram", fgDay(5), 900),
+  ];
+  const cmp = periodCompare(rows, "instagram").find((c) => c.key === "followers");
+  assert.equal(cmp.reported, true, "followers exist");
+  assert.equal(cmp.deltaKnown, false, "but no change was measured");
+
+  const text = summarizeForAI({ range: 7, scope: "instagram", connectedPlatforms: ["instagram"], metrics: rows, content: [], audience: [] });
+  assert.match(text, /Followers: 900 \(trend not measurable yet/, "the assistant is told the trend is unknown, not +0% or +125%");
+});

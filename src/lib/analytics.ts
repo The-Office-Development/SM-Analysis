@@ -6,7 +6,7 @@ import type { MetricPoint, AudienceSnapshot, ContentItem, Platform, Range, Scope
  * made this module impossible to compile for a test — and three defects lived
  * here undetected because of it. Nothing below touches the network or the DOM.
  */
-import { seriesByDay, followersByDay, sum, latest, engagementRate, type MetricKey } from "./series";
+import { seriesByDay, followersByDay, followerGrowth, sum, latest, engagementRate, type MetricKey } from "./series";
 import { platformName } from "./platformNames";
 import {
   publishTiming, followerCost, reachMultiples, reachConcentration, bestTimes, totalReported,
@@ -72,6 +72,12 @@ export interface Compare {
    * A LinkedIn Company Page reports no page-level views at all.
    */
   reported: boolean;
+  /**
+   * False when the figure exists but no change can be measured, e.g. followers
+   * whose only accounts started reporting after the midpoint. deltaPct is 0 then
+   * and must be shown as unknown, not as "no change".
+   */
+  deltaKnown?: boolean;
 }
 
 /** This half of the window vs the prior half (matches the app's momentum proxy). */
@@ -87,9 +93,11 @@ export function periodCompare(metrics: MetricPoint[], scope: Scope): Compare[] {
     if (s.length < 4) return { key, label, current: 0, previous: 0, deltaPct: 0, reported: s.length > 0 };
     const half = Math.floor(s.length / 2);
     if (key === "followers") {
-      const previous = s[half - 1]?.value ?? 0;
+      // Per account, from the midpoint; see followerGrowth. The total shown is
+      // still every account's latest, but the trend is only what was measured.
       const current = s[s.length - 1]?.value ?? 0;
-      return { key, label, current, previous, deltaPct: previous ? ((current - previous) / previous) * 100 : 0, reported: true };
+      const g = followerGrowth(metrics, scope, s[half - 1]?.date);
+      return { key, label, current, previous: g?.from ?? 0, deltaPct: g?.pct ?? 0, reported: true, deltaKnown: g !== null };
     }
     const previous = s.slice(0, half).reduce((a, x) => a + x.value, 0);
     const current = s.slice(s.length - half).reduce((a, x) => a + x.value, 0);
@@ -136,7 +144,9 @@ export function summarizeForAI(d: AISummaryInput): string {
       : totalReported(seriesByDay(d.metrics, d.scope, c.key as MetricKey));
     lines.push(total === null
       ? `- ${c.label}: not reported by this platform`
-      : `- ${c.label}: ${total.toLocaleString()} (${pct(c.deltaPct)})`);
+      : c.deltaKnown === false
+        ? `- ${c.label}: ${total.toLocaleString()} (trend not measurable yet: no account was measured at both ends)`
+        : `- ${c.label}: ${total.toLocaleString()} (${pct(c.deltaPct)})`);
   }
   lines.push(`- Engagement rate: ${engagementRate(d.metrics, d.scope).toFixed(1)}%`);
 

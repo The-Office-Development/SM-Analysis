@@ -105,7 +105,7 @@ export function buildSnapshot(dash: Dash): ReportSnapshot {
      * movement reported for a figure that does not exist. `delta()` already
      * renders null as n/a; it was simply never given one.
      */
-    deltaPct: c.reported ? c.deltaPct : null,
+    deltaPct: c.reported && c.deltaKnown !== false ? c.deltaPct : null,
   }));
 
   const scopedPlatforms: Platform[] =
