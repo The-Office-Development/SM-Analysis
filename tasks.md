@@ -340,8 +340,10 @@ connection.
 - [ ] Page and form wording ready to paste: `docs/LINKEDIN-APPLICATION.md` (2026-09-15)
 - [ ] 🔴 **The Office needs its own LinkedIn Page** with a super admin: the
       developer app must be verified by the applying organisation's page. `SETUP-LINKEDIN.md` §0
-- [ ] Create the app and submit the Development tier form (`SETUP-LINKEDIN.md`); a rejection
-      cannot be resubmitted, so step 0 first
+- [x] Company Page created (`/company/al-hujra-information-technology`), business email
+      verified, app `PulseBoard` created (Client ID `77npf65q6q4gty`), redirect URL set,
+      **Development tier form submitted 2026-09-17** (`SETUP-LINKEDIN.md` §1)
+- [ ] Watch `info@theoffice.it.com` for Microsoft Vetting Services; answer any document request
 - [ ] Drinkat: route A (make us super admin) or B (they connect). `CLIENT-CONNECT-LINKEDIN.md`
 - [ ] Probe, connect, sync a few days, reconcile against the Analytics tab, record
 

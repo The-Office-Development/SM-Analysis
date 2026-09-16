@@ -33,6 +33,23 @@ it travels in every authorize URL), type Standalone, associated with the Page
 `info@theoffice.it.com` (Zoho MX verified). Status of the steps below is tracked
 in `tasks.md` §10. The Client Secret is never written into this repository.
 
+**Development tier access form SUBMITTED 2026-09-17.** Business email verified on
+LinkedIn the same day. Redirect URL set. Answers given:
+- Legal name `Al-Hujra Information Technology Company / Limited Liability`;
+  alternate legal name `Al Hujra Information Technology` (the D&B/Google form and
+  the Page name)
+- Website `https://theoffice.it.com`; address Lina An-Nabulsi Street, Amman, 11171, Jordan
+- Primary use case **Platform**; other use cases **Page analytics** and **Other**
+  (read-only member analytics of a member's own profile). Page management,
+  Profile management and Employee advocacy were deliberately NOT claimed: all
+  three are posting, which PulseBoard never does, and Standard tier requires a
+  screencast of every use case claimed here.
+
+LinkedIn's next steps, from the confirmation page: an email from **Microsoft
+Vetting Services** to the business email; a verification of the business; possibly
+a request for documents by email. Have the registration PDF and the AGATO
+certified translation ready (national IDs redacted, as for Meta).
+
 1. `linkedin.com/developers/apps` → **Create app**, signed in as a super admin of
    The Office's LinkedIn Page.
 2. App name `PulseBoard`; LinkedIn Page: The Office's page; privacy policy URL
