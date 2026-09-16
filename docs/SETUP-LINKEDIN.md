@@ -19,7 +19,7 @@ new app and a new form. Have every item in step 0 ready before submitting.
 | Website | `https://theoffice.it.com` |
 | Privacy policy | `https://app.theoffice.it.com/privacy` (live, covers LinkedIn) |
 | **A business email address**, verified by LinkedIn | An `@theoffice.it.com` address (Zoho). "Personal email addresses won't pass the vetting process" |
-| 🔴 **Our own company's LinkedIn Page**, with a super admin who can verify the app | **Not confirmed to exist.** The app must be "verified by LinkedIn Page associated with same organization". Drinkat's page cannot do this; it has to be The Office's |
+| 🔴 **Our own company's LinkedIn Page**, with a super admin who can verify the app | **Does not exist yet (checked 2026-09-17).** The app must be "verified by LinkedIn Page associated with same organization". What was created instead is a PERSONAL PROFILE named after the company (`linkedin.com/in/al-hujra-information-technology-305944437`). That cannot verify an app, and LinkedIn forbids it: "you can't represent your organization with a LinkedIn profile ... Repeat or prolonged violations of our profile policies may lead to your LinkedIn account being restricted", and "you can't convert a profile into a Page" (LinkedIn Help a6204405). Create a Page (`/company/...`) from a real person's profile; never own the developer app from the company-named profile |
 | An app name with no part of "LinkedIn" or "Microsoft" | `PulseBoard` |
 
 **The wording for all of it is `LINKEDIN-APPLICATION.md`**: the page's name, about
