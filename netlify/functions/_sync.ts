@@ -1,5 +1,5 @@
 import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log, writeFailed } from "./_lib";
-import { igGet, IG, auditTokenScopes, STORY_METRIC_LADDER } from "./_instagram";
+import { igGet, IG, auditTokenScopes, STORY_METRIC_LADDER, STORY_METRIC_LADDER_VERSION } from "./_instagram";
 import {
   LI, liGet, liUrn, liNum, liLikes, liTime, liDayKey, type LiShareStats,
   LI_FACETS, liDemographicCount, urnTail, liEnumLabel,
@@ -393,7 +393,8 @@ export async function syncAccount(db: Db, acc: AccountRow): Promise<SyncResult> 
   if (acc.platform === "instagram") {
     const { data: pref } = await db.from("social_accounts").select("story_metrics").eq("id", acc.id).maybeSingle();
     const v = (pref as any)?.story_metrics;
-    storyMetrics = typeof v?.metrics === "string" ? v.metrics : null;
+    // A narrowing learned against an older ladder is discarded, not obeyed.
+    storyMetrics = v?.v === STORY_METRIC_LADDER_VERSION && typeof v?.metrics === "string" ? v.metrics : null;
   }
 
   /*
@@ -2109,7 +2110,10 @@ async function rememberStoryMetrics(
 ): Promise<void> {
   if (!capture.metrics || capture.metrics === previous) return;
   const { error } = await db.from("social_accounts").update({
-    story_metrics: { metrics: capture.metrics, detail: capture.detail, checked_at: new Date().toISOString() },
+    story_metrics: {
+      v: STORY_METRIC_LADDER_VERSION,
+      metrics: capture.metrics, detail: capture.detail, checked_at: new Date().toISOString(),
+    },
   }).eq("id", acc.id);
   writeFailed("sync.story_metrics_write_failed", error, { account: acc.id });
   log("sync.story_metrics_narrowed", {

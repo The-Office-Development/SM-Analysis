@@ -82,6 +82,13 @@ as work. Migrations 0001-0012 are all applied.
          grouping them by the question each answers, and the capture falls back
          to the proven six if Meta ever refuses the full list — an insights
          request is all-or-nothing and a story cannot be re-read after 24 hours.
+   - [x] **link_clicks is documented but not served** ("The metric link_clicks is
+         not available on this endpoint", live 2026-09-15). Dropped from the
+         request; the ladder is versioned so this narrowing is re-tested when the
+         lists change. Whether `profile_visits`, `follows`, `profile_activity`,
+         `total_views`, `reposts` and `facebook_views` are served is UNKNOWN: they
+         have never been asked for without link_clicks beside them. The next story
+         settles it.
    - [ ] Whether an emoji reaction to a story counts in `replies` is undocumented.
          Settle it against a live story: compare our stored `replies` with what
          the Instagram app shows for the same story.

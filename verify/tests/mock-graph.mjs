@@ -241,7 +241,10 @@ export function installGraphMock(opts) {
       };
       if ((q.get("fields") ?? "").includes("insights")) {
         if (storyInsights !== "ok" || opts.storyMetrics) return tooFewViewers();
-        return ok({ data: [{ id: story.id, insights: { data: STORY_INSIGHTS } }] });
+        // Only the metrics actually asked for, as Meta answers: a mock that
+        // returns everything hides a metric the code has stopped requesting.
+        const asked = /insights\.metric\(([^)]*)\)/.exec(q.get("fields") ?? "")?.[1]?.split(",") ?? [];
+        return ok({ data: [{ id: story.id, insights: { data: STORY_INSIGHTS.filter((m) => asked.includes(m.name)) } }] });
       }
       return ok({ data: [story] });
     }

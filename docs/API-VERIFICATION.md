@@ -176,6 +176,23 @@ SWIPE_FORWARD), and `action_type` on `profile_activity` (BIO_LINK_CLICKED, CALL,
 DIRECTION, EMAIL, OTHER, TEXT). A breakdown applies to the whole request, so the
 navigation split is its own call. The `action_type` split is not read yet.
 
+**Measured against a live story, 2026-09-15, and it corrects the list above.**
+Asking for all thirteen was refused with, verbatim:
+
+> "The metric link_clicks is not available on this endpoint."
+
+`link_clicks` is documented for a STORY and is not served here — the mirror image
+of §2, where two metrics were documented as absent and answered. Because an
+insights request is all-or-nothing, that one name also cost `profile_visits`,
+`follows`, `profile_activity`, `total_views`, `reposts` and `facebook_views`, and
+the capture fell back to the six proven ones. It is no longer requested, and the
+ladder is versioned so a narrowing learned against an older list is re-tested
+rather than obeyed for ever.
+
+What the same live story DID return: views 165, reach 115, replies 4,
+navigation 144 (tap_forward 71, tap_exit 58, swipe_forward 14, tap_back 1, which
+sums exactly to 144), total_interactions 15.
+
 **Caveats carried into the code:**
 - "Story media metrics with values less than 5 return an error code 10", so a
   fresh story reports nothing and is stored with null figures.

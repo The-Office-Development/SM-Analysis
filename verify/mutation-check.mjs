@@ -34,6 +34,9 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "a stale story-metric narrowing obeyed after the ladder changed", file: SYNC,
+    find: "storyMetrics = v?.v === STORY_METRIC_LADDER_VERSION && typeof v?.metrics === \"string\" ? v.metrics : null;",
+    replace: "storyMetrics = typeof v?.metrics === \"string\" ? v.metrics : null;" },
   { name: "the middle rung skipped, losing the four creator story metrics", file: SYNC,
     find: "const ladder = preferred && STORY_METRIC_LADDER.includes(preferred)",
     replace: "const ladder = [STORY_METRIC_LADDER[0], STORY_METRIC_LADDER[2]]; const _unused = preferred && STORY_METRIC_LADDER.includes(preferred)" },

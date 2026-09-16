@@ -100,7 +100,15 @@ export const IG = {
    * July 2, 2024", so asking for it on a story posted today invites an error on
    * a call that is all-or-nothing.
    */
-  STORY_INSIGHT_METRICS: "reach,views,total_views,replies,navigation,shares,reposts,total_interactions,profile_visits,profile_activity,follows,link_clicks,facebook_views",
+  /*
+   * `link_clicks` is DOCUMENTED for a story and is not served. Measured on a
+   * live story (2026-09-15): asking for the full documented list was refused
+   * with "The metric link_clicks is not available on this endpoint", and since
+   * an insights request is all-or-nothing that one name cost profile_visits,
+   * follows and profile_activity too. Documentation absence is not API absence
+   * (API-VERIFICATION.md §2); this is the same lesson the other way round.
+   */
+  STORY_INSIGHT_METRICS: "reach,views,total_views,replies,navigation,shares,reposts,total_interactions,profile_visits,profile_activity,follows,facebook_views",
   /*
    * The six that have answered on a live story (2026-09-14). If the full list
    * above is refused — one unsupported metric fails the whole request — the
@@ -115,7 +123,7 @@ export const IG = {
    * with them. Trying this before giving up keeps the four that matter most when
    * what Meta objects to is one of total_views, reposts or facebook_views.
    */
-  STORY_INSIGHT_METRICS_PLUS: "reach,views,replies,navigation,shares,total_interactions,profile_visits,follows,link_clicks,profile_activity",
+  STORY_INSIGHT_METRICS_PLUS: "reach,views,replies,navigation,shares,total_interactions,profile_visits,follows,profile_activity",
   /**
    * The only breakdown a story's navigation accepts: TAP_FORWARD, TAP_BACK,
    * TAP_EXIT, SWIPE_FORWARD. It answers what the total cannot — whether people
@@ -156,6 +164,14 @@ export const IG = {
  * hours, so the capture walks down this ladder until one answers rather than
  * losing every figure to a single metric Meta will not serve for this account.
  */
+/**
+ * Bumped whenever a rung changes. A stored preference from an older ladder is
+ * ignored, so a narrowing learned against a list that no longer exists cannot
+ * pin an account to the floor forever — which is exactly what one unavailable
+ * metric did on 2026-09-15.
+ */
+export const STORY_METRIC_LADDER_VERSION = 2;
+
 export const STORY_METRIC_LADDER = [
   IG.STORY_INSIGHT_METRICS,
   IG.STORY_INSIGHT_METRICS_PLUS,

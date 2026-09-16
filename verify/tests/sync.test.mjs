@@ -254,8 +254,14 @@ test("every figure Instagram reports for a story is stored, not just the six we 
   assert.equal(story.profile_visits, 17);
   assert.equal(story.profile_activity, 3);
   assert.equal(story.follows, 5);
-  assert.equal(story.link_clicks, 9);
   assert.equal(story.facebook_views, 12);
+  /*
+   * link_clicks is documented for a story and is NOT served: a live story was
+   * refused with "The metric link_clicks is not available on this endpoint",
+   * and being all-or-nothing that one name cost the whole request. It is no
+   * longer asked for, so it stays unknown rather than being lost with others.
+   */
+  assert.equal(story.link_clicks, null);
 
   // The navigation split: what the total cannot say, which is whether people
   // moved on or left.
@@ -276,7 +282,6 @@ test("the four creator metrics survive a refusal of the widest list", async () =
 
   assert.equal(story.profile_visits, 17, "kept");
   assert.equal(story.follows, 5);
-  assert.equal(story.link_clicks, 9);
   assert.equal(story.profile_activity, 3);
   assert.equal(story.facebook_views, null, "and what this account will not serve stays unknown");
 
@@ -285,6 +290,26 @@ test("the four creator metrics survive a refusal of the widest list", async () =
   assert.ok(acc.story_metrics?.metrics.includes("profile_visits"), "the working list is recorded");
   assert.ok(!acc.story_metrics.metrics.includes("facebook_views"));
   assert.match(acc.story_metrics.detail ?? "", /facebook_views/, "with Meta's own refusal text, which names the metric");
+  assert.ok(acc.story_metrics.v >= 2, "stamped with the ladder it was learned against");
+});
+
+test("a narrowing learned against an older ladder is ignored, not obeyed", async () => {
+  /*
+   * One unavailable metric (link_clicks) pinned a live account to the six-metric
+   * floor on 2026-09-15. Once the ladder drops that metric, the stored answer is
+   * about a list that no longer exists, and obeying it would keep the account on
+   * the floor for ever.
+   */
+  const db = seedDb();
+  const acc = db._rows("social_accounts").find((r) => r.id === account.id);
+  await db.from("social_accounts").update({
+    story_metrics: { v: 1, metrics: "reach,views,replies,navigation,shares,total_interactions", detail: "stale" },
+  }).eq("id", acc.id);
+
+  await syncUntilCaughtUp(db, account, { offset: 3, days: [addDays(TODAY, -29), TODAY] });
+  const story = db._rows("content").find((r) => r.external_id === "story_live");
+  assert.equal(story.profile_visits, 17, "the wider list is tried again");
+  assert.equal(db._rows("social_accounts").find((r) => r.id === account.id).story_metrics.v, 2);
 });
 
 test("a story keeps its figures when Meta refuses the full metric list", async () => {
