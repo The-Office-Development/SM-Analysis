@@ -27,6 +27,12 @@ text and specialties, the app's fields, and every answer the access form asks fo
 
 ## 1. Create the app
 
+**Done 2026-09-17:** app `PulseBoard`, Client ID `77npf65q6q4gty` (public by design:
+it travels in every authorize URL), type Standalone, associated with the Page
+"Al Hujra Information Technology" (irreversible). Business email for the form:
+`info@theoffice.it.com` (Zoho MX verified). Status of the steps below is tracked
+in `tasks.md` §10. The Client Secret is never written into this repository.
+
 1. `linkedin.com/developers/apps` → **Create app**, signed in as a super admin of
    The Office's LinkedIn Page.
 2. App name `PulseBoard`; LinkedIn Page: The Office's page; privacy policy URL
