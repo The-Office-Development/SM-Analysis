@@ -19,9 +19,14 @@ breakdowns into Supabase; the app renders dashboards, a planner, a grounded AI
 assistant, CSV/PDF exports and public read-only share links.
 
 - **Frontend** — React + TypeScript + Vite, `src/`. Hand-built SVG charts, no chart library.
-- **Backend** — Netlify Functions, `netlify/functions/`. Holds every platform secret.
+- **Backend** — the functions in `netlify/functions/`, re-exported by `functions/` as
+  Cloudflare Pages Functions. They hold every platform secret.
 - **Data** — Supabase Postgres, isolated `pulseboard` schema, RLS default-deny on every table.
-- **Hosting** — Netlify: static frontend, serverless functions, two scheduled functions.
+- **Hosting** — Cloudflare Pages (`pulseboard`), deployed by CI on a push to `main`.
+  The scheduled sync is a separate Worker, `worker-cron/`, which CI does NOT deploy
+  (see "The cron Worker is NOT deployed by CI"). `netlify.toml` is a leftover of the
+  first host; the live headers and SPA fallback come from `public/_headers` and
+  `public/_redirects` instead (verified against the live response 2026-09-18).
 
 **The audit.** A multi-domain pre-launch audit found 24 P0 findings. Full record in
 `docs/COMPLETE-AUDIT.md` (single file) with the seven specialist reports under
@@ -67,7 +72,8 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, 65 tests, mutation 24/24.
+Code is on `main`, all green: typecheck, build, **226 tests, mutation 106/106**
+(measured 2026-09-18). Migrations `0001`-`0020` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
 `app.theoffice.it.com` serves the app and its functions, and `@heath_ens21`
@@ -121,6 +127,31 @@ project, secrets set, the Meta app configured, deployed to
 
 Not done: the reconciliation gate (needs an account with real posts), Business
 Verification (blocked on a utility bill in the company's name), and App Review.
+
+**Measured 2026-09-18, and this paragraph supersedes the dates above.**
+94 sync runs in the trailing 24 hours, **0 failures**, no error codes in
+`sync_log`. Both Instagram accounts `connected`, `needs_reauth` false, last
+synced 2026-09-17T21:45 UTC, latest stored day 2026-09-17. `@malekismaiil`
+carries `write_scopes []`; `@heath_ens21` still carries
+`instagram_business_manage_messages` and `instagram_business_content_publish`,
+left in place deliberately and not to be raised again.
+
+**Six story metrics are still unproven.** The stored `story_metrics` for
+`@malekismaiil` is the narrowed six (`reach,views,replies,navigation,shares,
+total_interactions`), recorded when the live API refused `link_clicks` with "not
+available on this endpoint". That row predates `STORY_METRIC_LADDER_VERSION`,
+and `_sync.ts` only trusts a row whose `v` matches, so the next story retries
+the full list. Until one is posted, `profile_visits`, `follows`,
+`profile_activity`, `total_views`, `reposts` and `facebook_views` have never
+returned a number from this account, and whether an emoji reaction lands in
+`replies` is unknown.
+
+**LinkedIn is code-complete and access-blocked.** Page `145194327` created
+2026-09-17, app `PulseBoard` (`77npf65q6q4gty`) associated with it, redirect URL
+set, business email verified, Development tier form submitted 2026-09-17,
+awaiting Microsoft Vetting Services. No LinkedIn call has ever run against the
+real API, so every LinkedIn figure in this file is still mock-verified only.
+A rejection cannot be resubmitted with the same app: do not add products to it.
 
 ---
 

@@ -9,10 +9,53 @@ Metricool's asks for full control of the client's Facebook Page plus
 `business_management`, the scope this project dropped as a P0 finding. Reasoning
 in `docs/VENDOR-OPTIONS.md`, marked deferred.
 
-The software is finished and green: 48 tests, mutation 20/20, crons configured in
-code. What follows is switching it on, not building it.
+The software is finished and green: 226 tests, mutation 106/106, crons configured
+in code. What follows is switching it on, not building it.
 
-Last updated: 2026-08-28.
+Last updated: 2026-09-18.
+
+---
+
+## WHERE THINGS STAND — 2026-09-18
+
+Read from the live systems, not from this file. The 2026-09-08 block below is
+kept for the record; where the two disagree, this one wins.
+
+**Green:** 226 tests, mutation 106/106, typecheck and build clean. Migrations
+0001-0020 applied (0018 LinkedIn constraints, 0019 story metrics, 0020 story
+metric set), verified against the live catalog.
+
+**Instagram: working.** 94 sync runs in 24 hours, 0 failures. Two accounts
+connected and syncing, latest day 2026-09-17. One story stored
+(`17895852018398585`, 165 views). Blocked only by Meta: Business Verification
+result unknown, App Review not yet submitted, so no client account can connect.
+
+**LinkedIn: waiting on LinkedIn.** Page created 2026-09-17
+(`/company/al-hujra-information-technology`, ID `145194327`), app `PulseBoard`
+(Client ID `77npf65q6q4gty`) associated with it, redirect URL set, business email
+`info@theoffice.it.com` verified, Development tier form submitted 2026-09-17.
+Next signal is an email from Microsoft Vetting Services. Do not add products to
+the app: a rejected application cannot be resubmitted with the same app.
+
+### Next, in order
+
+1. **Meta.** Business Verification result, then Tech Provider check, reviewer
+   login, screencast, deletion-callback test, submit App Review.
+   `docs/APP-REVIEW-PREP.md`.
+2. **LinkedIn.** Answer the vetting email, confirm the app reads as verified by
+   the Page, then `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET` into
+   Cloudflare, redeploy the Pages app **and** the cron Worker, run
+   `verify/probe-live-linkedin.mjs --profile`, then connect Bader's own profile
+   as the first live test. `docs/SETUP-LINKEDIN.md` §3.
+3. **Story.** On the next original story, read the six metrics that have never
+   returned a number (`profile_visits`, `follows`, `profile_activity`,
+   `total_views`, `reposts`, `facebook_views`) and record the result in
+   `CLAUDE.md` §3. The stored ladder row is pre-version, so the retry is
+   automatic.
+4. **Owner items, stated once:** sign the Supabase DPA; confirm "Require App
+   Secret" is ON in the Meta app.
+5. **Offered, not approved:** a page picker for a member who administers more
+   than one LinkedIn Page. Today the first page is taken silently.
 
 ---
 

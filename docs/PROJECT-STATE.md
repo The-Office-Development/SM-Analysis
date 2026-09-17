@@ -3,7 +3,7 @@
 The living record. `CLAUDE.md` is the technical brief; this is the commercial
 and strategic one. Update it when a decision changes.
 
-Last updated: 2026-09-04 (first live API call; day-boundary fix; deploy pipeline reconnected).
+Last updated: 2026-09-18 (LinkedIn Page and app created, Development tier form submitted; Instagram syncing clean).
 
 ---
 
@@ -11,6 +11,63 @@ Last updated: 2026-09-04 (first live API call; day-boundary fix; deploy pipeline
 
 The rest of this file is context. This section is what to do next. **Keep it
 current; it is the first thing a new session should read after `CLAUDE.md`.**
+
+### Where it stands, 2026-09-18 (measured, not remembered)
+
+Everything below was read from the live systems on 2026-09-17T21:45 UTC, not
+from these notes.
+
+**Instagram: running, healthy, and waiting on one human decision.**
+94 sync runs in the last 24 hours, **0 failures**, no error codes. Both accounts
+are `connected` with `needs_reauth` false and last synced within the hour:
+`@malekismaiil` (the months-old professional account, the only valid oracle) and
+`@heath_ens21` (converted for testing). Latest stored day: 2026-09-17. The only
+thing Instagram is blocked on is **Meta Business Verification**, whose result is
+still unknown; App Review has not been submitted, so no client account can
+connect yet.
+
+**Story capture works, and six of its metrics are still unproven.**
+One story is stored (`17895852018398585`, 2026-09-14, 165 views). The ladder
+narrowed `@malekismaiil` to six metrics because the live API refused
+`link_clicks` ("not available on this endpoint"), and that stored row predates
+the ladder version stamp, so the next story retries the full list from scratch:
+`profile_visits`, `follows`, `profile_activity`, `total_views`, `reposts` and
+`facebook_views` have never returned a number here. They need another original
+story to settle. Whether an emoji reaction counts inside `replies` is open too.
+
+**LinkedIn: the code is finished, the access is not.**
+The Page was the missing piece and now exists: "Al Hujra Information
+Technology", `linkedin.com/company/al-hujra-information-technology`, page ID
+`145194327`, created 2026-09-17 and checked from outside against a control. The
+app `PulseBoard` (Client ID `77npf65q6q4gty`, secret never in this repo) is
+associated with it, the redirect URL is set, the business email
+`info@theoffice.it.com` is verified, and the **Development tier form was
+submitted on 2026-09-17**. Waiting on a Microsoft Vetting Services email to that
+address. Nothing further can be tested against LinkedIn until it arrives: a
+rejection cannot be resubmitted with the same app, so do not touch the app's
+products.
+
+**The build.** 226 tests, mutation 106/106, typecheck and build green.
+Migrations 0001 to 0020 applied and verified against the live catalog
+(0018 LinkedIn constraints, 0019 story metrics, 0020 story metric set).
+Hosting is Cloudflare Pages, and **CI does not deploy the cron Worker**: that is
+still `cd worker-cron && CLOUDFLARE_ACCOUNT_ID=69b37cce7d7633d2e73be9b548b8021a npx wrangler deploy`.
+
+**What is next, in order.**
+1. Meta: get the Business Verification result, then the Tech Provider check,
+   reviewer login, screencast, deletion-callback test, and submit App Review.
+   Until that passes, only accounts with a role on the Meta app can connect.
+2. LinkedIn: answer the Microsoft Vetting email, confirm the app shows as
+   verified by the Page, then set `LINKEDIN_CLIENT_ID` and
+   `LINKEDIN_CLIENT_SECRET` in Cloudflare, redeploy the app **and** the Worker,
+   and run `verify/probe-live-linkedin.mjs --profile` before connecting
+   anything. `docs/SETUP-LINKEDIN.md` §3.
+3. Story: when Malek posts another original story, read the six unproven
+   metrics and record what came back in `CLAUDE.md` §3.
+4. Owner items, stated once: sign the Supabase DPA, and confirm "Require App
+   Secret" is ON in the Meta app.
+5. Offered, not approved: a page picker for a member who administers several
+   LinkedIn Pages. Today the first page is taken silently.
 
 ### The company
 
