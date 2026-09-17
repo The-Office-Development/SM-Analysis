@@ -80,6 +80,36 @@ export function momentum(series: { value: number }[]): number {
 
 /** Growth of a stock series (last vs first). */
 /**
+ * The follower lines to DRAW for one platform.
+ *
+ * One summed line when the platform's accounts all start on the same day, which
+ * is the ordinary case. One line per account when they do not: a summed line
+ * adds a later account's whole following on the day it connected, and draws that
+ * as a vertical surge. A LinkedIn page with a founder's profile connected a week
+ * later did exactly that. Separate lines keep every point true.
+ *
+ * `account_id` is null for the summed line, so the caller knows whether to label
+ * a line by platform or by account.
+ */
+export function followerLines(
+  rows: MetricPoint[], platform: Platform,
+): { account_id: string | null; points: { date: string; value: number }[] }[] {
+  const firstDay = new Map<string, string>();
+  for (const r of rows) {
+    if (r.platform !== platform || r.followers === null || r.followers === undefined) continue;
+    const seen = firstDay.get(r.account_id);
+    if (!seen || r.date < seen) firstDay.set(r.account_id, r.date);
+  }
+  if (new Set(firstDay.values()).size <= 1) {
+    return [{ account_id: null, points: followersByDay(rows, platform) }];
+  }
+  return [...firstDay.keys()].sort().map((id) => ({
+    account_id: id,
+    points: followersByDay(rows.filter((r) => r.account_id === id), platform),
+  }));
+}
+
+/**
  * Follower growth in percent, measured PER ACCOUNT and only across accounts that
  * were measured at both ends. Null when no account was.
  *

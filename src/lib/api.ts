@@ -247,7 +247,7 @@ export async function askAI(
  */
 export {
   seriesByDay, followersByDay, perPlatformSeries, perPlatformFollowers,
-  momentum, stockDelta, followerGrowth, sum, latest, engagementRate,
+  momentum, stockDelta, followerGrowth, followerLines, sum, latest, engagementRate,
 } from "./series";
 export type { MetricKey } from "./series";
 

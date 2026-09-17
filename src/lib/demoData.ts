@@ -64,6 +64,13 @@ interface DemoAccount {
     saves: boolean;
     watch: boolean;
   };
+  /*
+   * A LinkedIn PERSONAL PROFILE (auth_mode linkedin_member), shaped exactly as
+   * syncLinkedInMember stores one: a follower total only from the day it
+   * connected (LinkedIn gives no history), impressions and engagements for the
+   * last two days only (post statistics are held 48 hours), and nothing else.
+   */
+  member?: { connectedDaysAgo: number };
 }
 const FULL = { views: true, churn: true, discovery: true, postReach: true, saves: true, watch: true };
 const ACCOUNTS: DemoAccount[] = [
@@ -77,6 +84,15 @@ const ACCOUNTS: DemoAccount[] = [
    */
   { platform: "linkedin", id: "demo-li", username: "northwind-co", base: 9400, reachMul: 1.3, er: 2.4, viewMul: 0,
     reports: { views: false, churn: false, discovery: false, postReach: false, saves: false, watch: false } },
+  /*
+   * The founder's own profile, connected six days ago. The cheapest test of
+   * null handling this repo has is a platform with genuine gaps, and a profile
+   * has the most: no posts, no reach, no demographics, no follower history
+   * before it connected, and post figures that vanish after two days.
+   */
+  { platform: "linkedin", id: "demo-li-me", username: "sara-haddad", base: 2350, reachMul: 0.9, er: 3.2, viewMul: 0,
+    reports: { views: false, churn: false, discovery: false, postReach: false, saves: false, watch: false },
+    member: { connectedDaysAgo: 6 } },
 ];
 
 export const demoAccounts: SocialAccount[] = ACCOUNTS.map((a, i) => ({
@@ -85,10 +101,12 @@ export const demoAccounts: SocialAccount[] = ACCOUNTS.map((a, i) => ({
   platform: a.platform,
   external_id: a.id,
   username: a.username,
-  display_name: "Northwind & Co.",
+  display_name: a.member ? "Sara Haddad" : "Northwind & Co.",
   avatar_url: null,
   status: "connected",
-  connected_at: isoDay(-DAYS + 1) + "T09:00:00Z",
+  // As the callbacks record it: a page and a profile are told apart only by this.
+  auth_mode: a.platform === "linkedin" ? (a.member ? "linkedin_member" : "linkedin_organization") : null,
+  connected_at: isoDay(a.member ? -a.member.connectedDaysAgo : -DAYS + 1) + "T09:00:00Z",
   last_synced_at: new Date(Date.now() - (i + 1) * 3600_000).toISOString(),
 }));
 
@@ -123,6 +141,20 @@ export const demoMetrics: MetricPoint[] = (() => {
       const reach_followers = attributed - reach_non_followers;
       const follows = Math.round(followers * growth * (1.6 + r() * 0.7)) + 3;
       const unfollows = Math.round(follows * (0.45 + r() * 0.3));
+
+      if (a.member) {
+        // Nothing exists from before the profile connected.
+        if (i > a.member.connectedDaysAgo) continue;
+        const held = i <= 2; // post statistics are nulled after 48 hours
+        rows.push({
+          account_id: a.id, platform: a.platform, date,
+          followers: Math.round(followers), reach: null, views: null,
+          impressions: held ? impressions : null,
+          engagements: held ? engagements : null,
+          follows: null, unfollows: null, reach_followers: null, reach_non_followers: null,
+        });
+        continue;
+      }
 
       rows.push({
         account_id: a.id, platform: a.platform, date,
@@ -163,6 +195,8 @@ const TITLES: Record<Platform, string[]> = {
 export const demoContent: ContentItem[] = (() => {
   const items: ContentItem[] = [];
   for (const a of ACCOUNTS) {
+    // LinkedIn does not let apps list a personal profile's posts.
+    if (a.member) continue;
     const r = mulberry32(hash(a.id + "content"));
     const last = demoMetrics.filter((m) => m.account_id === a.id).at(-1)!;
     TITLES[a.platform].forEach((title, i) => {

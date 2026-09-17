@@ -34,6 +34,8 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const mutations = [
+  { name: "a later account's arrival drawn as a follower surge", file: "verify/build-lib/series.js",
+    find: "if (new Set(firstDay.values()).size <= 1) {", replace: "if (true) {" },
   { name: "a newly connected account counted as follower growth", file: "verify/build-lib/series.js",
     find: "if (!start || start.date >= end.date)", replace: "if (!start)" },
   { name: "an unmeasurable follower trend presented as a measured one", file: ANALYTICS,

@@ -1,6 +1,6 @@
 import { useDash } from "../context/DashboardContext";
-import { PLATFORMS } from "../lib/platforms";
-import { followersByDay, seriesByDay, sum, latest, followerGrowth, engagementRate } from "../lib/api";
+import { PLATFORMS, followerSeries } from "../lib/platforms";
+import { followersByDay, seriesByDay, sum, latest, followerGrowth, followerLines, engagementRate } from "../lib/api";
 import { compact, metric, pctPlain } from "../lib/format";
 import { totalReported } from "../lib/insights";
 import PlatformTile from "../components/PlatformTile";
@@ -28,7 +28,9 @@ function PlatformsInner() {
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(min(300px,100%),1fr))" }}>
         {platforms.map((p) => {
           const foll = followersByDay(dash.metrics, p);
-          const acct = dash.accounts.find((a) => a.platform === p && a.status === "connected");
+          // Every connected account on the platform: a LinkedIn page and a profile
+          // both feed this tile, and naming only the first hid the second.
+          const accts = dash.accounts.filter((a) => a.platform === p && a.status === "connected");
           const stat = [
             // Per account; the combined line's first-vs-last read a newly connected
             // account as gained followers. See followerGrowth.
@@ -47,7 +49,7 @@ function PlatformsInner() {
             <section className="panel" key={p}>
               <div className="panel__head">
                 <PlatformTile platform={p} size={26} />
-                <div><h3>{PLATFORMS[p].name}</h3><span className="sub">@{acct?.username ?? "account"}</span></div>
+                <div><h3>{PLATFORMS[p].name}</h3><span className="sub">{accts.length ? accts.map((a) => `@${a.username}`).join(" · ") : "@account"}</span></div>
               </div>
               <div className="panel__body stack" style={{ gap: 16 }}>
                 <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -75,8 +77,8 @@ function PlatformsInner() {
                   * The reach comparison below keeps the zero baseline: reach can
                   * genuinely be zero, and its height is the magnitude.
                   */}
-                <LineChart series={[{ key: p, label: PLATFORMS[p].name, color: PLATFORMS[p].color, points: foll }]}
-                           height={120} legend={false} baseline="auto" />
+                <LineChart series={followerSeries(followerLines(dash.metrics, p), p, dash.accounts)}
+                           height={120} legend={followerLines(dash.metrics, p).length > 1} baseline="auto" />
               </div>
             </section>
           );

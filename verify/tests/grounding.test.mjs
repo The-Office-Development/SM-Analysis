@@ -176,3 +176,27 @@ test("a follower trend nobody can measure is said to be unmeasurable, never +0%"
   const text = summarizeForAI({ range: 7, scope: "instagram", connectedPlatforms: ["instagram"], metrics: rows, content: [], audience: [] });
   assert.match(text, /Followers: 900 \(trend not measurable yet/, "the assistant is told the trend is unknown, not +0% or +125%");
 });
+
+test("a platform's accounts that started on different days are drawn as separate lines", () => {
+  /*
+   * A summed follower line adds a later account's whole following on the day it
+   * connected and draws that as a surge. A LinkedIn page with a profile connected
+   * six days later showed exactly that step in the demo.
+   */
+  return import("../build-lib/series.js").then(({ followerLines }) => {
+    const page = Array.from({ length: 30 }, (_, i) => fgPoint("page", "linkedin", fgDay(i), 9000 + i * 10));
+    const profile = Array.from({ length: 7 }, (_, i) => fgPoint("me", "linkedin", fgDay(23 + i), 2300 + i));
+    const split = followerLines([...page, ...profile], "linkedin");
+    assert.equal(split.length, 2, "two lines, not one line with a step");
+    const me = split.find((l) => l.account_id === "me");
+    assert.equal(me.points[0].date, fgDay(23), "the profile's line starts when the profile started");
+    assert.equal(me.points[0].value, 2300);
+    const pg = split.find((l) => l.account_id === "page");
+    assert.ok(pg.points.every((p) => p.value < 10000), "the page's line never includes the profile's followers");
+
+    const together = [...page, ...page.map((r) => ({ ...r, account_id: "page2", followers: r.followers + 1 }))];
+    const one = followerLines(together, "linkedin");
+    assert.equal(one.length, 1, "accounts with the same history stay one summed line");
+    assert.equal(one[0].account_id, null);
+  });
+});

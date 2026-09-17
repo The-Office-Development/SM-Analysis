@@ -51,3 +51,27 @@ export const PLATFORM_FILL: Record<Platform, string> = {
   tiktok: "#111114",
   linkedin: "#0A66C2",
 };
+
+/**
+ * Chart series for a platform's followers, one per line followerLines draws.
+ * A split line is named by account and drawn in a lighter shade after the first,
+ * so a LinkedIn page and a profile on one chart can be told apart.
+ */
+export function followerSeries(
+  lines: { account_id: string | null; points: { date: string; value: number }[] }[],
+  platform: Platform,
+  accounts: { id: string; username: string; auth_mode?: string | null }[],
+): { key: string; label: string; color: string; points: { date: string; value: number }[] }[] {
+  const base = PLATFORMS[platform];
+  return lines.map((l, i) => {
+    if (!l.account_id) return { key: platform, label: base.name, color: base.color, points: l.points };
+    const acc = accounts.find((a) => a.id === l.account_id);
+    const kind = acc?.auth_mode === "linkedin_member" ? " profile" : acc?.auth_mode === "linkedin_organization" ? " page" : "";
+    return {
+      key: `${platform}:${l.account_id}`,
+      label: `${base.name}${kind} @${acc?.username ?? "account"}`,
+      color: i === 0 ? base.color : `color-mix(in srgb, ${base.color} 50%, var(--panel))`,
+      points: l.points,
+    };
+  });
+}

@@ -38,11 +38,22 @@ export default function LineChart({ series, height = 240, legend = true, baselin
   const scrubbing = useRef(false);
 
   const visible = series.filter((s) => !hidden.has(s.key) && s.points.length > 0);
-  // Series can differ in length (e.g. a Page synced before its linked IG account),
-  // so the axis follows the longest one and every lookup is bounds-checked.
-  const axis = series.reduce<Series | undefined>((a, s) => (!a || s.points.length > a.points.length ? s : a), undefined);
-  const axisPoints = axis?.points ?? [];
-  const n = axisPoints.length;
+  /*
+   * The x-axis is DATES, the union of every series' days, and each point is
+   * placed at its own date.
+   *
+   * It used to follow the longest series and place every other series by list
+   * position, so a series that started later was drawn from the left edge on the
+   * wrong dates: a LinkedIn page connected last week had its seven days plotted
+   * as the first seven days of the month, and the hover readout paired one day's
+   * date label with another day's value. A wrong number told in pixels.
+   */
+  // Not memoised: a cache keyed on length and last value could miss a shift of
+  // dates, and this is a few hundred strings at most.
+  const axisDates = [...new Set(series.flatMap((s) => s.points.map((p) => p.date)))].sort();
+  const dateIndex = new Map(axisDates.map((d, i) => [d, i]));
+  const valueOn = (s: Series, date: string | undefined) => (date ? s.points.find((p) => p.date === date)?.value : undefined);
+  const n = axisDates.length;
   const W = Math.max(width, 240);
   const padL = 44, padR = 12, padT = 10, padB = 24;
 
@@ -158,22 +169,23 @@ export default function LineChart({ series, height = 240, legend = true, baselin
           );
         })}
         {/* x labels */}
-        {axisPoints.map((p, i) =>
+        {axisDates.map((d, i) =>
           i % step === 0 ? (
             <text key={i} x={X(i)} y={height - 7} textAnchor="middle" fontSize={10} fill="var(--muted)">
-              {shortDate(p.date)}
+              {shortDate(d)}
             </text>
           ) : null
         )}
         {/* series */}
         {visible.map((s) => {
           const end = s.points.length - 1;
-          const line = s.points.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.value).toFixed(1)}`).join(" ");
+          const xAt = (i: number) => X(dateIndex.get(s.points[i].date) ?? 0);
+          const line = s.points.map((p, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)} ${Y(p.value).toFixed(1)}`).join(" ");
           // Close the fill on the axis FLOOR, not on zero. With a truncated
           // baseline Y(0) sits below the plot area, so the gradient spilled past
           // the bottom of the chart.
           const floorY = Y(yMin);
-          const area = `${line} L${X(end).toFixed(1)} ${floorY} L${X(0).toFixed(1)} ${floorY} Z`;
+          const area = `${line} L${xAt(end).toFixed(1)} ${floorY} L${xAt(0).toFixed(1)} ${floorY} Z`;
           const gid = `grad-${s.key}`;
           return (
             <g key={s.key}>
@@ -185,7 +197,7 @@ export default function LineChart({ series, height = 240, legend = true, baselin
               </defs>
               <path d={area} fill={`url(#${gid})`} />
               <path d={line} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-              <circle cx={X(end)} cy={Y(s.points[end].value)} r={3} fill={s.color} stroke="var(--panel)" strokeWidth={2} />
+              <circle cx={xAt(end)} cy={Y(s.points[end].value)} r={3} fill={s.color} stroke="var(--panel)" strokeWidth={2} />
             </g>
           );
         })}
@@ -193,9 +205,12 @@ export default function LineChart({ series, height = 240, legend = true, baselin
         {hover !== null && (
           <>
             <line x1={X(hover)} x2={X(hover)} y1={padT} y2={height - padB} stroke="var(--border-strong)" strokeWidth={1} />
-            {visible.map((s) => s.points[hover] && (
-              <circle key={s.key} cx={X(hover)} cy={Y(s.points[hover].value)} r={3.4} fill={s.color} stroke="var(--panel)" strokeWidth={2} />
-            ))}
+            {visible.map((s) => {
+              const v = valueOn(s, axisDates[hover]);
+              return v === undefined ? null : (
+                <circle key={s.key} cx={X(hover)} cy={Y(v)} r={3.4} fill={s.color} stroke="var(--panel)" strokeWidth={2} />
+              );
+            })}
           </>
         )}
       </svg>
@@ -217,7 +232,7 @@ export default function LineChart({ series, height = 240, legend = true, baselin
          */
         const fx = X(hover) / W;
         const anchorX = fx < 0.18 ? "0" : fx > 0.82 ? "-100%" : "-50%";
-        const topFrac = Y(Math.max(...visible.map((s) => s.points[hover]?.value ?? yMin))) / height;
+        const topFrac = Y(Math.max(...visible.map((s) => valueOn(s, axisDates[hover]) ?? yMin))) / height;
         const below = topFrac < 0.28;
         return (
         <div className="tooltip" style={{
@@ -231,12 +246,17 @@ export default function LineChart({ series, height = 240, legend = true, baselin
           top: `${topFrac * 100}%`,
           opacity: 1,
         }}>
-          <div className="d">{shortDate((axisPoints[hover] ?? axisPoints[axisPoints.length - 1]).date)}</div>
-          {visible.map((s) => s.points[hover] && (
-            <div className="r" key={s.key}>
-              <i style={{ background: s.color }} />{s.label}<b>{full(s.points[hover].value)}</b>
-            </div>
-          ))}
+          <div className="d">{shortDate(axisDates[hover] ?? axisDates[axisDates.length - 1])}</div>
+          {visible.map((s) => {
+            // A series with no value on this date says nothing, rather than
+            // showing a neighbouring day's figure under this date.
+            const v = valueOn(s, axisDates[hover]);
+            return v === undefined ? null : (
+              <div className="r" key={s.key}>
+                <i style={{ background: s.color }} />{s.label}<b>{full(v)}</b>
+              </div>
+            );
+          })}
         </div>
         );
       })()}

@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { useDash } from "../context/DashboardContext";
-import { PLATFORMS } from "../lib/platforms";
+import { PLATFORMS, followerSeries } from "../lib/platforms";
 import {
-  seriesByDay, followersByDay, sum, latest, followerGrowth, momentum, engagementRate,
+  seriesByDay, followersByDay, sum, latest, followerGrowth, followerLines, momentum, engagementRate,
 } from "../lib/api";
 import { compact, metric, sumKnown, full, pctPlain, ratioPct, shortDate } from "../lib/format";
 import { bestTimes, DOW_SHORT, fmtHour, totalReported } from "../lib/insights";
@@ -31,10 +31,9 @@ export default function Overview() {
   const viewSeries = seriesByDay(metrics, scope, "views");
   const engSeries = seriesByDay(metrics, scope, "engagements");
 
-  const growth: Series[] = platforms.map((p) => ({
-    key: p, label: PLATFORMS[p].name, color: PLATFORMS[p].color,
-    points: followersByDay(metrics, p),
-  }));
+  // One line per account where a platform's accounts started on different days;
+  // a summed line would draw the later account's arrival as a surge.
+  const growth: Series[] = platforms.flatMap((p) => followerSeries(followerLines(metrics, p), p, dash.accounts));
 
   /*
    * Rows for the three charts below, taken from the stored days directly rather
