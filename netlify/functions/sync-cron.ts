@@ -66,7 +66,7 @@ export async function runDue(db: Db, runOne: RunOne, now = Date.now()) {
     return { statusCode: 500, body: error.message };
   }
 
-  let ok = 0, failed = 0, attempted = 0, skipped = 0;
+  let ok = 0, failed = 0, attempted = 0, skipped = 0, unclaimable = 0;
   for (const acc of (accounts ?? []) as CronAccount[]) {
     if (attempted >= PER_RUN) break;
     if (Date.now() - startedAt > TIME_BUDGET_MS) break;
@@ -74,10 +74,23 @@ export async function runDue(db: Db, runOne: RunOne, now = Date.now()) {
      * Take the turn BEFORE running. A run that dies part-way (the subrequest
      * cap, a Worker kill) never reaches its own bookkeeping, and an account
      * whose turn was never recorded would be first in line again next minute.
+     *
+     * And take it as a compare-and-set: the update only matches while the
+     * account is still due, and returns the rows it changed. Two invocations
+     * that read the queue at the same moment would otherwise both run the same
+     * account; that happened live at 23:45 on 2026-09-18, when the old and new
+     * schedules overlapped during a deploy. Any run longer than a minute would
+     * overlap the next firing the same way.
      */
-    const { error: turnErr } = await db
-      .from("social_accounts").update({ sync_turn_at: new Date(now).toISOString() }).eq("id", acc.id);
-    writeFailed("cron.turn_write_failed", turnErr, { account: acc.id });
+    const { data: claimed, error: turnErr } = await db
+      .from("social_accounts")
+      .update({ sync_turn_at: new Date(now).toISOString() })
+      .eq("id", acc.id)
+      .or(`sync_turn_at.is.null,sync_turn_at.lt.${dueBefore}`)
+      .select("id");
+    if (writeFailed("cron.turn_write_failed", turnErr, { account: acc.id })) { unclaimable++; continue; }
+    // Another invocation took it between our read and this write.
+    if (!claimed?.length) { log("cron.turn_lost", { account: acc.id }); continue; }
 
     // LinkedIn's per-member daily call limit. The page has had its turn, so it
     // is not looked at again for fifteen minutes, but it is not an attempt.
@@ -91,11 +104,13 @@ export async function runDue(db: Db, runOne: RunOne, now = Date.now()) {
     }
   }
 
-  log("cron.finished", { attempted, ok, failed, skipped, due: accounts?.length ?? 0, ms: Date.now() - startedAt });
+  log("cron.finished", { attempted, ok, failed, skipped, unclaimable, due: accounts?.length ?? 0, ms: Date.now() - startedAt });
   // A run that syncs nothing is a failure, not a success. Returning 200 on 0/450
-  // is why an expired API version went unnoticed for three months.
-  const healthy = attempted === 0 || ok > 0;
-  return { statusCode: healthy ? 200 : 500, body: JSON.stringify({ attempted, ok, failed, skipped }) };
+  // is why an expired API version went unnoticed for three months. "Nothing
+  // was due" is healthy; "accounts were due and none could even be claimed"
+  // is the database refusing writes, and must not read as an idle minute.
+  const healthy = ok > 0 || (attempted === 0 && unclaimable === 0);
+  return { statusCode: healthy ? 200 : 500, body: JSON.stringify({ due: accounts?.length ?? 0, attempted, ok, failed, skipped, unclaimable }) };
 }
 
 export const run: Handler = async () => runDue(admin(), runAccount);

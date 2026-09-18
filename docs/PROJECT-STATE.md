@@ -47,7 +47,7 @@ address. Nothing further can be tested against LinkedIn until it arrives: a
 rejection cannot be resubmitted with the same app, so do not touch the app's
 products.
 
-**The build.** 256 tests, mutation 130/130, typecheck and build green.
+**The build.** 258 tests, mutation 133/133, typecheck and build green.
 Migrations 0001 to 0022 applied and verified against the live catalog
 (0018 LinkedIn constraints, 0019 story metrics, 0020 story metric set,
 0021 share-link expiry).

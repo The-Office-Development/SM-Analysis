@@ -59,6 +59,12 @@ test("an account whose turn is not yet due is left alone, and an idle minute run
   const res = await runDue(d, r.runOne, NOW);
   assert.deepEqual(r.ran, []);
   assert.equal(res.statusCode, 200, "nothing due is healthy, not a failure");
+  /*
+   * And the query itself found nothing. The claim would refuse these anyway,
+   * but only after spending a write on each: up to ten wasted subrequests every
+   * idle minute, reported to the operator as "due" when they were not.
+   */
+  assert.equal(JSON.parse(res.body).due, 0, "accounts not yet due are not even candidates");
 });
 
 test("the turn is taken BEFORE the run, so a run that dies still goes to the back", async () => {
@@ -110,4 +116,24 @@ test("only connected accounts are queued", async () => {
 
 test("the due interval is fifteen minutes, which is what a story's 24 hours are budgeted on", () => {
   assert.equal(DUE_AFTER_MS, 15 * 60_000);
+});
+
+test("two invocations reading the queue at once cannot both run the same account", async () => {
+  // Live at 23:45 on 2026-09-18: the old and new schedules overlapped during a
+  // deploy and both firings synced the same account.
+  const d = db([{ id: "a", sync_turn_at: ago(60) }, { id: "b", sync_turn_at: ago(30) }]);
+  const r = runner();
+  await Promise.all([runDue(d, r.runOne, NOW), runDue(d, r.runOne, NOW)]);
+  assert.equal(r.ran.filter((id) => id === "a").length, 1, `a ran twice: ${r.ran.join(",")}`);
+});
+
+test("accounts due but none claimable is a FAILED run, not an idle minute", async () => {
+  const d = makeDb(
+    { social_accounts: [{ id: "a", status: "connected", platform: "instagram", user_id: "u1", sync_turn_at: null }], sync_log: [] },
+    { failWrites: { social_accounts: 'permission denied for table "social_accounts"' } },
+  );
+  const r = runner();
+  const res = await runDue(d, r.runOne, NOW);
+  assert.deepEqual(r.ran, [], "an account whose turn could not be recorded is not run");
+  assert.equal(res.statusCode, 500, "and the run says so, rather than 200 like a quiet minute");
 });
