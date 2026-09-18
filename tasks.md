@@ -744,8 +744,16 @@ are now the only two placeholders blocked on something other than counsel.
 
 ## 6. Background — weeks, blocks nothing above
 
-- [x] Business Verification — **submitted 2026-09-13, in review.** (`docs/SETUP-META.md` §1). 10 minutes to 14 working
-      days. Note the correction recorded there: our registration carries no stamp
+- [x] Business Verification — **submitted 2026-09-13 (a Sunday), in review.** (`docs/SETUP-META.md` §1).
+      🔴 **The "10 minutes to 14 working days" this row used to state is not
+      Meta's number for this step.** The operator reports that Meta's own
+      submission screen says **2 business days**. That could not be confirmed
+      here on 2026-09-18: the Help Center page renders in JavaScript and returns
+      only its title, and the developer docs on business verification state no
+      timeline at all. Treat the screen the operator saw as the authority.
+      **By that number it is overdue:** Monday 09-14 through Friday 09-18 is five
+      business days. Overdue means a state to look at, not a queue to wait in:
+      see `SETUP-META.md` §1c. Note the correction recorded there: our registration carries no stamp
       **by design**, saying so in its own footer, which contradicts the inherited
       guidance that Meta rejects unstamped documents.
 - [ ] App Review, once real data exists to screencast. Advanced access for both

@@ -196,6 +196,45 @@ and note that it is itself blocked until business verification completes, so the
 sequencing is fixed. Nothing here has been attempted yet, and the 5-day figure is
 Meta's own wording on that page, not a measured turnaround.
 
+## 1c. It is overdue, 2026-09-18: what that means and what to look at
+
+Submitted Sunday 2026-09-13. Meta's own submission screen said **about 2 business
+days** (§1b, written that day). Monday 09-14 to Friday 09-18 is **five business
+days**. An older row in `tasks.md` claimed "10 minutes to 14 working days", which
+was inherited guidance, not Meta's number for this step, and it is corrected
+there.
+
+**Past the stated window, "in review" stops being an explanation.** Waiting
+longer only helps if the state is genuinely a queue. These are the states it
+could actually be in, and nothing in this repository can tell them apart: no API
+exposes verification status, and the app secret needed for even an app-level call
+lives only in Cloudflare. It is a dashboard-and-inbox check, and it takes two
+minutes.
+
+Look in **Business settings - Security Centre** (and `developers.facebook.com` -
+the app - **App settings - Basic**, which shows the same status beside the
+connected portfolio):
+
+| What it says | What it means | Do this |
+|---|---|---|
+| **In review / Pending** | Genuinely queued, past the stated window | Nothing to fix. Leave it; chase only if it passes ten business days |
+| **More information needed** / a document request | The clock stopped and Meta is waiting on **us** | Answer it. This is the state that looks identical to "waiting" from the outside and is the reason to check rather than assume |
+| **Not started / Eligible for verification** | The submission never completed | Start it again from that page and finish the upload |
+| **Failed / Revoked** | Rejected | Read the reason before resubmitting anything |
+| **Verified** | Done | Then Tech Provider access verification, then App Review (`APP-REVIEW-PREP.md`) |
+
+**Check the email too, and check whose it is.** A document request goes to the
+portfolio's admin address and routinely lands in spam or Promotions. If the
+portfolio admin is a personal address rather than `info@theoffice.it.com`, look
+in both. A request left unanswered is the single most likely reason a two-day
+review is on day five.
+
+**One thing not to do while it is pending:** do not edit the business name,
+address or portfolio details, and do not open a second portfolio to "try again".
+Verifying a different portfolio from the one the app is connected to produces a
+verified business and an app that is still blocked, which reads exactly like a
+stalled review.
+
 ## 2. The Instagram app — configuration
 
 **Where:** [developers.facebook.com](https://developers.facebook.com) → your app.

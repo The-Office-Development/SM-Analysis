@@ -54,7 +54,10 @@ Hosting is Cloudflare Pages, and **CI does not deploy the cron Worker**: that is
 still `cd worker-cron && CLOUDFLARE_ACCOUNT_ID=69b37cce7d7633d2e73be9b548b8021a npx wrangler deploy`.
 
 **What is next, in order.**
-1. Meta: get the Business Verification result, then the Tech Provider check,
+1. Meta: **Business Verification is overdue, not pending.** Submitted 2026-09-13
+   against Meta's stated two business days; 2026-09-18 is day five. Check
+   Security Centre and the portfolio admin's inbox for a document request before
+   assuming it is a queue (`SETUP-META.md` §1c). Then the Tech Provider check,
    reviewer login, screencast, deletion-callback test, and submit App Review.
    Until that passes, only accounts with a role on the Meta app can connect.
 2. LinkedIn: answer the Microsoft Vetting email, confirm the app shows as
