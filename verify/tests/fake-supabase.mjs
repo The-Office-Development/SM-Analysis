@@ -34,12 +34,38 @@ export function makeDb(seed = {}, opts = {}) {
       : v;
   };
 
+  /*
+   * Embedded selects, `select("...,social_accounts!inner(id,user_id)")`.
+   *
+   * PostgREST resolves the relation through a foreign key; a fake cannot, so
+   * each supported embed names its key here, copied from the schema. Only
+   * `!inner` is modelled: it drops a row whose relation does not match, which
+   * is what makes `.eq("social_accounts.user_id", uid)` an ownership check.
+   * Without this, refresh-post's tenant join could not be tested at all.
+   */
+  const EMBED_KEYS = {
+    "content.social_accounts": "account_id",   // content.account_id -> social_accounts.id
+  };
+
   function query(table) {
     let rows = rowsOf(table).map((r) => ({ ...r }));
     const preds = [];
+    const embeds = [];
     const api = {
-      select() { return api; },
-      eq(c, v) { preds.push((r) => r[c] === v); return api; },
+      select(cols) {
+        for (const m of String(cols ?? "").matchAll(/(\w+)!inner\(/g)) {
+          const fk = EMBED_KEYS[`${table}.${m[1]}`];
+          if (!fk) throw new Error(`fake-supabase: no foreign key known for ${table}.${m[1]}; add it to EMBED_KEYS`);
+          embeds.push({ rel: m[1], fk });
+        }
+        return api;
+      },
+      eq(c, v) {
+        const dot = c.indexOf(".");
+        if (dot > 0) { const rel = c.slice(0, dot), col = c.slice(dot + 1); preds.push((r) => r[rel]?.[col] === v); }
+        else preds.push((r) => r[c] === v);
+        return api;
+      },
       neq(c, v) { preds.push((r) => r[c] !== v); return api; },
       gte(c, v) { preds.push((r) => r[c] >= v); return api; },
       lt(c, v) { preds.push((r) => r[c] != null && r[c] < v); return api; },
@@ -66,7 +92,13 @@ export function makeDb(seed = {}, opts = {}) {
       },
       limit(n) { api._limit = n; return api; },
       _apply() {
-        let out = rows.filter((r) => preds.every((p) => p(r)));
+        let base = rows;
+        for (const { rel, fk } of embeds) {
+          base = base
+            .map((r) => ({ ...r, [rel]: rowsOf(rel).find((x) => x.id === r[fk]) ?? null }))
+            .filter((r) => r[rel] !== null);   // !inner
+        }
+        let out = base.filter((r) => preds.every((p) => p(r)));
         if (api._order) out.sort((a, b) => (api._order.asc ? 1 : -1) * cmp(a[api._order.c], b[api._order.c]));
         if (api._limit != null) out = out.slice(0, api._limit);
         return out;

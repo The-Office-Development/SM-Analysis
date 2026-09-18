@@ -35,8 +35,23 @@ const SYNC_HANDLER = "verify/build/sync.js";
 
 const PAGE_PICK = "verify/build/linkedin-page.js";
 const SHARE = "verify/build/share.js";
+const REFRESH = "verify/build/refresh-post.js";
 
 const mutations = [
+  { name: "a refresh response carrying nulls that blank stored figures on screen", file: REFRESH,
+    find: "? { ...known, refreshed_at: refreshedAt }\n", replace: "? { ...fresh, refreshed_at: refreshedAt }\n" },
+  { name: "a story refreshed with the feed metric list, so it always fails", file: REFRESH,
+    find: "if (story) {", replace: "if (false) {" },
+  { name: "a refused story list failing the refresh instead of stepping down", file: REFRESH,
+    find: "for (const metrics of storyLadderFrom(preferred)) {", replace: "for (const metrics of storyLadderFrom(preferred).slice(0, 1)) {" },
+  { name: "an expired story re-read on every page open", file: REFRESH,
+    find: "if (story && Number.isFinite(expiresAt) && expiresAt <= Date.now()) {", replace: "if (false) {" },
+  { name: "'checked just now' claimed when nothing came back", file: REFRESH,
+    find: ": { refreshed_at: refreshedAt })", replace: ": { refreshed_at: refreshedAt, checked_at: refreshedAt })" },
+  { name: "a dead token stepped down the story ladder instead of reported", file: REFRESH,
+    find: "if (isAuthError(e) || isThrottleError(e))\n                        throw e;", replace: "if (false)\n                        throw e;" },
+  { name: "any tenant's post refreshable by id", file: REFRESH,
+    find: '.eq("social_accounts.user_id", uid)', replace: "" },
   { name: "an expired share link still serving a client's figures", file: SHARE,
     find: "if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {",
     replace: "if (false) {" },
@@ -73,12 +88,15 @@ const mutations = [
   { name: "a stale story-metric narrowing obeyed after the ladder changed", file: SYNC,
     find: "storyMetrics = v?.v === STORY_METRIC_LADDER_VERSION && typeof v?.metrics === \"string\" ? v.metrics : null;",
     replace: "storyMetrics = typeof v?.metrics === \"string\" ? v.metrics : null;" },
-  { name: "the middle rung skipped, losing the four creator story metrics", file: SYNC,
-    find: "const ladder = preferred && STORY_METRIC_LADDER.includes(preferred)",
-    replace: "const ladder = [STORY_METRIC_LADDER[0], STORY_METRIC_LADDER[2]]; const _unused = preferred && STORY_METRIC_LADDER.includes(preferred)" },
+  // Retargeted 2026-09-19: the ladder and the story mapping moved into
+  // _instagram.ts so the sync and refresh-post share one copy. Mutating the
+  // shared helper now breaks BOTH callers, which is the point of sharing it.
+  { name: "the middle rung skipped, losing the four creator story metrics", file: INSTA,
+    find: "return preferred && ladder.includes(preferred) ? ladder.slice(ladder.indexOf(preferred)) : [...ladder];",
+    replace: "return [ladder[0], ladder[2]];" },
   { name: "no fallback when Meta refuses the full story metric list", file: SYNC,
     find: "for (const metrics of ladder) {", replace: "for (const metrics of ladder.slice(0, 1)) {" },
-  { name: "a story's total_interactions requested and thrown away again", file: SYNC,
+  { name: "a story's total_interactions requested and thrown away again", file: INSTA,
     find: "interactions: ins.total_interactions ?? null,", replace: "interactions: null," },
   { name: "the story navigation split stored under unreadable keys", file: SYNC,
     find: 'String((r.dimension_values ?? []).join("_")).toLowerCase()', replace: 'String((r.dimension_values ?? []).join("_"))' },
@@ -233,7 +251,7 @@ const mutations = [
   { name: "a story the batch could not measure left unmeasured", file: SYNC,
     find: "            if (!st?.id || insightsById.has(st.id))\n                continue;",
     replace: "            if (true)\n                continue;" },
-  { name: "a valueless insight written as a confident zero", file: SYNC,
+  { name: "a valueless insight written as a confident zero", file: INSTA,
     find: "        if (typeof v === \"number\" && Number.isFinite(v))\n            out[r.name] = v;",
     replace: "        if (true)\n            out[r.name] = v ?? 0;" },
   { name: "a refused run writing null over a story's measured figures", file: SYNC,
@@ -242,7 +260,7 @@ const mutations = [
   { name: "stories not captured at all", file: SYNC,
     find: "return { days, posts: [...posts, ...stories] };",
     replace: "return { days, posts };" },
-  { name: "a story's absent likes stored as zero, sinking it in every ranking", file: SYNC,
+  { name: "a story's absent likes stored as zero, sinking it in every ranking", file: INSTA,
     find: "likes: null, comments: null, saves: null,",
     replace: "likes: 0, comments: 0, saves: 0," },
   { name: "an unreported post metric stored as zero instead of null", file: SYNC,

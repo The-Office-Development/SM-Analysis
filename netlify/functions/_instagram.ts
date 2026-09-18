@@ -335,3 +335,62 @@ export async function auditTokenScopes(
   }
   return incomplete ? null : held;
 }
+
+/* ===========================================================================
+ * Shared by the sync and by refresh-post, so the two cannot drift.
+ *
+ * They did drift. refresh-post kept its own copy of all three: it read only
+ * `values[0].value` and missed figures served as `total_value`, it asked a
+ * story for the FEED metric list (which includes `saved`, not a story metric,
+ * so the all-or-nothing insights call failed on every story), and it had no
+ * ladder. One definition each, used by both.
+ * ======================================================================== */
+
+/**
+ * Insight rows as `{ name: number }`, leaving OUT any row without a numeric
+ * value. Never `?? 0`: a row with no value is unreported, and every caller
+ * writes `ins.x ?? null` precisely so that absence stays null.
+ */
+export function insightValues(rows: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const v = (r as any)?.values?.[0]?.value ?? (r as any)?.total_value?.value;
+    if (typeof v === "number" && Number.isFinite(v)) out[(r as any).name] = v;
+  }
+  return out;
+}
+
+/**
+ * The story metric lists to try, widest first, starting from the rung this
+ * account is already known to answer. A preference that is not a current rung
+ * (an older ladder's list) is ignored rather than obeyed.
+ */
+export function storyLadderFrom(preferred: string | null | undefined): string[] {
+  const ladder = STORY_METRIC_LADDER as readonly string[];
+  return preferred && ladder.includes(preferred) ? ladder.slice(ladder.indexOf(preferred)) : [...ladder];
+}
+
+/**
+ * A story's insight values as `content` columns.
+ *
+ * A story has no likes, comments or saves; they are null, "not applicable",
+ * never 0, which would sink every story to the bottom of a ranking by likes.
+ */
+export function storyFigures(ins: Record<string, number>) {
+  return {
+    views: ins.views ?? null,
+    reach: ins.reach ?? null,
+    shares: ins.shares ?? null,
+    likes: null, comments: null, saves: null,
+    replies: ins.replies ?? null,
+    navigation: ins.navigation ?? null,
+    total_views: ins.total_views ?? null,
+    reposts: ins.reposts ?? null,
+    interactions: ins.total_interactions ?? null,
+    profile_visits: ins.profile_visits ?? null,
+    profile_activity: ins.profile_activity ?? null,
+    follows: ins.follows ?? null,
+    link_clicks: ins.link_clicks ?? null,
+    facebook_views: ins.facebook_views ?? null,
+  };
+}

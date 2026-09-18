@@ -1,5 +1,5 @@
 import { type Db, graphGet, decryptToken, isAuthError, isThrottleError, GraphError, log, writeFailed } from "./_lib";
-import { igGet, IG, auditTokenScopes, STORY_METRIC_LADDER, STORY_METRIC_LADDER_VERSION } from "./_instagram";
+import { igGet, IG, auditTokenScopes, STORY_METRIC_LADDER, STORY_METRIC_LADDER_VERSION, insightValues, storyLadderFrom, storyFigures } from "./_instagram";
 import {
   LI, liGet, liUrn, liNum, liLikes, liTime, liDayKey, type LiShareStats,
   LI_FACETS, liDemographicCount, urnTail, liEnumLabel,
@@ -1671,9 +1671,7 @@ async function captureStories(
    * never serve them spends a call per story per run to learn what is already
    * known, and a story is re-read for its whole 24 hours.
    */
-  const ladder = preferred && (STORY_METRIC_LADDER as readonly string[]).includes(preferred)
-    ? (STORY_METRIC_LADDER as readonly string[]).slice((STORY_METRIC_LADDER as readonly string[]).indexOf(preferred))
-    : [...STORY_METRIC_LADDER];
+  const ladder = storyLadderFrom(preferred);
   let used: string | null = null;
   let refusal: string | null = null;
   /*
@@ -1810,29 +1808,12 @@ async function captureStories(
       media_type: "Story",
       permalink: safePermalink(m.permalink),
       published_at: published,
-      // Instagram reports views for stories; reach is the distinct-accounts
-      // figure. Neither is invented when absent.
-      views: ins.views ?? null,
-      reach: ins.reach ?? null,
-      shares: ins.shares ?? null,
-      // A story has no likes, comments or saves. null says "not applicable here"
-      // in the same vocabulary as "not reported", which is honest: writing 0
-      // would put a story at the bottom of any ranking sorted by likes.
-      likes: null, comments: null, saves: null,
+      // Every figure a story reports, mapped in ONE place (`storyFigures`) that
+      // refresh-post uses too. Nothing is invented when absent, and a story's
+      // likes, comments and saves are null, "not applicable", never 0.
+      ...storyFigures(ins),
       avg_watch_seconds: null, retention_pct: null,
-      replies: ins.replies ?? null,
-      navigation: ins.navigation ?? null,
       navigation_breakdown: navigationById.get(m.id) ?? null,
-      // The rest of what a story reports. Every one of these was documented and
-      // unread until 2026-09-15; see migration 0019.
-      total_views: ins.total_views ?? null,
-      reposts: ins.reposts ?? null,
-      interactions: ins.total_interactions ?? null,
-      profile_visits: ins.profile_visits ?? null,
-      profile_activity: ins.profile_activity ?? null,
-      follows: ins.follows ?? null,
-      link_clicks: ins.link_clicks ?? null,
-      facebook_views: ins.facebook_views ?? null,
       expires_at: new Date(Date.parse(published) + IG.STORY_LIFETIME_MS).toISOString(),
     };
   });
@@ -2090,12 +2071,7 @@ function normInsights(rows: any[]): Record<string, number> {
    * photo fallback `views ?? reach`, since a valueless views row stopped at 0
    * and never reached the reach figure beside it.
    */
-  const out: Record<string, number> = {};
-  for (const r of rows) {
-    const v = r.values?.[0]?.value ?? r.total_value?.value;
-    if (typeof v === "number" && Number.isFinite(v)) out[r.name] = v;
-  }
-  return out;
+  return insightValues(rows);
 }
 /**
  * Record which story metric list this account actually answers.

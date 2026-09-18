@@ -72,7 +72,7 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **240 tests, mutation 117/117**
+Code is on `main`, all green: typecheck, build, **248 tests, mutation 124/124**
 (measured 2026-09-19). Migrations `0001`-`0021` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
@@ -338,8 +338,17 @@ P0 finding. There is a test and a mutation guarding every one.
   wrote null over a real number — unrecoverable for a story once it expires.
   `mergeContentWithStored` keeps the stored value, as `mergeWithStored` does for
   days. Guarded by a mutation. `refresh-post.ts` follows the same rule by
-  updating only what it read, and has **no test at all**: no handler-level test
-  rig exists in this repo.
+  updating only what it read, **and by responding with only what it read**.
+- **Never send a figure the platform declined as `null` in a response the page
+  merges.** `PostDetail` spreads a refresh over the stored post, so a null in
+  the response blanks a real number on screen even when the database kept it.
+  refresh-post did exactly that until 2026-09-19, one layer above the fix that
+  stopped it writing the null. It also asked a story for the feed metric list
+  (`saved` is not a story metric, and insights are all-or-nothing), so no story
+  refresh ever worked. Its first test found both. The story mapping, ladder and
+  insight normaliser now live once in `_instagram.ts` (`storyFigures`,
+  `storyLadderFrom`, `insightValues`) and both the sync and the refresh use
+  them. Seven mutations guard the endpoint.
 
 ### LinkedIn: where the Instagram rules bend, and the rules of its own
 Checked 2026-09-14 against LinkedIn's primary docs; the full comparison is

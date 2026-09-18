@@ -138,6 +138,9 @@ function PostDetailInner() {
     // A platform with no single-post read would only spend a Worker invocation
     // on a refusal. LinkedIn in particular has 100 calls a day to protect.
     if (!LIVE_READ.includes(post.platform)) return;
+    // Instagram stops serving a story after 24 hours; its figures are final and
+    // a re-read is a guaranteed refusal that still costs a Worker invocation.
+    if (post.media_type === "Story" && post.expires_at && Date.parse(post.expires_at) <= Date.now()) return;
     if (autoDone.current === post.id) return;
     const age = post.checked_at ? Date.now() - Date.parse(post.checked_at) : Infinity;
     if (Number.isFinite(age) && age < AUTO_STALE_MS) return;
@@ -148,7 +151,9 @@ function PostDetailInner() {
     refreshPost(post.id)
       .then((r) => {
         if (cancelled) return;
-        const { refreshed_at: at, ...metrics } = r;
+        // Nothing new: keep the stored figures AND their true read time.
+        if (!r.refreshed_at) return;
+        const { refreshed_at: at, note: _n, ...metrics } = r;
         setFresh(metrics);
         setCheckedAt(at);
       })
@@ -232,17 +237,23 @@ function PostDetailInner() {
                 Open on {PLATFORMS[post.platform].name} ↗
               </a>
             )}
-            {LIVE_READ.includes(post.platform) && <button type="button" className="btn btn--sm" disabled={refreshing}
+            {LIVE_READ.includes(post.platform) && !expired && <button type="button" className="btn btn--sm" disabled={refreshing}
               style={{ marginLeft: "auto" }}
               onClick={async () => {
                 setRefreshing(true); setRefreshMsg(null);
                 try {
                   const r = await refreshPost(post.id);
-                  // refreshed_at is metadata about the fetch, not a column on the post.
-                  const { refreshed_at: _t, ...metrics } = r;
-                  setFresh(metrics);
-                  setCheckedAt(r.refreshed_at);
-                  setRefreshMsg(`Updated just now, ${new Date(r.refreshed_at).toLocaleTimeString()}`);
+                  if (!r.refreshed_at) {
+                    // Nothing came back. Say that, and leave the figures and their
+                    // read time exactly as they were rather than claiming a check.
+                    setRefreshMsg(r.note ?? "Instagram has nothing new for this yet.");
+                  } else {
+                    // refreshed_at is metadata about the fetch, not a column on the post.
+                    const { refreshed_at: _t, note: _n, ...metrics } = r;
+                    setFresh(metrics);
+                    setCheckedAt(r.refreshed_at);
+                    setRefreshMsg(`Updated just now, ${new Date(r.refreshed_at).toLocaleTimeString()}`);
+                  }
                 } catch (e) {
                   setRefreshMsg(e instanceof Error ? e.message : "Could not refresh.");
                 } finally { setRefreshing(false); }

@@ -9,7 +9,7 @@ Metricool's asks for full control of the client's Facebook Page plus
 `business_management`, the scope this project dropped as a P0 finding. Reasoning
 in `docs/VENDOR-OPTIONS.md`, marked deferred.
 
-The software is finished and green: 240 tests, mutation 117/117, crons configured
+The software is finished and green: 248 tests, mutation 124/124, crons configured
 in code. What follows is switching it on, not building it.
 
 Last updated: 2026-09-18.
@@ -21,7 +21,7 @@ Last updated: 2026-09-18.
 Read from the live systems, not from this file. The 2026-09-08 block below is
 kept for the record; where the two disagree, this one wins.
 
-**Green:** 240 tests, mutation 117/117, typecheck and build clean. Migrations
+**Green:** 248 tests, mutation 124/124, typecheck and build clean. Migrations
 0001-0020 applied (0018 LinkedIn constraints, 0019 story metrics, 0020 story
 metric set), verified against the live catalog.
 

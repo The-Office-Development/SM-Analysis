@@ -297,7 +297,12 @@ export type { MetricKey } from "./series";
  * history and can never be live, while a single post is one call. The question
  * this serves has a deadline measured in hours.
  */
-export async function refreshPost(id: string): Promise<Partial<ContentItem> & { refreshed_at: string }> {
+/**
+ * `refreshed_at` is null when Instagram returned no figures this time; `note`
+ * then says so. The response only ever carries figures actually read, so it is
+ * safe to spread over the stored post.
+ */
+export async function refreshPost(id: string): Promise<Partial<ContentItem> & { refreshed_at: string | null; note?: string }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not signed in.");
   const res = await fetch("/api/refresh-post", {
