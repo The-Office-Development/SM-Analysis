@@ -72,8 +72,8 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **248 tests, mutation 124/124**
-(measured 2026-09-19). Migrations `0001`-`0021` are applied.
+Code is on `main`, all green: typecheck, build, **256 tests, mutation 130/130**
+(measured 2026-09-19). Migrations `0001`-`0022` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
 `app.theoffice.it.com` serves the app and its functions, and `@heath_ens21`
@@ -387,11 +387,21 @@ found last deployed on 2026-09-08, so four days of sync fixes, including the
 ### Things that look wrong but are not
 - `metrics_daily` columns are nullable *on purpose*.
 - Days are re-fetched repeatedly *on purpose*; upserts are idempotent.
-- The sync cron is scheduled every 15 minutes (`worker-cron/wrangler.toml`) and
-  stops early *on purpose* — each Cloudflare invocation gets 50 subrequests, and
-  stories, which expire in 24 hours, are why it runs that often. `sync_log` on
-  2026-09-12 showed 39 runs per account in 24 hours rather than 96; that gap is
-  observed and not yet explained, so do not quote the schedule as the cadence.
+- The sync cron fires **every minute** and syncs **one** account per firing
+  (`sync-cron.ts`, `worker-cron/wrangler.toml`), *on purpose*. The Worker's own
+  log on 2026-09-18 explained the old "39 runs per account, not 96" gap: each
+  15-minute firing synced one account and then **failed** the next with "Too
+  many subrequests by single Worker invocation" (50 on the free plan; one
+  Instagram account spends ~27 calls plus database work). That failure could
+  not reach `sync_log`, because the insert is a subrequest too, so the table
+  showed zero failures while half of all runs failed, and the run returned 200.
+  **`sync_log` cannot record a failure caused by running out of subrequests.**
+  When the table and the platform disagree, read the Worker's log
+  (`npx wrangler tail pulseboard-cron --format json`).
+- Queue order is `sync_turn_at` (migration 0022), stamped when an account is
+  TAKEN, before its run. Never order the cron by `last_synced_at`: it moves only
+  on success, so with one account per run a failing account would take every
+  slot. Six mutations guard the queue.
 - `buildCsv` uses `seriesByDay(..., "followers")` while the dashboard uses
   `followersByDay()`. These agree: the primary key is `(account_id, date)`.
 

@@ -71,7 +71,17 @@ export function makeDb(seed = {}, opts = {}) {
       lt(c, v) { preds.push((r) => r[c] != null && r[c] < v); return api; },
       lte(c, v) { preds.push((r) => r[c] <= v); return api; },
       in(c, vals) { const set = new Set(vals); preds.push((r) => set.has(r[c])); return api; },
-      order(c, o = {}) { api._order = { c, asc: o.ascending !== false }; return api; },
+      /*
+       * Nulls placed as PostgREST places them: last by default for ascending,
+       * first when asked. The fake used to compare null as equal to everything,
+       * so `nullsFirst` was silently ignored and "never had a turn goes first"
+       * failed here while being true in production.
+       */
+      order(c, o = {}) {
+        const asc = o.ascending !== false;
+        api._order = { c, asc, nullsFirst: o.nullsFirst ?? !asc };
+        return api;
+      },
       /** Minimal PostgREST `or` support: "col.is.null,col.lt.value" (OR of terms). */
       or(expr) {
         const terms = String(expr).split(",").map((t) => {
@@ -99,7 +109,14 @@ export function makeDb(seed = {}, opts = {}) {
             .filter((r) => r[rel] !== null);   // !inner
         }
         let out = base.filter((r) => preds.every((p) => p(r)));
-        if (api._order) out.sort((a, b) => (api._order.asc ? 1 : -1) * cmp(a[api._order.c], b[api._order.c]));
+        if (api._order) {
+          const { c, asc, nullsFirst } = api._order;
+          out.sort((a, b) => {
+            const an = a[c] == null, bn = b[c] == null;
+            if (an || bn) return an === bn ? 0 : (an ? (nullsFirst ? -1 : 1) : (nullsFirst ? 1 : -1));
+            return (asc ? 1 : -1) * cmp(a[c], b[c]);
+          });
+        }
         if (api._limit != null) out = out.slice(0, api._limit);
         return out;
       },

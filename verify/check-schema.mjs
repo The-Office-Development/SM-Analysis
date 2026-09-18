@@ -78,6 +78,7 @@ const EXPECTED = [
   { version: "0019_story_metrics", table: "content", column: "profile_visits" },
   { version: "0020_story_metric_set", table: "social_accounts", column: "story_metrics" },
   { version: "0021_share_expiry", table: "report_shares", column: "expires_at" },
+  { version: "0022_sync_turn", table: "social_accounts", column: "sync_turn_at" },
 ];
 
 /** Every table anon must NOT be able to read. */

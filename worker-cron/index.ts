@@ -1,10 +1,10 @@
 /**
- * The hourly sync, as a Cloudflare Cron Trigger.
+ * The scheduled sync (every minute, one due account per run), as a Cloudflare Cron Trigger.
  *
  * Pages Functions cannot be scheduled — only a Worker can — so this is a
  * separate deployment from the Pages project that serves the app. It is
  * deliberately thin: it imports `run` from netlify/functions/sync-cron.ts and
- * calls it. The pacing (hourly, least-recently-synced first), the time budget,
+ * calls it. The pacing (one due account per run, longest-waiting first), the time budget,
  * and the rule that a run syncing 0 of 450 accounts is a FAILURE rather than a
  * 200 are all decisions that belong in one place. Reimplementing them here
  * would let the two platforms drift, and the drift would be silent.
@@ -28,7 +28,7 @@ import { run as refreshTokens } from "../netlify/functions/token-refresh";
 export default {
   async scheduled(event: ScheduledController, _env: unknown, ctx: ExecutionContext) {
     /*
-     * Two schedules, one Worker. `event.cron` says which fired, so the hourly
+     * Two schedules, one Worker. `event.cron` says which fired, so the per-minute
      * sync and the four-hourly token refresh stay independent rather than one
      * being bolted onto the other's cadence.
      *

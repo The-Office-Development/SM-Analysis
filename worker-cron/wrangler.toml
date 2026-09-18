@@ -29,7 +29,17 @@ compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
 [triggers]
-# Every 15 minutes. The body stops early on its budget and the trailing re-fetch
+# EVERY MINUTE, one account per firing (2026-09-19). The Worker's own log on
+# 2026-09-18 settled the paragraph below: each 15-minute firing synced one
+# account and then failed the next with "Too many subrequests by single Worker
+# invocation". The free plan's 50 subrequests fit one Instagram account, not
+# two, and the failure could not reach sync_log because that write is a
+# subrequest too. That is the "39 runs per account, not 96" gap, explained.
+# Each firing now takes one DUE account (its last turn over 15 minutes ago)
+# and costs one request against the 100,000 a day; an idle minute is a single
+# database query. The history below is kept because it records the reasoning.
+#
+# Previously: every 15 minutes. The body stops early on its budget and the trailing re-fetch
 # in _sync.ts heals any missed run, so the cadence is a floor on freshness rather
 # than a guarantee of completeness. (Until 2026-09-12 this paragraph began
 # "Hourly, matching the Netlify schedule it replaces", directly above a line
@@ -49,4 +59,4 @@ compatibility_flags = ["nodejs_compat"]
 #
 # What it does NOT fix: a single run still cannot finish. More trips, same size
 # truck.
-crons = ["*/15 * * * *", "0 */4 * * *"]
+crons = ["* * * * *", "0 */4 * * *"]

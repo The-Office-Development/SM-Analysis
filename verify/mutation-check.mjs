@@ -36,8 +36,22 @@ const SYNC_HANDLER = "verify/build/sync.js";
 const PAGE_PICK = "verify/build/linkedin-page.js";
 const SHARE = "verify/build/share.js";
 const REFRESH = "verify/build/refresh-post.js";
+const CRON = "verify/build/sync-cron.js";
 
 const mutations = [
+  { name: "two accounts per cron run, so the second hits the 50-subrequest cap", file: CRON,
+    find: "if (attempted >= PER_RUN)", replace: "if (attempted >= PER_RUN + 1)" },
+  { name: "the cron queue ordered by last success, so a failing account takes every slot", file: CRON,
+    find: '.order("sync_turn_at", { ascending: true, nullsFirst: true })',
+    replace: '.order("last_synced_at", { ascending: true, nullsFirst: true })' },
+  { name: "a cron turn never recorded, so a run that dies is first in line forever", file: CRON,
+    find: ".update({ sync_turn_at: new Date(now).toISOString() })", replace: ".update({})" },
+  { name: "every account re-synced every minute, due or not", file: CRON,
+    find: ".or(`sync_turn_at.is.null,sync_turn_at.lt.${dueBefore}`)", replace: "" },
+  { name: "a LinkedIn page held back by its call limit using up the run", file: CRON,
+    find: "skipped++;", replace: "skipped++; attempted++;" },
+  { name: "disconnected and expired accounts queued for sync", file: CRON,
+    find: '.eq("status", "connected")\n        .or(', replace: '.or(' },
   { name: "a refresh response carrying nulls that blank stored figures on screen", file: REFRESH,
     find: "? { ...known, refreshed_at: refreshedAt }\n", replace: "? { ...fresh, refreshed_at: refreshedAt }\n" },
   { name: "a story refreshed with the feed metric list, so it always fails", file: REFRESH,
