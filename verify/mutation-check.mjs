@@ -33,7 +33,24 @@ const ANALYTICS = "verify/build-lib/analytics.js";
 const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
+const PAGE_PICK = "verify/build/linkedin-page.js";
+
 const mutations = [
+  { name: "a LinkedIn Page switch that keeps the previous Page's numbers", file: PAGE_PICK,
+    find: 'gone("metrics_daily", await db.from("metrics_daily").delete().eq("account_id", acc.id)),',
+    replace: "true," },
+  { name: "any URN the browser sends accepted as a Page to connect", file: PAGE_PICK,
+    find: "if (!available.includes(urn))", replace: "if (false)" },
+  { name: "a Page switch that repoints the account after a refused delete", file: PAGE_PICK,
+    find: "if (failed) {", replace: "if (false) {" },
+  { name: "another user's LinkedIn account switchable", file: PAGE_PICK,
+    find: "if (!acc || acc.user_id !== uid || acc.platform !== \"linkedin\")", replace: "if (!acc)" },
+  { name: "the sync left reading the old Page after a switch", file: PAGE_PICK,
+    find: ".update({ extra: { ...extra, urn } })", replace: ".update({ extra })" },
+  { name: "a switched account still claiming it was synced recently", file: PAGE_PICK,
+    find: "last_synced_at: null,", replace: "last_synced_at: new Date().toISOString()," },
+  { name: "page names re-fetched on every render, burning the daily call budget", file: PAGE_PICK,
+    find: "const missing = urns.filter((u) => !known[u]);", replace: "const missing = urns;" },
   { name: "a later account's arrival drawn as a follower surge", file: "verify/build-lib/series.js",
     find: "if (new Set(firstDay.values()).size <= 1) {", replace: "if (true) {" },
   { name: "a newly connected account counted as follower growth", file: "verify/build-lib/series.js",

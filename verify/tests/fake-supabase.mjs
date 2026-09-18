@@ -154,6 +154,13 @@ export function makeDb(seed = {}, opts = {}) {
       admin: { deleteUser: async () => ({ data: null, error: null }) },
     },
     _rows: (t) => rowsOf(t).map((r) => ({ ...r })),
+    /*
+     * Replace a table's contents. `_rows` deliberately hands out copies, so a
+     * test that edits what it returns edits nothing and then asserts against
+     * the unchanged original — a test that cannot fail. This is the supported
+     * way to set up a variant.
+     */
+    _seed: (t, rows) => { tables.set(t, rows.map((r) => ({ ...r }))); },
     _tables: tables,
   };
 }

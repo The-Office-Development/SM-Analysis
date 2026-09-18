@@ -101,6 +101,12 @@ verified website and domain, app verified by the organisation's page.
    BATCH_GET. Record what it settles in `LINKEDIN-PLAN.md` Phase 3.
 5. Connect Drinkat's page in PulseBoard, let it sync for a few days, then run
    `node verify/reconcile.mjs --account <id>` beside the page's Analytics tab.
+6. **If the member administers more than one page, check the picker.** The
+   callback connects the first page it finds; Connections then shows
+   "Change page", served by `/api/linkedin-page`. Confirm the list names every
+   page they administer and none they do not, and that switching empties the
+   previous page's numbers rather than adding to them. Built 2026-09-18 against
+   the mock only: no part of it has met the real API.
 
 Limits while on development tier: 500 calls per app and 100 per member per 24
 hours, no BATCH_GET, and the integration must be finished "within twelve months

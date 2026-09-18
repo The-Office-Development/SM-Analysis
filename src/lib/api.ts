@@ -271,3 +271,36 @@ export async function refreshPost(id: string): Promise<Partial<ContentItem> & { 
   if (!res.ok) throw new Error(body.message ?? "Could not refresh that post.");
   return body;
 }
+
+/* --------------------------- LinkedIn page pick -------------------------- */
+
+/**
+ * The Pages this LinkedIn connection could point at.
+ *
+ * Read on demand rather than with the account list: each name is a LinkedIn API
+ * call the first time, and development tier allows 100 per member per day.
+ */
+export async function linkedInPages(accountId: string): Promise<{ chosen: string | null; options: { urn: string; name: string }[] }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not signed in.");
+  const res = await fetch(`/api/linkedin-page?account_id=${encodeURIComponent(accountId)}`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message || "Could not read your LinkedIn Pages.");
+  return body;
+}
+
+/** Point this connection at a different Page. Deletes the previous Page's stored numbers. */
+export async function switchLinkedInPage(accountId: string, urn: string): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not signed in.");
+  const res = await fetch("/api/linkedin-page", {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ account_id: accountId, urn }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message || "Could not switch Page.");
+  return body.message as string;
+}

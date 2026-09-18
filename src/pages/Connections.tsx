@@ -6,7 +6,7 @@ import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import { connectErrorMessage } from "../lib/connectErrors";
 import { isConfigured } from "../lib/supabase";
-import { startOAuth, disconnectAccount, exportMyData, deleteMyAccount } from "../lib/api";
+import { startOAuth, disconnectAccount, exportMyData, deleteMyAccount, linkedInPages, switchLinkedInPage } from "../lib/api";
 import { PLATFORMS, PLATFORM_ORDER, PLATFORM_FILL } from "../lib/platforms";
 import { SETUP_GUIDES, redirectUri } from "../lib/setupGuides";
 import { formatDistanceToNow } from "date-fns";
@@ -163,6 +163,9 @@ export default function Connections() {
                       {p === "linkedin" && <span className="muted">· {a.auth_mode === "linkedin_member" ? "profile" : "page"}</span>}
                       {a.last_synced_at && <span className="muted">· synced {formatDistanceToNow(new Date(a.last_synced_at), { addSuffix: true })}</span>}
                       <ScopeNote platform={p} writeScopes={a.write_scopes} checkedAt={a.scopes_checked_at} member={a.auth_mode === "linkedin_member"} />
+                      {p === "linkedin" && a.auth_mode !== "linkedin_member" && (
+                        <PagePicker accountId={a.id} demo={demo} onSwitched={() => void dash.refresh()} />
+                      )}
                       <button className="btn btn--sm btn--danger" style={{ marginLeft: 8, height: 24 }} onClick={() => disconnect(a.id, p)}>Disconnect</button>
                       {a.status === "connected" && a.needs_reauth && (
                         <div className="muted" style={{ flexBasis: "100%", fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>
@@ -217,6 +220,75 @@ export default function Connections() {
 
       <YourData demo={demo} />
     </>
+  );
+}
+
+/**
+ * Which Page this connection reads, when the member administers more than one.
+ *
+ * The OAuth callback takes the first administered page, because the consent
+ * screen gives no opportunity to choose. For a client with one page that is
+ * invisible and correct. For a client with three it was silently wrong: they
+ * would read one page's numbers under the assumption it was another, and
+ * nothing on the screen admitted a choice had been made for them.
+ *
+ * The list is fetched on click, not on render: each unknown name costs a
+ * LinkedIn call, and development tier allows 100 per member per day.
+ */
+function PagePicker({ accountId, demo, onSwitched }: { accountId: string; demo: boolean; onSwitched: () => void }) {
+  const toast = useToast();
+  const [opts, setOpts] = useState<{ chosen: string | null; options: { urn: string; name: string }[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    if (demo) { toast("This is a preview. Page switching works on a real connection."); return; }
+    setBusy(true);
+    try { setOpts(await linkedInPages(accountId)); }
+    catch (e) { toast(e instanceof Error ? e.message : "Could not read your LinkedIn Pages."); }
+    finally { setBusy(false); }
+  }
+
+  async function choose(urn: string) {
+    const name = opts?.options.find((o) => o.urn === urn)?.name ?? "that Page";
+    if (!window.confirm(
+      `Read ${name} instead?\n\nThe numbers already stored for the Page this connection reads now will be deleted, because they belong to that Page. The next sync fills in ${name}.`
+    )) return;
+    setBusy(true);
+    try {
+      toast(await switchLinkedInPage(accountId, urn));
+      setOpts(null);
+      onSwitched();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not switch Page.");
+    } finally { setBusy(false); }
+  }
+
+  // Nothing to choose between: one page, or the list has not been asked for yet.
+  if (opts && opts.options.length < 2) {
+    return <span className="muted" style={{ fontSize: 11.5 }}>This is the only Page you administer.</span>;
+  }
+  if (!opts) {
+    return (
+      <button className="btn btn--sm btn--ghost" style={{ height: 24 }} disabled={busy} onClick={() => void load()}>
+        {busy ? "Checking…" : "Change page"}
+      </button>
+    );
+  }
+  return (
+    <div style={{ flexBasis: "100%", marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      <span className="muted" style={{ fontSize: 11.5 }}>You administer {opts.options.length} Pages. Reading:</span>
+      {opts.options.map((o) => (
+        <button
+          key={o.urn}
+          className={`btn btn--sm ${o.urn === opts.chosen ? "btn--primary" : ""}`}
+          style={{ height: 24 }}
+          disabled={busy || o.urn === opts.chosen}
+          onClick={() => void choose(o.urn)}
+        >
+          {o.name}
+        </button>
+      ))}
+    </div>
   );
 }
 

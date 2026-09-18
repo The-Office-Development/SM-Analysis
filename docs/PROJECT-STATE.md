@@ -47,7 +47,7 @@ address. Nothing further can be tested against LinkedIn until it arrives: a
 rejection cannot be resubmitted with the same app, so do not touch the app's
 products.
 
-**The build.** 226 tests, mutation 106/106, typecheck and build green.
+**The build.** 233 tests, mutation 113/113, typecheck and build green.
 Migrations 0001 to 0020 applied and verified against the live catalog
 (0018 LinkedIn constraints, 0019 story metrics, 0020 story metric set).
 Hosting is Cloudflare Pages, and **CI does not deploy the cron Worker**: that is
@@ -66,8 +66,12 @@ still `cd worker-cron && CLOUDFLARE_ACCOUNT_ID=69b37cce7d7633d2e73be9b548b8021a 
    metrics and record what came back in `CLAUDE.md` §3.
 4. Owner items, stated once: sign the Supabase DPA, and confirm "Require App
    Secret" is ON in the Meta app.
-5. Offered, not approved: a page picker for a member who administers several
-   LinkedIn Pages. Today the first page is taken silently.
+5. ~~Offered, not approved: a page picker.~~ **Built 2026-09-18.** Connections
+   now has "Change page" for a LinkedIn Page connection, served by
+   `/api/linkedin-page`. Switching deletes the stored numbers of the page being
+   left, because they belong to it; blending two pages into one series is the
+   fabricated figure this project refuses. Unproven against the real API, like
+   everything else on LinkedIn.
 
 ### The company
 

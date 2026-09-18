@@ -159,11 +159,14 @@ export const handler: Handler = async (event) => {
     /*
      * One page per connection, and the first administered page is taken.
      *
-     * A client with several pages needs to choose, and that is a UI this does
-     * not have yet. Taking the first is a decision, not an accident: it is
+     * A client with several pages needs to choose, and the consent screen gives
+     * no opportunity to. Taking the first is a decision, not an accident: it is
      * recorded in the log with the full list so a wrong pick is diagnosable, and
-     * `available_orgs` is stored so a picker can be added without another
-     * authorisation round trip.
+     * `available_orgs` is stored so the choice can be changed afterwards.
+     *
+     * That is now `linkedin-page.ts` (Connections -> Change page), which needs
+     * no second authorisation. Keep storing `available_orgs`: the picker offers
+     * only what is in it, so an empty list means the client cannot switch.
      */
     const chosen = orgs[0];
     const orgId = chosen.urn.split(":").pop() ?? "";

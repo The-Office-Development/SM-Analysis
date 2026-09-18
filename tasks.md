@@ -9,7 +9,7 @@ Metricool's asks for full control of the client's Facebook Page plus
 `business_management`, the scope this project dropped as a P0 finding. Reasoning
 in `docs/VENDOR-OPTIONS.md`, marked deferred.
 
-The software is finished and green: 226 tests, mutation 106/106, crons configured
+The software is finished and green: 233 tests, mutation 113/113, crons configured
 in code. What follows is switching it on, not building it.
 
 Last updated: 2026-09-18.
@@ -21,7 +21,7 @@ Last updated: 2026-09-18.
 Read from the live systems, not from this file. The 2026-09-08 block below is
 kept for the record; where the two disagree, this one wins.
 
-**Green:** 226 tests, mutation 106/106, typecheck and build clean. Migrations
+**Green:** 233 tests, mutation 113/113, typecheck and build clean. Migrations
 0001-0020 applied (0018 LinkedIn constraints, 0019 story metrics, 0020 story
 metric set), verified against the live catalog.
 
@@ -54,8 +54,11 @@ the app: a rejected application cannot be resubmitted with the same app.
    automatic.
 4. **Owner items, stated once:** sign the Supabase DPA; confirm "Require App
    Secret" is ON in the Meta app.
-5. **Offered, not approved:** a page picker for a member who administers more
-   than one LinkedIn Page. Today the first page is taken silently.
+5. ~~**Offered, not approved:** a page picker.~~ **Built 2026-09-18**, with the
+   endpoint `/api/linkedin-page` and "Change page" on Connections. Seven
+   mutations guard it, including the one that matters: a switch that keeps the
+   previous page's rows, which would blend two audiences into one follower line.
+   Untested against the real LinkedIn API, because we have no access yet.
 
 ---
 

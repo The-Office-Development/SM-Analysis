@@ -18,15 +18,6 @@
     "rootDir": "../netlify/functions",
     "outDir": "./build"
   },
-  "files": [
-    "../netlify/functions/_sync.ts",
-    "../netlify/functions/_lib.ts",
-    "../netlify/functions/_tokens.ts",
-    "../netlify/functions/meta-data-deletion.ts",
-    "../netlify/functions/_instagram.ts",
-    "../netlify/functions/sync.ts",
-    "../netlify/functions/oauth-linkedin.ts",
-    "../netlify/functions/oauth-instagram.ts",
-    "../netlify/functions/oauth-linkedin-callback.ts"
-  ]
+  "//": "Every handler, not a hand-kept list. A list here meant a new function compiled nowhere, so a test importing it failed with ERR_MODULE_NOT_FOUND and the obvious fix was to add one more line to a list that was wrong again the next time. This is the same staleness that let the mutation runner skip whole test files.",
+  "include": ["../netlify/functions/**/*.ts"]
 }

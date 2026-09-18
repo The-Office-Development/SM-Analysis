@@ -112,6 +112,10 @@ export const MEMBER_ID = "yrZCpj2Z12";
 /** Base daily counts per member metric; the day of the month is added to each. */
 export const MEMBER_METRIC = { IMPRESSION: 300, REACTION: 20, COMMENT: 4, RESHARE: 2 };
 export const ORG_URN = `urn:li:organization:${ORG_ID}`;
+/** The second and third pages a member may administer, for the page picker. */
+export const ORG_ID_2 = "8800112";
+export const ORG_ID_3 = "8800113";
+export const ORG_NAMES = { [ORG_ID]: "Drinkat", [ORG_ID_2]: "Drinkat Amman", [ORG_ID_3]: "Drinkat Roastery" };
 export const FOLLOWERS = 8421;
 
 /**
@@ -217,7 +221,15 @@ export function installLinkedInMock(opts = {}) {
     }
 
     if (path.startsWith("/organizations/")) {
-      return json({ id: Number(ORG_ID), localizedName: "Drinkat", vanityName: "drinkat" });
+      /*
+       * Name per id, not one name for every id. A single hardcoded name made a
+       * page SWITCH indistinguishable from no switch at all: the account ended
+       * up named "Drinkat" either way, so the test could not see which page it
+       * was pointing at.
+       */
+      const id = path.split("/").pop();
+      const name = ORG_NAMES[id] ?? `Organization ${id}`;
+      return json({ id: Number(id), localizedName: name, vanityName: name.toLowerCase().replace(/[^a-z0-9]+/g, "-") });
     }
 
     if (path.startsWith("/networkSizes/")) {

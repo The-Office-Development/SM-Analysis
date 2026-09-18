@@ -72,7 +72,7 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **226 tests, mutation 106/106**
+Code is on `main`, all green: typecheck, build, **233 tests, mutation 113/113**
 (measured 2026-09-18). Migrations `0001`-`0020` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
