@@ -198,8 +198,11 @@ Meta's own wording on that page, not a measured turnaround.
 
 ## 1c. It is overdue, 2026-09-18: what that means and what to look at
 
-Submitted Sunday 2026-09-13. Meta's own submission screen said **about 2 business
-days** (§1b, written that day). Monday 09-14 to Friday 09-18 is **five business
+Submitted Sunday 2026-09-13. Meta's Security Centre says, verbatim and still on
+screen on 2026-09-19: "Thank you for submitting your information. It should take
+about **2 business days** to review your information and we'll update your
+verification status after the review is complete." (§1b recorded the same figure
+on the day of submission.) Monday 09-14 to Friday 09-18 is **five business
 days**. An older row in `tasks.md` claimed "10 minutes to 14 working days", which
 was inherited guidance, not Meta's number for this step, and it is corrected
 there.
@@ -234,6 +237,7 @@ The operator's own screen, which is the only oracle for this:
 | Business verification | **In review** |
 | Access verification (Tech Provider) | Locked: "To start access verification, you need to complete business verification" |
 | Set and correct | contact email `info@theoffice.it.com`, privacy policy, terms, data-deletion callback |
+| Use case selected | "App requires access to permissions on Meta for Developers" - the right one |
 | Empty | **App icon**, App domains, Namespace, DPO contact block |
 
 **So it is the first row of the table above: genuinely queued.** Not a document
@@ -248,6 +252,30 @@ portfolio's admin address and routinely lands in spam or Promotions. If the
 portfolio admin is a personal address rather than `info@theoffice.it.com`, look
 in both. A request left unanswered is the single most likely reason a two-day
 review is on day five.
+
+### The Security Centre's own warnings, 2026-09-19
+
+Separate from verification, and blocking nothing: Security Centre reports "1 user
+without passkey enabled", two-factor authentication required of "No one", and
+**"You're the only business admin. Add another admin to help if you get locked
+out of your account."**
+
+None of that affects the review. It does affect the thing this project's second
+constraint is about: this portfolio owns the app that holds clients' Instagram
+tokens, so whoever holds that one account holds the lot, and there is no second
+admin to recover through. Two items are worth doing once, in this order, and are
+the operator's call:
+
+1. Turn on two-factor authentication for the admin account itself, then set
+   "Who's required to turn on two-factor authentication" to everyone. Doing it
+   the other way round is how people lock themselves out.
+2. Add a second business admin (the other officer on the registration). One
+   admin is a single point of failure for the portfolio, the app, and every
+   client connection under it.
+
+Meta's passkey recommendation reads "Remove users without passkeys from your
+business portfolio", which with one admin would mean removing yourself. Enabling
+a passkey is the version of that advice that applies here.
 
 **One thing not to do while it is pending:** do not edit the business name,
 address or portfolio details, and do not open a second portfolio to "try again".

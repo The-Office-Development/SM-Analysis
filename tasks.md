@@ -53,7 +53,9 @@ the app: a rejected application cannot be resubmitted with the same app.
    `CLAUDE.md` §3. The stored ladder row is pre-version, so the retry is
    automatic.
 4. **Owner items, stated once:** sign the Supabase DPA; confirm "Require App
-   Secret" is ON in the Meta app.
+   Secret" is ON in the Meta app; enable 2FA on the business admin account and
+   add a second admin (`SETUP-META.md` §1c - one admin owns every client token
+   and there is no recovery path).
 5. ~~**Offered, not approved:** a page picker.~~ **Built 2026-09-18**, with the
    endpoint `/api/linkedin-page` and "Change page" on Connections. Seven
    mutations guard it, including the one that matters: a switch that keeps the
@@ -746,11 +748,13 @@ are now the only two placeholders blocked on something other than counsel.
 
 - [x] Business Verification — **submitted 2026-09-13 (a Sunday), in review.** (`docs/SETUP-META.md` §1).
       🔴 **The "10 minutes to 14 working days" this row used to state is not
-      Meta's number for this step.** The operator reports that Meta's own
-      submission screen says **2 business days**. That could not be confirmed
-      here on 2026-09-18: the Help Center page renders in JavaScript and returns
-      only its title, and the developer docs on business verification state no
-      timeline at all. Treat the screen the operator saw as the authority.
+      Meta's number for this step.** Meta's own Security Centre says, verbatim
+      (read 2026-09-19): "Thank you for submitting your information. It should
+      take about **2 business days** to review your information and we'll update
+      your verification status after the review is complete." The Help Center
+      page cannot be used to check this from a terminal (it renders in
+      JavaScript and returns only its title) and the developer docs state no
+      timeline at all, so the product's own screen is the source.
       **By that number it is overdue:** Monday 09-14 through Friday 09-18 is five
       business days. Overdue means a state to look at, not a queue to wait in:
       see `SETUP-META.md` §1c. Note the correction recorded there: our registration carries no stamp
