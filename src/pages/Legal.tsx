@@ -10,11 +10,16 @@ import ThemeToggle from "../components/ThemeToggle";
  * does — it is not boilerplate.
  *
  * >>> EVERY STATEMENT HERE MUST BE TRUE OF THE CODE AS IT STANDS. <<<
- * Two claims were removed in 2026-08 because they were not: that shared links
- * expire, and that records are kept for a retention period after disconnection.
- * Neither feature exists — there is no expiry column on `report_shares` and no
- * purge job — and Meta checks a privacy policy against real behaviour. If
- * expiry or retention is built later, describe it here THEN, not before.
+ * Two claims were removed in 2026-08 because they were not true: that shared
+ * links expire, and that records are kept for a retention period after
+ * disconnection. Meta checks a privacy policy against real behaviour.
+ *
+ * **Share expiry and revocation were built on 2026-09-19** (migration 0021,
+ * `share.ts`, the list on Reports), so that paragraph is rewritten to describe
+ * them — which is the rule working in the other direction: a control the
+ * product HAS must be named here, or the client never learns they have it.
+ * Retention after disconnection still does not exist, and still must not be
+ * claimed: disconnecting deletes immediately.
  *
  * The registered name and address are settled from the certified translation
  * (2026-08-19). The former bracketed placeholders were filled on 2026-09-14 and
@@ -144,8 +149,9 @@ export function Privacy() {
       <p>We keep what you connect for as long as you keep it connected, and no longer. <b>Disconnecting an account deletes it immediately</b>: the access token, every daily metric, every post record, the audience breakdowns and that account's sync history are removed at once, not after a delay. There is no retention window afterwards because there is nothing left to retain. Deleting your whole account removes everything above along with your goals, your recorded consents and any report links you created.</p>
 
       <h3>Shared report links</h3>
-      <p>A shared link holds a <b>snapshot</b> of the figures as they stood when you created it; it does not update afterwards. Anyone holding the link can open it without signing in, so treat one as public once you have sent it.</p>
-      <p><b>Links do not currently expire, and there is no way to revoke a single link.</b> Deleting your account removes every link you have created. If you need a link withdrawn before then, write to {CONTACT} and we will remove it for you.</p>
+      <p>A shared link holds a <b>snapshot</b> of the figures as they stood when you created it; it does not update afterwards. Anyone holding the link can open it without signing in, so treat one as public for as long as it works.</p>
+      <p><b>You choose how long a link lasts</b> when you create it: 7, 30 or 90 days, or no expiry. The default is 30 days. An expired link stops opening for everyone and shows only that it has expired; it shows no figures.</p>
+      <p><b>You can revoke any link at any time</b>, from <i>Reports</i> → <i>Links you have shared</i>, which lists every link you have published. Revoking deletes the stored snapshot, so the link stops working for everyone holding it, including people you have already sent it to. Deleting your account removes every link you have created. Links created before 19 September 2026 have no expiry and can be revoked the same way.</p>
 
       <h3>Your rights</h3>
       <p>You may ask us for a copy of your data, ask us to correct or delete it, or withdraw consent. Use <b>Export my data</b> and <b>Delete my account</b> on the Connections page, or write to {CONTACT}; we respond within 30 days. You may also complain to the Personal Data Protection Unit at Jordan's Ministry of Digital Economy and Entrepreneurship.</p>

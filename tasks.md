@@ -9,7 +9,7 @@ Metricool's asks for full control of the client's Facebook Page plus
 `business_management`, the scope this project dropped as a P0 finding. Reasoning
 in `docs/VENDOR-OPTIONS.md`, marked deferred.
 
-The software is finished and green: 233 tests, mutation 113/113, crons configured
+The software is finished and green: 240 tests, mutation 117/117, crons configured
 in code. What follows is switching it on, not building it.
 
 Last updated: 2026-09-18.
@@ -21,7 +21,7 @@ Last updated: 2026-09-18.
 Read from the live systems, not from this file. The 2026-09-08 block below is
 kept for the record; where the two disagree, this one wins.
 
-**Green:** 233 tests, mutation 113/113, typecheck and build clean. Migrations
+**Green:** 240 tests, mutation 117/117, typecheck and build clean. Migrations
 0001-0020 applied (0018 LinkedIn constraints, 0019 story metrics, 0020 story
 metric set), verified against the live catalog.
 
@@ -1089,7 +1089,14 @@ year, and we could.
 
 ## 7. Known gaps, deliberately deferred
 
-- [ ] Share-link expiry and revocation — **not built.** See §0.
+- [x] Share-link expiry and revocation — **built 2026-09-19.** Migration 0021 adds
+      `report_shares.expires_at` (null = never, which every earlier link is);
+      `share.ts` refuses an expired link with 410 and no payload; Reports lists
+      every link with Copy and Revoke. Revoking deletes the row, so the snapshot
+      stops existing rather than hiding behind a flag. Enforced in the function
+      because the public read uses the service-role key and bypasses RLS. The
+      privacy policy is rewritten to describe the controls: a feature the product
+      HAS must be named there too, not only ones it lacks.
 - [ ] Retention purge job — **built for LinkedIn 2026-09-14** (its storage limits require one). Instagram and Facebook data is kept while connected and deleted on disconnect, which is what the privacy policy states; no purge is owed there.
 - [ ] Queue-backed sync. The hourly cron is fine to a few hundred accounts.
 - [ ] PWA polish: manifest, icons, installability.

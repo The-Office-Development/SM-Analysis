@@ -34,8 +34,21 @@ const SNAPSHOT = "verify/build-lib/snapshot.js";
 const SYNC_HANDLER = "verify/build/sync.js";
 
 const PAGE_PICK = "verify/build/linkedin-page.js";
+const SHARE = "verify/build/share.js";
 
 const mutations = [
+  { name: "an expired share link still serving a client's figures", file: SHARE,
+    find: "if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {",
+    replace: "if (false) {" },
+  { name: "an expiry the caller asked for stored as no expiry at all", file: SHARE,
+    find: "expiresAt = new Date(Date.now() + Math.round(days) * 86_400_000).toISOString();",
+    replace: "expiresAt = null;" },
+  { name: "a nonsense expiry accepted, so the link never ends", file: SHARE,
+    find: "if (typeof days !== \"number\" || !Number.isFinite(days) || days < 1 || days > 365)",
+    replace: "if (false)" },
+  { name: "the expired refusal carrying the snapshot anyway", file: SHARE,
+    find: 'return json(410, { message: "This link has expired.", code: "expired" });',
+    replace: 'return json(410, { message: "This link has expired.", code: "expired", snapshot: data.payload });' },
   { name: "a LinkedIn Page switch that keeps the previous Page's numbers", file: PAGE_PICK,
     find: 'gone("metrics_daily", await db.from("metrics_daily").delete().eq("account_id", acc.id)),',
     replace: "true," },

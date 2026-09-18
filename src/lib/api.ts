@@ -122,24 +122,62 @@ export async function deleteGoal(id: string): Promise<void> {
 /* ----------------------------- share links ------------------------------ */
 
 /** Persist a report snapshot server-side and get a public read-only URL. */
-export async function createShare(snapshot: unknown): Promise<{ slug: string; url: string }> {
+export async function createShare(
+  snapshot: unknown,
+  // Days until the link stops resolving. Null keeps it permanent, which is what
+  // every link made before 2026-09-19 is.
+  expiresInDays: number | null = null,
+): Promise<{ slug: string; url: string; expires_at: string | null }> {
   if (isDemoMode()) throw new Error("Share links are disabled in the preview. They work once you sign in with real data.");
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not signed in.");
   const res = await fetch("/api/share", {
     method: "POST",
     headers: { "content-type": "application/json", Authorization: `Bearer ${session.access_token}` },
-    body: JSON.stringify({ snapshot }),
+    body: JSON.stringify({ snapshot, expires_in_days: expiresInDays }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.message || "Could not create a share link.");
-  return body as { slug: string; url: string };
+  return body as { slug: string; url: string; expires_at: string | null };
+}
+
+export interface ShareLink { slug: string; created_at: string; expires_at: string | null }
+
+/**
+ * Every link this user has published, newest first.
+ *
+ * Read straight from the table rather than through a function: `report_shares`
+ * grants select and delete to `authenticated` under an owner-only policy, so
+ * the browser can only ever see its own rows. The payload is deliberately not
+ * selected; this list answers "what is out there", not "what did it say".
+ */
+export async function fetchShares(): Promise<ShareLink[]> {
+  if (isDemoMode()) return [];
+  const { data, error } = await supabase
+    .from("report_shares")
+    .select("slug,created_at,expires_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ShareLink[];
+}
+
+/** Revoke a link: the row is deleted, so the snapshot stops existing. */
+export async function revokeShare(slug: string): Promise<void> {
+  const { error } = await supabase.from("report_shares").delete().eq("slug", slug);
+  if (error) throw error;
 }
 
 /** Fetch a shared snapshot by slug — no auth (served via service role). */
 export async function fetchShare(slug: string): Promise<unknown> {
   const res = await fetch(`/api/share?slug=${encodeURIComponent(slug)}`);
-  if (!res.ok) throw new Error("This report link is invalid or has been removed.");
+  if (!res.ok) {
+    // The reader is usually a sponsor, not the owner. "Expired" tells them what
+    // to ask for; "invalid or removed" reads as a broken product.
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.code === "expired"
+      ? "This report link has expired. Ask whoever sent it for a new one."
+      : "This report link is invalid or has been removed.");
+  }
   const body = await res.json();
   return body.snapshot;
 }

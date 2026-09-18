@@ -453,4 +453,8 @@
    daily metrics; posts have their own time dimension, so the choice is explicit
    rather than implied. */
 .btn--sm{padding:4px 9px;font-size:11.5px;border-radius:7px}
+/* A select sized to sit beside a .btn--sm. Height only: the mobile block near
+   the top of this file raises every control to 16px text and 42px so iOS does
+   not zoom on focus, and an inline style here would defeat that. */
+.input--sm{height:30px;padding:0 8px;font-size:12.5px;border-radius:7px}
 .btn--on{background:var(--text);color:var(--panel);border-color:var(--text)}

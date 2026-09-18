@@ -47,9 +47,10 @@ address. Nothing further can be tested against LinkedIn until it arrives: a
 rejection cannot be resubmitted with the same app, so do not touch the app's
 products.
 
-**The build.** 233 tests, mutation 113/113, typecheck and build green.
-Migrations 0001 to 0020 applied and verified against the live catalog
-(0018 LinkedIn constraints, 0019 story metrics, 0020 story metric set).
+**The build.** 240 tests, mutation 117/117, typecheck and build green.
+Migrations 0001 to 0021 applied and verified against the live catalog
+(0018 LinkedIn constraints, 0019 story metrics, 0020 story metric set,
+0021 share-link expiry).
 Hosting is Cloudflare Pages, and **CI does not deploy the cron Worker**: that is
 still `cd worker-cron && CLOUDFLARE_ACCOUNT_ID=69b37cce7d7633d2e73be9b548b8021a npx wrangler deploy`.
 

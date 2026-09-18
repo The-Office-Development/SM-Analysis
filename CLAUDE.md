@@ -72,8 +72,8 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **233 tests, mutation 113/113**
-(measured 2026-09-18). Migrations `0001`-`0020` are applied.
+Code is on `main`, all green: typecheck, build, **240 tests, mutation 117/117**
+(measured 2026-09-19). Migrations `0001`-`0021` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
 `app.theoffice.it.com` serves the app and its functions, and `@heath_ens21`
@@ -217,8 +217,7 @@ there.
 (Supabase, Netlify and Anthropic are all outside Jordan), region choice, alerting
 and on-call, counsel sign-off on the PDPL analysis and the draft legal pages.
 
-**Deferred.** Share-link expiry and revocation; a retention purge job; a real
-queue-backed sync for scale; remaining optimistic claims in `src/lib/setupGuides.ts`.
+**Deferred.** A retention purge job; a real queue-backed sync for scale; remaining optimistic claims in `src/lib/setupGuides.ts`.
 
 ---
 
