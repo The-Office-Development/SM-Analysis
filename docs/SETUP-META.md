@@ -223,6 +223,26 @@ connected portfolio):
 | **Failed / Revoked** | Rejected | Read the reason before resubmitting anything |
 | **Verified** | Done | Then Tech Provider access verification, then App Review (`APP-REVIEW-PREP.md`) |
 
+### Read from the dashboard, 2026-09-19
+
+The operator's own screen, which is the only oracle for this:
+
+| | |
+|---|---|
+| App | `PulseBoard`, ID `934736295759559`, type Business, **mode Development** |
+| Business portfolio | `Al-Hujra Information Technology`, ID `1614885220033140` |
+| Business verification | **In review** |
+| Access verification (Tech Provider) | Locked: "To start access verification, you need to complete business verification" |
+| Set and correct | contact email `info@theoffice.it.com`, privacy policy, terms, data-deletion callback |
+| Empty | **App icon**, App domains, Namespace, DPO contact block |
+
+**So it is the first row of the table above: genuinely queued.** Not a document
+request, not an incomplete submission, not a rejection. There is nothing to
+answer and nothing to fix; it is simply late. Leave it, and chase only if it
+passes about ten business days (Friday 2026-09-25). The sequencing is also now
+confirmed from the product itself rather than from documentation: Tech Provider
+verification says in as many words that it cannot start until this finishes.
+
 **Check the email too, and check whose it is.** A document request goes to the
 portfolio's admin address and routinely lands in spam or Promotions. If the
 portfolio admin is a personal address rather than `info@theoffice.it.com`, look
