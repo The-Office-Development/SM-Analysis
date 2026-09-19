@@ -67,6 +67,30 @@ the app: a rejected application cannot be resubmitted with the same app.
 
 ---
 
+## WHILE META AND LINKEDIN ARE PENDING — noted 2026-09-19
+
+Work that needs neither approval. Instagram is closed to clients, not to us:
+the two role accounts sync end to end, so anything provable on real data is
+fair game.
+
+- [ ] **Alerting.** The cron bug of 2026-09-18 (half of all syncs failing, while
+      sync_log said zero) ran for at least a week because nothing watches the
+      system. Build a health endpoint that fails when any connected account has
+      not synced in ~2 hours or a run fails, and point a free uptime monitor at
+      it. Owner decision: which monitor (UptimeRobot free is the usual one).
+- [ ] **Pre-write Meta's Data Protection Assessment.** It follows App Review and
+      asks how data is stored, protected, deleted, and who the sub-processors
+      are. Every answer is in the code and in `TRANSFER-ASSESSMENT.md`.
+      Drafting it now turns a later delay into copy-paste.
+- [ ] **Reviewer's-eye walkthrough.** Drive the app in the screencast order
+      (`APP-REVIEW-PREP.md` §5), screenshot each page a reviewer sees, fix
+      anything that reads as broken or unfinished. Reviewers reject for broken
+      flows, not only for policy.
+- [ ] **Re-run the reconciliation.** Last run 2026-09-05 (views within 0.7%).
+      The sync's cadence and story handling changed on 2026-09-18/19. Needs
+      one of the operators to read about six figures off @malekismaiil's
+      Insights screen; `node verify/reconcile.mjs --account <id>` does the rest.
+
 ## WHERE THINGS STAND — 2026-09-08
 
 Sections 1 and 2 below were done on 2026-09-04 and are kept for the record, not
