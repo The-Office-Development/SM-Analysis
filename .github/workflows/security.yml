@@ -25,13 +25,13 @@ jobs:
     name: Static analysis and dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Dependency audit (production, fails on high)
         run: npm audit --omit=dev --audit-level=high
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install semgrep==1.177.0
@@ -56,7 +56,7 @@ jobs:
           --exclude node_modules --exclude dist --exclude verify/build
           --exclude verify/build-lib --exclude verify/build-fe --exclude verify/build-oauth
           src netlify functions worker-cron supabase || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: semgrep-report
