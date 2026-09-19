@@ -14,13 +14,23 @@
 #    reads this site cross-origin.
 # If an external image is ever shown (an avatar), add its CDN host to img-src
 # by name; do not put `https:` back.
+#
+# Cloudflare Web Analytics (operator decision 2026-09-19: keep it, make it work).
+# Cloudflare injects its beacon into every page; until this date script-src
+# 'self' blocked it, so it had never collected anything and logged a CSP error
+# on every page. Allowed here by PATH, not by host: both the documented
+# `/beacon.min.js` and the versioned `/beacon.min.js/...` URL actually injected
+# on this site (an exact path would not match the versioned one). No connect-src
+# change: on a Cloudflare-proxied site the beacon reports to our own
+# /cdn-cgi/rum, which 'self' covers (Cloudflare docs, "Data origin and
+# collection"). Named in the privacy policy, as any analytics must be.
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com/beacon.min.js https://static.cloudflareinsights.com/beacon.min.js/; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   Cross-Origin-Opener-Policy: same-origin
   ! Access-Control-Allow-Origin
 

@@ -122,9 +122,18 @@ export function Privacy() {
           * that does. This is the page a Meta reviewer reads during App Review
           * and the list the Data Protection Assessment asks for by name.
           */}
-        <li><b>Cloudflare</b>: hosting, the scheduled sync, and server logs.</li>
+        <li><b>Cloudflare</b>: hosting, the scheduled sync, server logs, and visitor analytics (below).</li>
         <li><b>Anthropic</b>: powers the optional AI assistant. When you use it, a compact summary of your dashboard figures and the titles of your top posts is sent to produce an answer. Your access tokens and raw records are never sent. If you do not use the assistant, nothing is sent.</li>
       </ul>
+      <h3>Visitor analytics</h3>
+      {/*
+        * Added 2026-09-19 when Web Analytics was made to work (it had been
+        * blocked by our own CSP and collected nothing). Every sentence here is
+        * either Cloudflare's documented behaviour or measured on this site;
+        * do not add "no cookies" or similar without measuring it first.
+        */}
+      <p>We use <b>Cloudflare Web Analytics</b> to count visits and see which pages are used and how quickly they load. For each page view it records the page address, the site you came from, your browser type, your country and page-load timings. It does not see your connected accounts, your figures or your posts. Cloudflare states that it "does not collect or use your visitors' personal data".</p>
+
       <h3>Where it is processed</h3>
       {/*
         * Regions checked 2026-09-14: the Supabase project is Central EU (Frankfurt),

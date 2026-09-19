@@ -40,6 +40,8 @@ dashboard (the organisation's legal documents).
 
 ## 2. Cloudflare: hosting, the scheduled sync, logs
 
+**Also, from 2026-09-19: visitor analytics** (Cloudflare Web Analytics): page path, referrer, browser, country and load timings per page view. No platform data. Named in the privacy policy.
+
 **What it holds or sees:** requests to the app and its functions in transit,
 including tokens being used against the platforms; function logs. The log
 helper redacts any field named like `token`, `secret`, `proof` or
