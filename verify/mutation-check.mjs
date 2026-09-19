@@ -41,6 +41,8 @@ const HEALTH = "verify/build/health.js";
 const AUDIT = "verify/build/_audit.js";
 
 const mutations = [
+  { name: "token decryption accepting a 4-byte GCM tag (Semgrep gcm-no-tag-length)", file: LIB,
+    find: 'raw.subarray(0, 12), { authTagLength: GCM_TAG });', replace: 'raw.subarray(0, 12));' },
   { name: "disconnect saying 'data deleted' after the deletes were refused", file: "verify/build/disconnect.js",
     find: "if (failed.length) {", replace: "if (false) {" },
   { name: "deauthorize reporting ok while still holding the withdrawn credential", file: "verify/build/meta-deauthorize.js",

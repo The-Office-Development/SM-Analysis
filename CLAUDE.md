@@ -72,8 +72,8 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **290 tests, mutation 149/149**
-(measured 2026-09-19). Migrations `0001`-`0023` are applied.
+Code is on `main`, all green: typecheck, build, **291 tests, mutation 150/150**
+(measured 2026-09-19). Migrations `0001`-`0024` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
 `app.theoffice.it.com` serves the app and its functions, and `@heath_ens21`
@@ -235,7 +235,7 @@ and on-call, counsel sign-off on the PDPL analysis and the draft legal pages.
 npm test        # typecheck, build, the suite, then the mutation gate
 ```
 The mutation check injects every defect listed in `verify/mutation-check.mjs`
-(149 on 2026-09-19) and requires each one to be caught; a pattern that no longer
+(150 on 2026-09-19) and requires each one to be caught; a pattern that no longer
 matches the build fails the gate too, so a refactor cannot silently retire one.
 **If you fix a defect the suite would not otherwise catch, add a mutation for it.**
 
@@ -430,6 +430,12 @@ found last deployed on 2026-09-08, so four days of sync fixes, including the
   off the redirect, so no exit can be missed. `/api/health` turns red on an
   alarming event (`isAlarming`: a data subject's right not honoured, or a Meta
   deletion/deauthorize request matching nobody) and if the weekly review stops.
+- **Security testing is continuous, and its first results are dated**
+  (`.github/workflows/security.yml`, `docs/security/`). Semgrep and `npm audit`
+  gate every push on high severity; a nosemgrep suppression needs its reason on
+  the line above it. Re-run `supabase db advisors --linked --type security`
+  after any migration that adds a function: 0023's two trigger functions shipped
+  without a pinned search_path and only the advisor noticed (fixed in 0024).
 - **Never reply "deleted" without checking the deletes.** Instrumenting the
   audit log found `disconnect.ts` telling clients "stored data deleted" after
   refused deletes, `meta-deauthorize.ts` answering `ok` while still holding a

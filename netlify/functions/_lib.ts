@@ -143,15 +143,26 @@ export function deletionStatus(found: boolean, failed: number): "completed" | "n
 const ENC_PREFIX = "v1:";
 
 function encKey(): Buffer {
+  // Semgrep's node_secret flags the NAME of the variable read here; the value
+  // comes from the environment and fails closed if absent (requireSecret).
+  // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_secret
   const buf = Buffer.from(requireSecret("TOKEN_ENC_KEY"), "base64");
   if (buf.length !== 32) throw new Error("TOKEN_ENC_KEY must decode to 32 bytes (base64 of 32 random bytes).");
   return buf;
 }
 
+/**
+ * The authentication tag is always 16 bytes, and decryption REQUIRES 16.
+ * Without `authTagLength`, Node accepts a tag as short as 4 bytes, so a stored
+ * value cut short would be checked against a 32-bit tag instead of a 128-bit
+ * one. Found by the Semgrep scan of 2026-09-19 (gcm-no-tag-length).
+ */
+const GCM_TAG = 16;
+
 /** AES-256-GCM. A leaked database snapshot is then not a set of live credentials. */
 export function encryptToken(plain: string): string {
   const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv("aes-256-gcm", encKey(), iv);
+  const c = crypto.createCipheriv("aes-256-gcm", encKey(), iv, { authTagLength: GCM_TAG });
   const ct = Buffer.concat([c.update(plain, "utf8"), c.final()]);
   return ENC_PREFIX + Buffer.concat([iv, c.getAuthTag(), ct]).toString("base64");
 }
@@ -160,9 +171,9 @@ export function encryptToken(plain: string): string {
 export function decryptToken(stored: string): string {
   if (!stored.startsWith(ENC_PREFIX)) return stored; // legacy plaintext row
   const raw = Buffer.from(stored.slice(ENC_PREFIX.length), "base64");
-  const d = crypto.createDecipheriv("aes-256-gcm", encKey(), raw.subarray(0, 12));
-  d.setAuthTag(raw.subarray(12, 28));
-  return d.update(raw.subarray(28)).toString("utf8") + d.final("utf8");
+  const d = crypto.createDecipheriv("aes-256-gcm", encKey(), raw.subarray(0, 12), { authTagLength: GCM_TAG });
+  d.setAuthTag(raw.subarray(12, 12 + GCM_TAG));
+  return d.update(raw.subarray(12 + GCM_TAG)).toString("utf8") + d.final("utf8");
 }
 
 /** A Supabase client typed to accept any schema (we use `pulseboard`). */

@@ -80,6 +80,7 @@ const EXPECTED = [
   { version: "0021_share_expiry", table: "report_shares", column: "expires_at" },
   { version: "0022_sync_turn", table: "social_accounts", column: "sync_turn_at" },
   { version: "0023_audit_log", table: "audit_log", column: "platform_user_id" },
+  { version: "0024_function_hardening", table: null, column: null, note: "privileges and search_path only; ledger row here, the security advisor re-run is the proof" },
 ];
 
 /** Every table anon must NOT be able to read. */

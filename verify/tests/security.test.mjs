@@ -86,6 +86,21 @@ test("a tampered ciphertext fails rather than returning garbage", () => {
   assert.throws(() => lib.decryptToken(broken));
 });
 
+test("a stored token with its authentication tag cut to 4 bytes is refused", async () => {
+  // Semgrep, 2026-09-19 (gcm-no-tag-length): without authTagLength Node accepts
+  // a GCM tag as short as 4 bytes. Forge exactly that: a genuine encryption of
+  // "", keeping only the IV and the first 4 bytes of its tag. Without the fix
+  // this decrypts to "" (an empty token) against a 32-bit check.
+  const crypto = await import("node:crypto");
+  const key = Buffer.from(process.env.TOKEN_ENC_KEY, "base64");
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv("aes-256-gcm", key, iv, { authTagLength: 16 });
+  c.update(Buffer.alloc(0)); c.final();
+  const shortTag = c.getAuthTag().subarray(0, 4);
+  const forged = "v1:" + Buffer.concat([iv, shortTag]).toString("base64");
+  assert.throws(() => lib.decryptToken(forged), "a 4-byte tag must not authenticate anything");
+});
+
 /* ---- error classification ------------------------------------------------ */
 
 test("auth and throttle errors are told apart by code, not by message text", () => {

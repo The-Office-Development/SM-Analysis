@@ -1,0 +1,78 @@
+name: Security tests
+
+# Meta's Data Protection Assessment (v3.1, 3.1-12.a and .b) asks for software
+# and backend vulnerability testing at least every 12 months, with a dated
+# report. This makes it continuous instead of annual:
+#   * static analysis (Semgrep) and a dependency audit on every push to main,
+#     FAILING on high-severity findings;
+#   * a passive live scan (OWASP ZAP baseline) of the production site, weekly
+#     and on demand. Passive: it crawls and reads responses; it does not attack.
+# Each run keeps its full report as an artifact; the first dated results are in
+# docs/security/.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"   # Mondays, 04:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Static analysis and dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Dependency audit (production, fails on high)
+        run: npm audit --omit=dev --audit-level=high
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install semgrep==1.177.0
+      - name: Semgrep (fails on ERROR severity)
+        env:
+          SEMGREP_SEND_METRICS: "off"
+        run: >
+          semgrep scan --metrics=off --severity ERROR --error
+          --config p/typescript --config p/javascript --config p/react
+          --config p/secrets --config p/nodejsscan
+          --exclude node_modules --exclude dist --exclude verify/build
+          --exclude verify/build-lib --exclude verify/build-fe --exclude verify/build-oauth
+          src netlify functions worker-cron supabase
+      - name: Semgrep full report, every severity, kept as evidence
+        if: always()
+        env:
+          SEMGREP_SEND_METRICS: "off"
+        run: >
+          semgrep scan --metrics=off --sarif -o semgrep.sarif
+          --config p/typescript --config p/javascript --config p/react
+          --config p/secrets --config p/nodejsscan
+          --exclude node_modules --exclude dist --exclude verify/build
+          --exclude verify/build-lib --exclude verify/build-fe --exclude verify/build-oauth
+          src netlify functions worker-cron supabase || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-report
+          path: semgrep.sarif
+          retention-days: 90
+
+  live:
+    name: Live passive scan (OWASP ZAP baseline)
+    # Weekly and on demand. Not on every push: it scans the deployed site,
+    # which a push has not necessarily reached yet.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: https://app.theoffice.it.com
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-baseline-report

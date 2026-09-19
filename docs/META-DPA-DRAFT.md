@@ -83,9 +83,9 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
 | 3.1-10 | Staff store Platform Data on devices? | **Yes, possible**: operators can download CSV/PDF exports and run maintenance scripts. So: a (full-disk encryption) + c (acceptable use). FileVault **measured ON** on the build Mac | 🔴 confirm FileVault on every other device used; written acceptable-use note |
 | 3.1-11.a | TLS 1.2+ on all public transmission? | **Yes, measured**: TLS 1.2 accepted; TLS 1.0 and 1.1 refused by the server (`alert protocol version`). HSTS set (`public/_headers`). Every call to Meta is HTTPS | 🟡 attach an SSL Labs report |
 | 11.c | Never unencrypted, never SSL 2/3? | **Yes** | ✅ |
-| 3.1-12.a | Software vulnerability testing in the last 12 months | Multi-domain pre-launch security audit (`docs/COMPLETE-AUDIT.md`, `docs/audit/`); `npm audit` of production dependencies **measured 0 vulnerabilities** | 🟡 add a repeatable SAST and DAST run with dated reports (see below) |
-| 3.1-12.b | Backend environment testing | As above | 🟡 same |
-| 3.1-12.c | Cloud misconfiguration testing, 12-monthly | Not yet done as such | 🟡 run Supabase's security advisors and record the result; review Cloudflare settings |
+| 3.1-12.a | Software vulnerability testing in the last 12 months | **a (SAST) and b (DAST), continuous**: Semgrep and `npm audit` on every push, failing on high severity; OWASP ZAP baseline against the live site weekly (`.github/workflows/security.yml`). First dated results: `docs/security/2026-09-19-security-tests.md` (one real finding, fixed). Plus the pre-launch audit (`docs/COMPLETE-AUDIT.md`) | ✅ |
+| 3.1-12.b | Backend environment testing | As above: the functions are in the scanned code, and the live scan covers the deployed backend | ✅ |
+| 3.1-12.c | Cloud misconfiguration testing, 12-monthly | **Supabase security advisor run 2026-09-19**: five findings, three fixed (migration 0024), two accounted for (`docs/security/2026-09-19-security-tests.md`) | ✅ (🔴 leaked-password protection is an owner setting) |
 | 3.1-13.a | Tokens stored on client devices? | **No.** Tokens exist only server-side; the browser can read neither `account_secrets` nor `provider_identities` (grants in `0001`) | ✅ |
 | 3.1-13.b | App secret exposed to clients? | **No** | ✅ |
 | 3.1-13.c | User token protection | **b** (application encryption: never stored in cleartext) and **c** (`appsecret_proof` on every Facebook Login call). Token material is redacted from logs by `log()` in `_lib.ts` | ✅ + 🟡 screenshot |
@@ -118,9 +118,9 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
    platform's live logs: connect, disconnect, deletion requests, token refresh
    failures, auth failures, each with user id, event, time and outcome
    (3.1-22.b/d). A weekly automated summary of it (3.1-22.e).
-3. **Repeatable security testing with dated reports**: a SAST scan (e.g. Semgrep)
+3. ~~Repeatable security testing~~ **done 2026-09-19**. It was: repeatable security testing with dated reports: a SAST scan (e.g. Semgrep)
    and a DAST baseline scan (e.g. OWASP ZAP) of the live app, in CI (3.1-12).
-4. **Cloud configuration review**: Supabase security advisors plus a Cloudflare
+4. ~~Cloud configuration review~~ **done 2026-09-19** for Supabase. It was: cloud configuration review: Supabase security advisors plus a Cloudflare
    settings review, recorded with a date (3.1-12.c).
 5. ~~Dependabot~~ **done 2026-09-19** (config; alerts are a repo setting).
 6. **One written information-security policy** covering encryption, access,
