@@ -1099,7 +1099,12 @@ year, and we could.
       HAS must be named there too, not only ones it lacks.
 - [ ] Retention purge job — **built for LinkedIn 2026-09-14** (its storage limits require one). Instagram and Facebook data is kept while connected and deleted on disconnect, which is what the privacy policy states; no purge is owed there.
 - [ ] Queue-backed sync. The hourly cron is fine to a few hundred accounts.
-- [ ] PWA polish: manifest, icons, installability.
+- [x] PWA polish — **manifest added 2026-09-19** (`public/manifest.webmanifest`,
+      standalone, the existing 192/512 marks, 512 also declared maskable: the
+      mark sits inside the 80% safe circle on a full-bleed background).
+      `theme-color` follows the app's canvas in light and dark. No service
+      worker, deliberately: offline would show stale figures as current,
+      which is the one thing this product must not do.
 - [ ] DPO question under the PDPL (Art. 11(A)(5) names transfer abroad). Legal-page wording: accepted by the operator 2026-09-14, no separate counsel review.
 - [ ] A standing watch on Meta's deprecation schedule. `CLAUDE.md` calls this a
       permanent tax on the product, and its absence caused most of the audit
