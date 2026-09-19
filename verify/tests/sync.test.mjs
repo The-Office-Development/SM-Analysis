@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { syncAccount, dayKeyFromEndTime, syncStart, syncWindow, backfillTurn, seriesFrom, rotatingWindow } from "../build/_sync.js";
 import { makeDb } from "./fake-supabase.mjs";
+import * as lib from "../build/_lib.js";
 import { installGraphMock, trueValue, trueNetFollows, addDays } from "./mock-graph.mjs";
 
 process.env.GRAPH_BACKOFF_BASE_MS = "1";
@@ -616,6 +617,59 @@ test("a TikTok success response is not mistaken for an error", async () => {
   assert.equal(rows[0].followers, 4321);
   // Lifetime video views are not a day's reach and must not be recorded as one.
   assert.equal(rows[0].reach, null);
+});
+
+/* ---- TikTok: the project's own rules, whatever TikTok's docs say ---------- */
+
+async function tiktokSync(videosOrStatus, info = { follower_count: 100 }) {
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const ok = (body) => new Response(JSON.stringify({ ...body, error: { code: "ok", message: "" } }), { status: 200 });
+    if (String(url).includes("/user/info/")) return ok({ data: { user: info } });
+    if (typeof videosOrStatus === "number") {
+      // The shape TikTok actually returned for a bad token, observed 2026-09-19.
+      const code = videosOrStatus === 401 ? "access_token_invalid" : "internal_error";
+      return new Response(JSON.stringify({ error: { code, message: "x", log_id: "1" } }), { status: videosOrStatus });
+    }
+    return ok({ data: { videos: videosOrStatus } });
+  };
+  const db = makeDb({
+    account_secrets: [{ account_id: "tt-1", access_token: "PLAINTEXT", extra: {} }],
+    social_accounts: [{ id: "tt-1", user_id: "u1", platform: "tiktok", external_id: "open123", username: "creator", status: "connected" }],
+    metrics_daily: [], content: [],
+  });
+  try {
+    await syncAccount(db, { id: "tt-1", platform: "tiktok", external_id: "open123", username: "creator" });
+    return { db, error: null };
+  } catch (error) { return { db, error }; }
+  finally { globalThis.fetch = original; }
+}
+
+test("TikTok: a figure the API leaves out is null, and reach and saves are never invented", async () => {
+  const { db, error } = await tiktokSync([{ id: "v1", title: "t", create_time: 1_758_000_000, view_count: 900 }]);
+  assert.equal(error, null);
+  const v = db._rows("content")[0];
+  assert.equal(v.views, 900);
+  assert.equal(v.likes, null, "an absent like count is unreported, not zero");
+  assert.equal(v.reach, null, "views are plays; reach is distinct accounts; one is not the other");
+  assert.equal(v.saves, null, "this API does not report saves at all");
+});
+
+test("TikTok: an expired token is an AUTH error, so the account is flagged, not shown as having no videos", async () => {
+  const { error } = await tiktokSync(401);
+  assert.ok(error, "the error propagates instead of becoming an empty list");
+  assert.equal(lib.isAuthError(error), true);
+});
+
+test("TikTok: a failing video list fails the run instead of reading as 'no videos'", async () => {
+  const { error } = await tiktokSync(500);
+  assert.ok(error);
+  assert.equal(lib.isAuthError(error), false);
+});
+
+test("TikTok: a video with no creation time is skipped, not filed under today", async () => {
+  const { db } = await tiktokSync([{ id: "no-time", view_count: 5 }, { id: "ok", create_time: 1_758_000_000, view_count: 7 }]);
+  assert.deepEqual(db._rows("content").map((r) => r.external_id), ["ok"]);
 });
 
 /* ---- 0007: the day boundary belongs to the account, not to the platform ---- */

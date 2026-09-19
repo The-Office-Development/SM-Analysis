@@ -72,7 +72,7 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **292 tests, mutation 152/152**
+Code is on `main`, all green: typecheck, build, **296 tests, mutation 157/157**
 (measured 2026-09-19). Migrations `0001`-`0024` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
@@ -235,7 +235,7 @@ and on-call, counsel sign-off on the PDPL analysis and the draft legal pages.
 npm test        # typecheck, build, the suite, then the mutation gate
 ```
 The mutation check injects every defect listed in `verify/mutation-check.mjs`
-(152 on 2026-09-19) and requires each one to be caught; a pattern that no longer
+(157 on 2026-09-19) and requires each one to be caught; a pattern that no longer
 matches the build fails the gate too, so a refactor cannot silently retire one.
 **If you fix a defect the suite would not otherwise catch, add a mutation for it.**
 

@@ -41,6 +41,17 @@ const HEALTH = "verify/build/health.js";
 const AUDIT = "verify/build/_audit.js";
 
 const mutations = [
+  { name: "TikTok: an absent like count stored as a confident zero", file: SYNC,
+    find: "likes: num(v.like_count),", replace: "likes: v.like_count ?? 0," },
+  { name: "TikTok: reach invented from video views", file: SYNC,
+    find: "            saves: null,\n            reach: null,\n            avg_watch_seconds: null, // video duration",
+    replace: "            saves: null,\n            reach: num(v.view_count),\n            avg_watch_seconds: null, // video duration" },
+  { name: "TikTok: a failing video list swallowed into 'no videos'", file: SYNC,
+    find: "token, { max_count: 20 });", replace: "token, { max_count: 20 }).catch(() => ({ data: { videos: [] } }));" },
+  { name: "TikTok: an expired token not recognised, so the account is never flagged", file: SYNC,
+    find: 'const auth = status === 401 || code === "access_token_invalid";', replace: "const auth = false;" },
+  { name: "TikTok: a video with no creation time filed under today", file: SYNC,
+    find: 'if (typeof v.create_time !== "number") {', replace: "if (false) { v.create_time = Date.now() / 1000;" },
   { name: "a key rotation that breaks every live connection until it finishes", file: LIB,
     find: "return decryptWith(prev, raw);", replace: "throw e;" },
   { name: "a token under the old key reported as already rotated", file: LIB,

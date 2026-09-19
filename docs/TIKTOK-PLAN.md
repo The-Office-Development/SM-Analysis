@@ -77,6 +77,15 @@ account. Read on 2026-09-19, the sync breaks this project's own first rules:
 - TikTok errors are plain `Error`s, so `isAuthError` cannot recognise an
   expired token and the account would never be flagged for reconnection.
 
+**Fixed 2026-09-19, without the docs** (these break our own rules whatever
+TikTok says): figures are null when absent, never 0; saves and reach are null
+rather than invented; the video list's errors propagate; a video without a
+creation time is skipped; and TikTok errors are classified on liGet's
+convention (a dead token as code 190, a throttle as 4), using the 401
+`access_token_invalid` we observed first-hand. Four tests, five mutations.
+**Still unverified and unchanged:** every endpoint, field name and limit, and
+paging (one page of 20). That is the rebuild, after the docs are read.
+
 ## 4. Which API, to be settled from the primary docs
 
 - **Display API** (Login Kit + `user.info.stats`, `video.list`): works for any

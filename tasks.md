@@ -9,7 +9,7 @@ Metricool's asks for full control of the client's Facebook Page plus
 `business_management`, the scope this project dropped as a P0 finding. Reasoning
 in `docs/VENDOR-OPTIONS.md`, marked deferred.
 
-The software is finished and green: 292 tests, mutation 152/152, crons configured
+The software is finished and green: 296 tests, mutation 157/157, crons configured
 in code. What follows is switching it on, not building it.
 
 Last updated: 2026-09-18.
@@ -21,7 +21,7 @@ Last updated: 2026-09-18.
 Read from the live systems, not from this file. The 2026-09-08 block below is
 kept for the record; where the two disagree, this one wins.
 
-**Green:** 292 tests, mutation 152/152, typecheck and build clean. Migrations
+**Green:** 296 tests, mutation 157/157, typecheck and build clean. Migrations
 0001-0020 applied (0018 LinkedIn constraints, 0019 story metrics, 0020 story
 metric set), verified against the live catalog.
 
@@ -80,9 +80,10 @@ connect.
       route is `brew install --cask cloudflare-warp` (routes via Cloudflare,
       measured to reach TikTok from Amman). A private key-locked relay Worker
       was refused by Claude Code's safety check and is not an option.
-- [ ] Rebuild `syncTiktok`: it has never run against a real account and breaks
-      the first invariants (`?? 0` everywhere, reach invented from views,
-      swallowed errors, one page, invented dates, unclassified auth errors)
+- [~] Rebuild `syncTiktok`. **The invariant breaches are fixed (2026-09-19)**:
+      null not zero, no invented reach or saves, errors propagate, no invented
+      dates, expired tokens classified. **Left for the rebuild, after the docs:**
+      endpoints, field names, paging (still one page of 20), limits.
 - [ ] Connect-page copy for the VPN step; no TikTok-hosted media in the dashboard
 - [ ] TikTok developer app (operator, on a VPN), sandbox test, then review
 

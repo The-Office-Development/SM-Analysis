@@ -1268,36 +1268,64 @@ async function audienceFacebook(acc: AccountRow, token: string, c: { calls: numb
 }
 
 /* ------------------------------- TikTok ---------------------------------- */
+/*
+ * NOT verified against TikTok's documentation: developers.tiktok.com is
+ * unreachable from Jordan (docs/TIKTOK-PLAN.md), and this path has never run
+ * against a real account. The endpoints and field names below are unchanged
+ * from before and still unverified; the rebuild waits on reading the docs.
+ *
+ * What changed on 2026-09-19 is only what this project's own rules require
+ * whatever TikTok's docs say. It used to write `?? 0` for every figure, store
+ * `saves: 0` and reach copied from views (both invented), swallow every error
+ * on the video list including an expired token, and file a video with no
+ * creation time under today.
+ */
 async function syncTiktok(acc: AccountRow, token: string, c: { calls: number }): Promise<{ days: DayRow[]; posts: Post[] }> {
   spend(c);
   const info = await tiktokJson("https://open.tiktokapis.com/v2/user/info/?fields=follower_count,likes_count,video_count", token);
   const user = info.data?.user ?? {};
   spend(c);
+  // No catch: a dead token or a throttle must reach runAccount, which flags
+  // the account for reconnection or stops. An empty list here used to read as
+  // "this creator has no videos".
   const listRes = await tiktokPost(
     "https://open.tiktokapis.com/v2/video/list/?fields=id,title,view_count,like_count,comment_count,share_count,create_time,share_url,duration",
     token, { max_count: 20 }
-  ).catch(() => ({ data: { videos: [] } }));
-  const videos = listRes.data?.videos ?? [];
-  const posts: Post[] = videos.map((v: any) => ({
-    external_id: String(v.id),
-    title: (v.title || "TikTok video").slice(0, 120),
-    media_type: "Video",
-    permalink: safePermalink(v.share_url),
-    published_at: v.create_time ? new Date(v.create_time * 1000).toISOString() : new Date().toISOString(),
-    views: v.view_count ?? 0,
-    likes: v.like_count ?? 0,
-    comments: v.comment_count ?? 0,
-    shares: v.share_count ?? 0,
-    saves: 0,
-    reach: v.view_count ?? 0,
-    avg_watch_seconds: null,   // video duration is not average watch time.
-    retention_pct: null,
-  }));
+  );
+  const videos: any[] = listRes.data?.videos ?? [];
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const posts: Post[] = [];
+  for (const v of videos) {
+    // A video with no creation time is skipped, not filed under today: a date
+    // invented at sync time would put it in whatever window the sync ran in.
+    if (typeof v.create_time !== "number") {
+      log("sync.tiktok_video_without_time", { account: acc.id, video: String(v.id ?? "") });
+      continue;
+    }
+    posts.push({
+      external_id: String(v.id),
+      title: (v.title || "TikTok video").slice(0, 120),
+      media_type: "Video",
+      permalink: safePermalink(v.share_url),
+      published_at: new Date(v.create_time * 1000).toISOString(),
+      // null, never 0: an absent figure is unreported, not nobody.
+      views: num(v.view_count),
+      likes: num(v.like_count),
+      comments: num(v.comment_count),
+      shares: num(v.share_count),
+      // Not reported by this API at all. Neither is reach: views are plays,
+      // reach is distinct accounts, and copying one into the other invented it.
+      saves: null,
+      reach: null,
+      avg_watch_seconds: null,   // video duration is not average watch time.
+      retention_pct: null,
+    });
+  }
   // TikTok exposes no daily history, so only the follower count is a real daily
   // figure. Lifetime video views are NOT a day's reach and are no longer written
   // as one.
   const days: DayRow[] = [{
-    date: today(), followers: user.follower_count ?? null,
+    date: today(), followers: num(user.follower_count),
     reach: null, impressions: null, views: null, engagements: null,
     // TikTok exposes no follower-direction or discovery breakdown.
     follows: null, unfollows: null, reach_followers: null, reach_non_followers: null,
@@ -1314,11 +1342,30 @@ async function syncTiktok(acc: AccountRow, token: string, c: { calls: number }):
 function tiktokFailed(j: any): boolean {
   return Boolean(j?.error && j.error.code && j.error.code !== "ok");
 }
+
+/**
+ * A TikTok failure as a classified GraphError, on the convention liGet uses:
+ * a dead token carries Meta's 190 and a throttle carries 4, so the shared
+ * isAuthError/isThrottleError need no TikTok branch.
+ *
+ * Observed first-hand 2026-09-19 (a request from Cloudflare's Amman data
+ * centre): a bad token is HTTP 401 with {"error":{"code":"access_token_invalid"}}.
+ * The throttle code name is from secondary sources until the docs are read;
+ * HTTP 429 is classified regardless of the body.
+ */
+function tiktokError(status: number, j: any): GraphError {
+  const code = j?.error?.code;
+  const auth = status === 401 || code === "access_token_invalid";
+  const throttle = status === 429 || code === "rate_limit_exceeded";
+  return new GraphError(j?.error?.message || `tiktok_error:${code ?? status}`, {
+    status, code: auth ? 190 : throttle ? 4 : undefined, retryable: throttle || status >= 500,
+  });
+}
+
 async function tiktokJson(url: string, token: string) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
-  const j = await res.json();
-  if (tiktokFailed(j)) throw new Error(j.error.message || `tiktok_error:${j.error.code}`);
-  if (!res.ok) throw new Error(`tiktok HTTP ${res.status}`);
+  const j = await res.json().catch(() => null);
+  if (!res.ok || tiktokFailed(j)) throw tiktokError(res.status, j);
   return j;
 }
 async function tiktokPost(url: string, token: string, body: unknown) {
@@ -1328,8 +1375,8 @@ async function tiktokPost(url: string, token: string, body: unknown) {
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(8000),
   });
-  const j = await res.json();
-  if (tiktokFailed(j)) throw new Error(j.error.message || "tiktok_error");
+  const j = await res.json().catch(() => null);
+  if (!res.ok || tiktokFailed(j)) throw tiktokError(res.status, j);
   return j;
 }
 
