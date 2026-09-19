@@ -85,6 +85,10 @@ connect.
       dates, expired tokens classified. **Left for the rebuild, after the docs:**
       endpoints, field names, paging (still one page of 20), limits.
 - [ ] Connect-page copy for the VPN step; no TikTok-hosted media in the dashboard
+- [ ] Re-derive TikTok's `reports` block in `demoData.ts` from the chosen API.
+      Today the demo shows TikTok per-post reach, saves and "Photo" posts, which
+      the current sync never stores; whether the Business API can is exactly
+      what reading the docs decides (`APP-REVIEW-PREP.md` §6)
 - [ ] TikTok developer app (operator, on a VPN), sandbox test, then review
 
 ## WHILE META AND LINKEDIN ARE PENDING — noted 2026-09-19

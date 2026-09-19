@@ -169,22 +169,38 @@ A rejection cannot be resubmitted with the same app: do not add products to it.
 > `docs/VENDOR-OPTIONS.md`. The step-by-step deployment path is
 > `docs/DEPLOY-RUNBOOK.md`.
 
-**Blocking, technical (about a day):**
-- apply `supabase/migrations/0001` → `0007` in order
-- set `TOKEN_ENC_KEY` and `OAUTH_STATE_SECRET`; scope Netlify env vars to the production context
-- register the data-deletion and deauthorize callback URLs; turn on Require App Secret
-- set `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` (distinct from `META_APP_*`)
-- see `docs/SETUP-META.md` for the full administrative path
-- deploy, connect a real Instagram account, then run
-  `node verify/reconcile.mjs --account <id>` and **compare settled days against the
-  account's own Instagram insights** — this is the gate that matters most, and no
-  client sees the product until the numbers agree
+**Rewritten 2026-09-19.** This section used to open with "apply migrations
+0001-0007, set Netlify env vars, register the callbacks": all done weeks
+earlier, and a list a new session would have started redoing. Verify anything
+here against the live system before acting on it.
 
-**Blocking, administrative (not code, start first — it runs in parallel):**
-- Business Verification: submitted 2026-09-13, **in review**; Meta's own screen says
-  "about 2 business days" (`SETUP-META.md` §1c). Then Tech Provider verification,
-  which cannot start before it
-- App Review with a screencast, Data Use Checkup, Data Protection Assessment
+**Done; do not redo.** Migrations `0001`-`0024` applied (`npm run verify:schema`);
+secrets set in Cloudflare; the Meta data-deletion callback registered (seen on
+the app dashboard 2026-09-19); deployed to `app.theoffice.it.com`; two Instagram
+accounts syncing every 15 minutes; `/api/health` live. The first
+reconciliation (2026-09-05) put views within 0.7% of Instagram's own panel.
+
+**Blocking, external: nothing here is in the code.**
+- **Meta**, strictly in order: Business Verification (submitted 2026-09-13, in
+  review; chase 2026-09-25, `SETUP-META.md` §1c) → Tech Provider verification
+  → App Review → switch the app to Live. Until then only accounts with a role
+  on the Meta app can connect.
+- **LinkedIn**: Development tier application submitted 2026-09-17. Nobody can
+  connect LinkedIn until it is granted; `node verify/linkedin-access-check.mjs`
+  shows the moment it is.
+- **TikTok**: its docs are unreachable from Jordan; the rebuild waits on a VPN
+  (`docs/TIKTOK-PLAN.md`).
+
+**Before submitting App Review** (`APP-REVIEW-PREP.md` §3-5): a live test of the
+deletion callback (it needs PulseBoard removed from a connected account, then
+reconnected; the one path never exercised for real), confirm both callback URLs
+in the Instagram product settings, the screencast on `@malekismaiil`, and a
+reviewer login made on the day. **Re-run the reconciliation** first: the sync's
+cadence and story handling changed on 2026-09-18/19.
+
+**Owner items** are listed once, in `tasks.md` and in `docs/META-DPA-DRAFT.md`
+(2FA across the admin accounts, the Supabase DPA, the uptime monitor, Web
+Analytics off, and others). Do not re-raise them each session.
 
 **`online_followers` and `follower_count` are REQUESTABLE after all — the
 documentation check was wrong, and a live call proved it.**
@@ -220,11 +236,20 @@ found wrong; the finding, the citations and the fix are in
 reconciliation gate below still stands, and if a name is wrong it is wrong only
 there.
 
-**Organisational.** DPO question under Jordan's PDPL, cross-border transfer file
-(Supabase, Netlify and Anthropic are all outside Jordan), region choice, alerting
-and on-call, counsel sign-off on the PDPL analysis and the draft legal pages.
+**Organisational.** Open: the DPO question under PDPL Article 11(A)(5). Done:
+the cross-border transfer assessment (`TRANSFER-ASSESSMENT.md`), the written
+security policy (`docs/security/INFORMATION-SECURITY-POLICY.md`), alerting
+(`/api/health`; the uptime monitor that watches it is an owner item). The legal
+pages were accepted by the operator on 2026-09-14 without a separate counsel
+review, by decision.
 
-**Deferred.** A retention purge job; a real queue-backed sync for scale; remaining optimistic claims in `src/lib/setupGuides.ts`.
+**Deferred.** Scale past ~15 accounts: the per-minute cron gives each account a
+15-minute cadence up to 15, then slows by a minute per account; the answer is
+a higher subrequest limit (Workers Paid) and `SYNC_ACCOUNTS_PER_RUN`, an owner
+spending decision. Remaining optimistic claims in `src/lib/setupGuides.ts`
+(hidden on the live site). Retention purges exist where a rule requires one
+(LinkedIn, the audit log); Instagram data is kept while connected and deleted
+on disconnect, as the privacy policy states.
 
 ---
 
