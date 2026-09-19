@@ -55,3 +55,23 @@ First run: `security.yml` run 35412269234, 2026-09-19, against
 | Info | Caching and "modern web app" notes | No action |
 
 The next weekly run should show the three mediums gone; record it here.
+
+## Visitor analytics, made to work and verified (later on 2026-09-19)
+
+Operator decision: keep Cloudflare Web Analytics. It had been blocked by our
+CSP since the policy existed, so it had never collected anything.
+
+Measured live in a real browser (a `curl` check was discarded: its control
+failed, because Cloudflare injects the beacon only for browser requests):
+
+| Page | Beacon loaded | Reports sent |
+|---|---|---|
+| `/` (control) | yes | 1, to our own `/cdn-cgi/rum` |
+| `/privacy` (control) | yes | 1 |
+| `/r/<probe>` (a share page) | **no** | **none**; the probe slug appears in no report |
+
+Also measured: no CSP violations, no cookies, no local or session storage used
+by the beacon, no third-party origin contacted. Share pages are excluded by
+`Cache-Control: ... no-transform` on `/r/*` (Cloudflare documents that it then
+does not inject the beacon); Cloudflare's own path-exclusion rules need the
+Pro plan.

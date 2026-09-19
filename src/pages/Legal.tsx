@@ -134,7 +134,7 @@ export function Privacy() {
         * beacon set no cookies, used no local or session storage, and posted
         * only to our own /cdn-cgi/rum. Re-measure before changing this.
         */}
-      <p>We use <b>Cloudflare Web Analytics</b> to count visits and see which pages are used and how quickly they load. For each page view it records the page address, the site you came from, your browser type, your country and page-load timings. It does not see your connected accounts, your figures or your posts. Cloudflare states that it "does not collect or use your visitors' personal data". On this site it sets no cookies and stores nothing in your browser, and it reports only to our own domain.</p>
+      <p>We use <b>Cloudflare Web Analytics</b> to count visits and see which pages are used and how quickly they load. For each page view it records the page address, the site you came from, your browser type, your country and page-load timings. It does not see your connected accounts, your figures or your posts. Cloudflare states that it "does not collect or use your visitors' personal data". On this site it sets no cookies and stores nothing in your browser, and it reports only to our own domain. <b>Shared report pages are never tracked</b>: a report link's address works like a password, so those pages do not load the analytics at all.</p>
 
       <h3>Where it is processed</h3>
       {/*
