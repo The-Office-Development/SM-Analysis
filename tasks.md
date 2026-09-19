@@ -67,6 +67,18 @@ the app: a rejected application cannot be resubmitted with the same app.
 
 ---
 
+## OPEN QUESTION — is `follower_count` a net or a gross series? (2026-09-19)
+
+`CLAUDE.md` and `API-VERIFICATION.md` §6.4 say Instagram's `follower_count`
+"can replace the reconstructed follower line". That holds only if it is the
+day's NET change. If it counts only NEW followers (gross follows), it cannot
+replace a line built from follows minus unfollows, and the note is wrong.
+Settle it before building on it: fetch `follower_count` for `@malekismaiil`
+for 7 settled days and compare with our stored `follows` and
+`follows - unfollows` for the same days. Needs a live token, which is
+encrypted with a key that exists only in Cloudflare, so either a token from
+Meta's token generator or the reconciliation session with Malek.
+
 ## TIKTOK — started 2026-09-19, plan in `docs/TIKTOK-PLAN.md`
 
 For Jordanian creators via VPN (operator decision). TikTok is blocked in Jordan,
