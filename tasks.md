@@ -9,7 +9,7 @@ Metricool's asks for full control of the client's Facebook Page plus
 `business_management`, the scope this project dropped as a P0 finding. Reasoning
 in `docs/VENDOR-OPTIONS.md`, marked deferred.
 
-The software is finished and green: 258 tests, mutation 133/133, crons configured
+The software is finished and green: 271 tests, mutation 140/140, crons configured
 in code. What follows is switching it on, not building it.
 
 Last updated: 2026-09-18.
@@ -21,7 +21,7 @@ Last updated: 2026-09-18.
 Read from the live systems, not from this file. The 2026-09-08 block below is
 kept for the record; where the two disagree, this one wins.
 
-**Green:** 258 tests, mutation 133/133, typecheck and build clean. Migrations
+**Green:** 271 tests, mutation 140/140, typecheck and build clean. Migrations
 0001-0020 applied (0018 LinkedIn constraints, 0019 story metrics, 0020 story
 metric set), verified against the live catalog.
 
@@ -75,7 +75,11 @@ data centre**, so our servers are unaffected. Clients need their VPN only to
 connect.
 
 - [ ] VPN on this Mac; read TikTok's primary docs (Display API and Business API)
-      and record the verified endpoint, field and limit list in the plan
+      and record the verified endpoint, field and limit list in the plan.
+      **Parked by the operator 2026-09-19.** No VPN is installed; the suggested
+      route is `brew install --cask cloudflare-warp` (routes via Cloudflare,
+      measured to reach TikTok from Amman). A private key-locked relay Worker
+      was refused by Claude Code's safety check and is not an option.
 - [ ] Rebuild `syncTiktok`: it has never run against a real account and breaks
       the first invariants (`?? 0` everywhere, reach invented from views,
       swallowed errors, one page, invented dates, unclassified auth errors)
@@ -88,11 +92,15 @@ Work that needs neither approval. Instagram is closed to clients, not to us:
 the two role accounts sync end to end, so anything provable on real data is
 fair game.
 
-- [ ] **Alerting.** The cron bug of 2026-09-18 (half of all syncs failing, while
+- [~] **Alerting.** The cron bug of 2026-09-18 (half of all syncs failing, while
       sync_log said zero) ran for at least a week because nothing watches the
-      system. Build a health endpoint that fails when any connected account has
-      not synced in ~2 hours or a run fails, and point a free uptime monitor at
-      it. Owner decision: which monitor (UptimeRobot free is the usual one).
+      system. **Built 2026-09-19: `/api/health`** (200 ok / 503 not ok), judged
+      by last success and the cron's heartbeat, never by the log. Detail with
+      `?key=` from `HEALTH_KEY`; the operator's copy of the key is in
+      `~/.pulseboard-health-key` on the build Mac, never in the repo.
+      **Left:** point a free uptime monitor at
+      `https://app.theoffice.it.com/api/health` (UptimeRobot free, 5-minute
+      checks, alert on non-200). Owner's account, owner's phone.
 - [ ] **Pre-write Meta's Data Protection Assessment.** It follows App Review and
       asks how data is stored, protected, deleted, and who the sub-processors
       are. Every answer is in the code and in `TRANSFER-ASSESSMENT.md`.

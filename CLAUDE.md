@@ -72,7 +72,7 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **258 tests, mutation 133/133**
+Code is on `main`, all green: typecheck, build, **271 tests, mutation 140/140**
 (measured 2026-09-19). Migrations `0001`-`0022` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
@@ -181,8 +181,9 @@ A rejection cannot be resubmitted with the same app: do not add products to it.
   client sees the product until the numbers agree
 
 **Blocking, administrative (not code, start first — it runs in parallel):**
-- Business Verification (10 minutes to 14 working days; Jordanian commercial registration,
-  stamped English translation if needed)
+- Business Verification: submitted 2026-09-13, **in review**; Meta's own screen says
+  "about 2 business days" (`SETUP-META.md` §1c). Then Tech Provider verification,
+  which cannot start before it
 - App Review with a screencast, Data Use Checkup, Data Protection Assessment
 
 **`online_followers` and `follower_count` are REQUESTABLE after all — the
@@ -231,9 +232,11 @@ and on-call, counsel sign-off on the PDPL analysis and the draft legal pages.
 
 ### Run this before you claim anything works
 ```bash
-npm test        # typecheck, build, 65 assertions, then the mutation gate
+npm test        # typecheck, build, the suite, then the mutation gate
 ```
-The mutation check injects 24 real defects and requires every one to be caught.
+The mutation check injects every defect listed in `verify/mutation-check.mjs`
+(140 on 2026-09-19) and requires each one to be caught; a pattern that no longer
+matches the build fails the gate too, so a refactor cannot silently retire one.
 **If you fix a defect the suite would not otherwise catch, add a mutation for it.**
 
 ### Invariants — do not "simplify" these back into bugs
@@ -411,6 +414,14 @@ found last deployed on 2026-09-08, so four days of sync fixes, including the
   on success, so with one account per run a failing account would take every
   slot. A run where accounts were due but none could be claimed returns 500,
   not a quiet 200. Nine mutations guard the queue.
+- **`/api/health` judges by outcomes, never by `sync_log`.** It turns red (503)
+  when a connected account's last SUCCESS is older than three of its turns
+  (floor two hours; LinkedIn on its own slower schedule) or when the cron has
+  taken no turn for 30 minutes. That is precisely the 2026-09-18 failure: turns
+  kept being taken while nothing succeeded, and the log could not say so.
+  Publicly it answers only `{"ok":…}`; counts and reasons need `?key=` matching
+  the `HEALTH_KEY` secret. An expired client connection is reported, not red:
+  that is the client's action, not a system fault. Seven mutations guard it.
 - `buildCsv` uses `seriesByDay(..., "followers")` while the dashboard uses
   `followersByDay()`. These agree: the primary key is `(account_id, date)`.
 

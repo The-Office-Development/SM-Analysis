@@ -22,6 +22,7 @@ import { handler as accountData } from "../../netlify/functions/account-data";
 import { handler as ai } from "../../netlify/functions/ai";
 import { handler as deletionStatus } from "../../netlify/functions/deletion-status";
 import { handler as disconnect } from "../../netlify/functions/disconnect";
+import { handler as health } from "../../netlify/functions/health";
 import { handler as linkedinPage } from "../../netlify/functions/linkedin-page";
 import { handler as metaDataDeletion } from "../../netlify/functions/meta-data-deletion";
 import { handler as metaDeauthorize } from "../../netlify/functions/meta-deauthorize";
@@ -42,6 +43,7 @@ const ROUTES: Record<string, NetlifyHandler> = {
   "ai": ai as NetlifyHandler,
   "deletion-status": deletionStatus as NetlifyHandler,
   "disconnect": disconnect as NetlifyHandler,
+  "health": health as NetlifyHandler,
   "linkedin-page": linkedinPage as NetlifyHandler,
   "meta-data-deletion": metaDataDeletion as NetlifyHandler,
   "meta-deauthorize": metaDeauthorize as NetlifyHandler,

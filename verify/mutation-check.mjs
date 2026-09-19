@@ -37,8 +37,24 @@ const PAGE_PICK = "verify/build/linkedin-page.js";
 const SHARE = "verify/build/share.js";
 const REFRESH = "verify/build/refresh-post.js";
 const CRON = "verify/build/sync-cron.js";
+const HEALTH = "verify/build/health.js";
 
 const mutations = [
+  { name: "health judged by turns taken, blind to a sync that never succeeds (2026-09-18)", file: HEALTH,
+    find: "ago(a.last_synced_at ?? a.connected_at)", replace: "ago(a.sync_turn_at ?? a.connected_at)" },
+  { name: "a stopped cron not noticed by the health check", file: HEALTH,
+    find: "if (live.length && lastTurnMs > CRON_SILENT_MS)", replace: "if (false)" },
+  { name: "health detail shown to anyone without the key", file: HEALTH,
+    find: ": { ok: result.ok };", replace: ": { ok: result.ok, ...result.detail };" },
+  { name: "a health answer the browser or a CDN may cache", file: HEALTH,
+    find: '// A cached "ok" is exactly the failure this endpoint exists to prevent.\n        headers: { "content-type": "application/json", "cache-control": "no-store" },',
+    replace: '// A cached "ok" is exactly the failure this endpoint exists to prevent.\n        headers: { "content-type": "application/json" },' },
+  { name: "a client's expired connection turning the system health red", file: HEALTH,
+    find: 'const live = rows.filter((a) => a.status === "connected");', replace: "const live = rows;" },
+  { name: "any key accepted for the health detail", file: HEALTH,
+    find: "return a.length === b.length && crypto.timingSafeEqual(a, b);", replace: "return true;" },
+  { name: "LinkedIn pages called stale at Instagram's pace", file: HEALTH,
+    find: 'const turn = platform === "linkedin"', replace: 'const turn = false' },
   { name: "two accounts per cron run, so the second hits the 50-subrequest cap", file: CRON,
     find: "if (attempted >= PER_RUN)", replace: "if (attempted >= PER_RUN + 1)" },
   { name: "the cron queue ordered by last success, so a failing account takes every slot", file: CRON,
