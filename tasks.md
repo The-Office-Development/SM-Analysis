@@ -67,6 +67,21 @@ the app: a rejected application cannot be resubmitted with the same app.
 
 ---
 
+## TIKTOK — started 2026-09-19, plan in `docs/TIKTOK-PLAN.md`
+
+For Jordanian creators via VPN (operator decision). TikTok is blocked in Jordan,
+measured: unreachable from Amman ISPs, but **reachable from Cloudflare's Amman
+data centre**, so our servers are unaffected. Clients need their VPN only to
+connect.
+
+- [ ] VPN on this Mac; read TikTok's primary docs (Display API and Business API)
+      and record the verified endpoint, field and limit list in the plan
+- [ ] Rebuild `syncTiktok`: it has never run against a real account and breaks
+      the first invariants (`?? 0` everywhere, reach invented from views,
+      swallowed errors, one page, invented dates, unclassified auth errors)
+- [ ] Connect-page copy for the VPN step; no TikTok-hosted media in the dashboard
+- [ ] TikTok developer app (operator, on a VPN), sandbox test, then review
+
 ## WHILE META AND LINKEDIN ARE PENDING — noted 2026-09-19
 
 Work that needs neither approval. Instagram is closed to clients, not to us:
