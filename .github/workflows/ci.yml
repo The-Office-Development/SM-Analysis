@@ -70,6 +70,10 @@ jobs:
           name: dist
           path: dist
           retention-days: 3
+          # upload-artifact v4 drops hidden files by default, so dist/.well-known
+          # (security.txt, Meta DPA 3.1-21) never reached production: the site
+          # answered that path with the SPA's HTML. Found 2026-09-19.
+          include-hidden-files: true
 
   # ---------------------------------------------------------------------------
   # Deploy.
