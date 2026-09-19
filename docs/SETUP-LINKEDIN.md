@@ -45,6 +45,18 @@ LinkedIn the same day. Redirect URL set. Answers given:
   three are posting, which PulseBoard never does, and Standard tier requires a
   screencast of every use case claimed here.
 
+**Measured 2026-09-19: until this is approved, nobody can connect LinkedIn at
+all, including us.** LinkedIn refuses all five scopes for this app with "The
+requested permission scope is not valid", and refuses plain `openid profile
+email` too, so the app has no products yet. A made-up client id gets a
+different page, which is the control that makes the refusal meaningful. Do not
+work around it by adding Sign In with LinkedIn: Community Management access is
+only granted to apps with no other products.
+
+**To know the moment it is approved, without waiting for the email:**
+`node verify/linkedin-access-check.mjs`. No credentials; exits 0 when all five
+scopes are granted.
+
 LinkedIn's next steps, from the confirmation page: an email from **Microsoft
 Vetting Services** to the business email; a verification of the business; possibly
 a request for documents by email. Have the registration PDF and the AGATO

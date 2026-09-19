@@ -34,7 +34,10 @@ result unknown, App Review not yet submitted, so no client account can connect.
 (`/company/al-hujra-information-technology`, ID `145194327`), app `PulseBoard`
 (Client ID `77npf65q6q4gty`) associated with it, redirect URL set, business email
 `info@theoffice.it.com` verified, Development tier form submitted 2026-09-17.
-Next signal is an email from Microsoft Vetting Services. Do not add products to
+Next signal is an email from Microsoft Vetting Services, or run
+`node verify/linkedin-access-check.mjs`, which reads LinkedIn's own verdict on
+our scopes without credentials (2026-09-19: all five refused, so nobody can
+connect LinkedIn yet, us included). Do not add products to
 the app: a rejected application cannot be resubmitted with the same app.
 
 ### Next, in order
