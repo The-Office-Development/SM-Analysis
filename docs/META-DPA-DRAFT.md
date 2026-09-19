@@ -105,7 +105,7 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
 | 3.1-22.d | Retained 30+ days | **Yes, 90 days**, then purged automatically | ✅ |
 | 3.1-22.e | Automated weekly review of application logs | **Yes**: an automated weekly review counts the week's events and alarms and records that it ran; `/api/health` turns red (paging the operator via the uptime monitor) on any alarming event within 24 hours, and if the weekly review ever stops running | ✅ once the uptime monitor is set up |
 | 3.1-22.f | Weekly admin-log review | | 🔴 a weekly look, recorded |
-| 3.1-22.g | Incident investigation process, reporting to Meta | | 🟡 draft a one-page procedure |
+| 3.1-22.g | Incident investigation process, reporting to Meta | **Yes**: policy §8. Contain, assess, decide within 24 hours, notify users (24 h) and Jordan's Data Protection Unit (72 h) per PDPL Article 20(A), and Meta; record and fix with a test. Key rotation without downtime (`verify/rotate-token-key.mjs`) | ✅ |
 | 3.1-23 | Personnel security | Two officers | 🔴 confidentiality agreement; short security briefing, dated |
 
 ---
@@ -123,7 +123,7 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
 4. ~~Cloud configuration review~~ **done 2026-09-19** for Supabase. It was: cloud configuration review: Supabase security advisors plus a Cloudflare
    settings review, recorded with a date (3.1-12.c).
 5. ~~Dependabot~~ **done 2026-09-19** (config; alerts are a repo setting).
-6. **One written information-security policy** covering encryption, access,
+6. ~~One written information-security policy~~ **done 2026-09-19**: `docs/security/INFORMATION-SECURITY-POLICY.md`, every rule with how it is enforced today and the ones not yet in force marked. It was: one written information-security policy covering encryption, access,
    patching, logging, incidents and devices. Meta asks for "written policy"
    evidence on almost every security question; one document serves all.
 

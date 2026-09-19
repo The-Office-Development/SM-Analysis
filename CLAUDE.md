@@ -72,7 +72,7 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **291 tests, mutation 150/150**
+Code is on `main`, all green: typecheck, build, **292 tests, mutation 152/152**
 (measured 2026-09-19). Migrations `0001`-`0024` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
@@ -235,7 +235,7 @@ and on-call, counsel sign-off on the PDPL analysis and the draft legal pages.
 npm test        # typecheck, build, the suite, then the mutation gate
 ```
 The mutation check injects every defect listed in `verify/mutation-check.mjs`
-(150 on 2026-09-19) and requires each one to be caught; a pattern that no longer
+(152 on 2026-09-19) and requires each one to be caught; a pattern that no longer
 matches the build fails the gate too, so a refactor cannot silently retire one.
 **If you fix a defect the suite would not otherwise catch, add a mutation for it.**
 
@@ -436,6 +436,13 @@ found last deployed on 2026-09-08, so four days of sync fixes, including the
   the line above it. Re-run `supabase db advisors --linked --type security`
   after any migration that adds a function: 0023's two trigger functions shipped
   without a pinned search_path and only the advisor noticed (fixed in 0024).
+- **The token encryption key can be rotated without downtime**:
+  `TOKEN_ENC_KEY_PREVIOUS` is read only as a fallback during a rotation, and
+  `verify/rotate-token-key.mjs` re-encrypts every stored token, then proves
+  each one opens with the new key alone. Never "fix" a decryption failure by
+  removing the fallback mid-rotation; that breaks every live connection. The
+  written security policy is `docs/security/INFORMATION-SECURITY-POLICY.md`;
+  change a rule there when the system changes.
 - **Never reply "deleted" without checking the deletes.** Instrumenting the
   audit log found `disconnect.ts` telling clients "stored data deleted" after
   refused deletes, `meta-deauthorize.ts` answering `ok` while still holding a

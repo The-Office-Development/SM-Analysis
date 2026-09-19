@@ -41,6 +41,11 @@ const HEALTH = "verify/build/health.js";
 const AUDIT = "verify/build/_audit.js";
 
 const mutations = [
+  { name: "a key rotation that breaks every live connection until it finishes", file: LIB,
+    find: "return decryptWith(prev, raw);", replace: "throw e;" },
+  { name: "a token under the old key reported as already rotated", file: LIB,
+    find: '        decryptWith(encKey(), Buffer.from(stored.slice(ENC_PREFIX.length), "base64"));\n        return false;',
+    replace: "        return false;" },
   { name: "token decryption accepting a 4-byte GCM tag (Semgrep gcm-no-tag-length)", file: LIB,
     find: 'raw.subarray(0, 12), { authTagLength: GCM_TAG });', replace: 'raw.subarray(0, 12));' },
   { name: "disconnect saying 'data deleted' after the deletes were refused", file: "verify/build/disconnect.js",

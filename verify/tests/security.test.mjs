@@ -101,6 +101,34 @@ test("a stored token with its authentication tag cut to 4 bytes is refused", asy
   assert.throws(() => lib.decryptToken(forged), "a 4-byte tag must not authenticate anything");
 });
 
+/* ---- key rotation ---------------------------------------------------------- */
+
+test("during a key rotation, tokens written under the OLD key still open, and new ones use the NEW key", async () => {
+  const crypto = await import("node:crypto");
+  const saved = { cur: process.env.TOKEN_ENC_KEY, prev: process.env.TOKEN_ENC_KEY_PREVIOUS };
+  try {
+    const oldKey = saved.cur;
+    const underOld = lib.encryptToken("old-token");
+    const newKey = crypto.randomBytes(32).toString("base64");
+    process.env.TOKEN_ENC_KEY = newKey;
+
+    delete process.env.TOKEN_ENC_KEY_PREVIOUS;
+    assert.throws(() => lib.decryptToken(underOld), "outside a rotation, a token under another key is refused");
+
+    process.env.TOKEN_ENC_KEY_PREVIOUS = oldKey;
+    assert.equal(lib.decryptToken(underOld), "old-token", "a live connection keeps working mid-rotation");
+    assert.equal(lib.needsReencrypt(underOld), true);
+
+    const underNew = lib.encryptToken("new-token");
+    assert.equal(lib.needsReencrypt(underNew), false, "new writes already use the new key");
+    delete process.env.TOKEN_ENC_KEY_PREVIOUS;
+    assert.equal(lib.decryptToken(underNew), "new-token", "and open without the old key at all");
+  } finally {
+    process.env.TOKEN_ENC_KEY = saved.cur;
+    if (saved.prev === undefined) delete process.env.TOKEN_ENC_KEY_PREVIOUS; else process.env.TOKEN_ENC_KEY_PREVIOUS = saved.prev;
+  }
+});
+
 /* ---- error classification ------------------------------------------------ */
 
 test("auth and throttle errors are told apart by code, not by message text", () => {

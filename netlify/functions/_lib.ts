@@ -152,6 +152,24 @@ function encKey(): Buffer {
 }
 
 /**
+ * The key being rotated OUT, readable only during a rotation.
+ *
+ * Rotation (docs/security/INFORMATION-SECURITY-POLICY.md §8, and
+ * verify/rotate-token-key.mjs) must never break a live connection: set the new
+ * key as TOKEN_ENC_KEY and the old one as TOKEN_ENC_KEY_PREVIOUS, redeploy the
+ * app AND the Worker, re-encrypt every stored token, then remove PREVIOUS. In
+ * between, new tokens are written with the new key and old ones still read.
+ * Unset (the normal state), nothing falls back.
+ */
+function previousKey(): Buffer | null {
+  const v = process.env.TOKEN_ENC_KEY_PREVIOUS ?? "";
+  if (!v) return null;
+  const buf = Buffer.from(v, "base64");
+  if (buf.length !== 32) throw new Error("TOKEN_ENC_KEY_PREVIOUS must decode to 32 bytes.");
+  return buf;
+}
+
+/**
  * The authentication tag is always 16 bytes, and decryption REQUIRES 16.
  * Without `authTagLength`, Node accepts a tag as short as 4 bytes, so a stored
  * value cut short would be checked against a 32-bit tag instead of a 128-bit
@@ -167,13 +185,33 @@ export function encryptToken(plain: string): string {
   return ENC_PREFIX + Buffer.concat([iv, c.getAuthTag(), ct]).toString("base64");
 }
 
+function decryptWith(key: Buffer, raw: Buffer): string {
+  const d = crypto.createDecipheriv("aes-256-gcm", key, raw.subarray(0, 12), { authTagLength: GCM_TAG });
+  d.setAuthTag(raw.subarray(12, 12 + GCM_TAG));
+  return d.update(raw.subarray(12 + GCM_TAG)).toString("utf8") + d.final("utf8");
+}
+
 /** Decrypts a stored token. Values written before encryption are returned as-is. */
 export function decryptToken(stored: string): string {
   if (!stored.startsWith(ENC_PREFIX)) return stored; // legacy plaintext row
   const raw = Buffer.from(stored.slice(ENC_PREFIX.length), "base64");
-  const d = crypto.createDecipheriv("aes-256-gcm", encKey(), raw.subarray(0, 12), { authTagLength: GCM_TAG });
-  d.setAuthTag(raw.subarray(12, 12 + GCM_TAG));
-  return d.update(raw.subarray(12 + GCM_TAG)).toString("utf8") + d.final("utf8");
+  try {
+    return decryptWith(encKey(), raw);
+  } catch (e) {
+    // Only during a rotation. GCM authenticates, so a wrong key fails loudly
+    // rather than returning garbage; trying the previous key cannot mistake one
+    // token for another.
+    const prev = previousKey();
+    if (!prev) throw e;
+    return decryptWith(prev, raw);
+  }
+}
+
+/** True when a stored token still needs re-encrypting under the current key. */
+export function needsReencrypt(stored: string): boolean {
+  if (!stored.startsWith(ENC_PREFIX)) return true;   // legacy plaintext
+  try { decryptWith(encKey(), Buffer.from(stored.slice(ENC_PREFIX.length), "base64")); return false; }
+  catch { return true; }
 }
 
 /** A Supabase client typed to accept any schema (we use `pulseboard`). */
