@@ -39,8 +39,19 @@ Five findings before, two after, both accounted for.
 Measured the same day: TLS 1.2 accepted; TLS 1.0 and 1.1 refused by the
 server (`alert protocol version`). See `META-DPA-DRAFT.md`.
 
-## Live passive scan (OWASP ZAP baseline)
+## Live passive scan: OWASP ZAP baseline (action v0.15.0)
 
-Runs in CI (`security.yml`, job `live`); there is no Docker on the build Mac.
-The first run's report is the `zap-baseline-report` artifact of the workflow's
-first manual run. Record its result here.
+First run: `security.yml` run 35412269234, 2026-09-19, against
+`https://app.theoffice.it.com`. **No high-risk findings.**
+
+| Risk | Finding | Verdict |
+|---|---|---|
+| Medium | CSP: wildcard directive (`img-src ... https:`) | **Fixed.** The app renders no external image, so `img-src 'self' data:` |
+| Medium | CSP: `style-src 'unsafe-inline'` | **Fixed.** Not needed: React sets styles through the DOM. Proven with zero violations across every page, and a broken-policy control (128 violations) |
+| Medium | Cross-domain: `Access-Control-Allow-Origin: *` | **Fixed.** Cloudflare's default, detached in `_headers`; nothing reads this site cross-origin |
+| Low | Cross-Origin-Opener-Policy missing | **Fixed.** `same-origin`; sign-in is by redirect, never popup |
+| Low | Cross-Origin-Embedder-Policy missing | Accepted: `require-corp` gains nothing for this app and would block any future third-party asset without a CORP header |
+| Low | Timestamp disclosure | Accepted: build-time numbers in bundled assets, no information of value |
+| Info | Caching and "modern web app" notes | No action |
+
+The next weekly run should show the three mediums gone; record it here.
