@@ -146,6 +146,12 @@ the full list. Until one is posted, `profile_visits`, `follows`,
 returned a number from this account, and whether an emoji reaction lands in
 `replies` is unknown.
 
+**No original story has been missed.** Confirmed with the operator 2026-09-19:
+the only story `@malekismaiil` posted after the stored one (15 September, 21:00
+Amman) was a mention of another account, and `/stories` does not return those.
+So the empty table since then is correct, not a capture failure. Do not re-open
+this without a new ORIGINAL story that is missing.
+
 **LinkedIn is code-complete and access-blocked.** Page `145194327` created
 2026-09-17, app `PulseBoard` (`77npf65q6q4gty`) associated with it, redirect URL
 set, business email verified, Development tier form submitted 2026-09-17,
