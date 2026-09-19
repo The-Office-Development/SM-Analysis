@@ -129,10 +129,12 @@ export function Privacy() {
       {/*
         * Added 2026-09-19 when Web Analytics was made to work (it had been
         * blocked by our own CSP and collected nothing). Every sentence here is
-        * either Cloudflare's documented behaviour or measured on this site;
-        * do not add "no cookies" or similar without measuring it first.
+        * either Cloudflare's documented behaviour or measured on this site.
+        * Measured live 2026-09-19 in a clean browser across three pages: the
+        * beacon set no cookies, used no local or session storage, and posted
+        * only to our own /cdn-cgi/rum. Re-measure before changing this.
         */}
-      <p>We use <b>Cloudflare Web Analytics</b> to count visits and see which pages are used and how quickly they load. For each page view it records the page address, the site you came from, your browser type, your country and page-load timings. It does not see your connected accounts, your figures or your posts. Cloudflare states that it "does not collect or use your visitors' personal data".</p>
+      <p>We use <b>Cloudflare Web Analytics</b> to count visits and see which pages are used and how quickly they load. For each page view it records the page address, the site you came from, your browser type, your country and page-load timings. It does not see your connected accounts, your figures or your posts. Cloudflare states that it "does not collect or use your visitors' personal data". On this site it sets no cookies and stores nothing in your browser, and it reports only to our own domain.</p>
 
       <h3>Where it is processed</h3>
       {/*
