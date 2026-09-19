@@ -1,0 +1,7 @@
+# How to report a security vulnerability in PulseBoard (app.theoffice.it.com).
+# Format: RFC 9116. Reports are read by the operators of Al-Hujra Information
+# Technology Company / Limited Liability (trading as The Office), Amman, Jordan.
+Contact: mailto:info@theoffice.it.com
+Expires: 2027-09-19T00:00:00.000Z
+Preferred-Languages: en, ar
+Canonical: https://app.theoffice.it.com/.well-known/security.txt

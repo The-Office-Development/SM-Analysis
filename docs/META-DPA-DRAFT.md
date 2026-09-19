@@ -96,9 +96,9 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
 | 3.1-15.d | MFA on backend admin (Supabase, Cloudflare, Meta Business) | Meta Business Security Centre showed 2FA required of **"No one"** | 🔴 enable and require (`SETUP-META.md` §1c) |
 | 3.1-15.e | MFA on SSH / remote servers | Not applicable: no servers of our own | ✅ N/A |
 | 3.1-16 | Account management system; yearly review; prompt revocation | Two officers hold every admin role | 🔴 written one-page procedure; first review dated |
-| 3.1-17.a | Patching, backend | Dependencies pinned by `package-lock.json`; `npm audit` clean | 🟡 enable Dependabot security updates |
+| 3.1-17.a | Patching, backend | Dependencies pinned by `package-lock.json`; `npm audit` clean; **Dependabot weekly** (`.github/dependabot.yml`, added 2026-09-19), and every update must pass CI including the mutation gate | ✅ (🔴 also switch on Dependabot security alerts in the repo settings) |
 | 3.1-17.c | Patching, organisation's own systems | | 🔴 automatic OS updates on work devices |
-| 3.1-21 | Public way to report vulnerabilities | **Measured: none.** `/.well-known/security.txt` returned our app's HTML page (the SPA fallback), not a security.txt | 🟡 publish `security.txt` |
+| 3.1-21 | Public way to report vulnerabilities | **Published 2026-09-19**: `/.well-known/security.txt` (RFC 9116), contact `info@theoffice.it.com`. Before that the URL returned our app's HTML (the SPA fallback). A test fails a month before it expires | ✅ |
 | 3.1-22.a | Admin audit logs | Cloudflare and Supabase keep account audit logs for their dashboards | 🔴 confirm retention on our plans; screenshot |
 | 3.1-22.b | Application event logs (user id, event, time, success) | Structured logs exist (`log()`), and `sync_log` in the database. **But Cloudflare keeps function logs only live** (no `observability` configured), so they are not retained | 🟡 an audit table in Postgres, below |
 | 3.1-22.d | Retained 30+ days | **No, today** | 🟡 same |
@@ -112,7 +112,7 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
 ## The gaps, as work
 
 **Ours to close (code, config, documents):**
-1. **Publish `security.txt`** at `/.well-known/security.txt` (3.1-21).
+1. ~~Publish `security.txt`~~ **done 2026-09-19**.
 2. **An application audit log** retained 90 days in our own database, not the
    platform's live logs: connect, disconnect, deletion requests, token refresh
    failures, auth failures, each with user id, event, time and outcome
@@ -121,7 +121,7 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
    and a DAST baseline scan (e.g. OWASP ZAP) of the live app, in CI (3.1-12).
 4. **Cloud configuration review**: Supabase security advisors plus a Cloudflare
    settings review, recorded with a date (3.1-12.c).
-5. **Dependabot** security updates (3.1-17.a).
+5. ~~Dependabot~~ **done 2026-09-19** (config; alerts are a repo setting).
 6. **One written information-security policy** covering encryption, access,
    patching, logging, incidents and devices. Meta asks for "written policy"
    evidence on almost every security question; one document serves all.

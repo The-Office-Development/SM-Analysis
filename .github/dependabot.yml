@@ -1,0 +1,14 @@
+# Meta DPA 3.1-17.a asks for a defined patching process for the backend.
+# Weekly, so security fixes to dependencies arrive as pull requests, which CI
+# (typecheck, the suite, the mutation gate) must pass before anything merges.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
