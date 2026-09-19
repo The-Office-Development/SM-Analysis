@@ -72,8 +72,8 @@ Two constraints shape every decision:
 
 ## 3. Where it currently stands
 
-Code is on `main`, all green: typecheck, build, **271 tests, mutation 140/140**
-(measured 2026-09-19). Migrations `0001`-`0022` are applied.
+Code is on `main`, all green: typecheck, build, **290 tests, mutation 149/149**
+(measured 2026-09-19). Migrations `0001`-`0023` are applied.
 
 **It is deployed, and one real account is connected.** As of 2026-09-04
 `app.theoffice.it.com` serves the app and its functions, and `@heath_ens21`
@@ -235,7 +235,7 @@ and on-call, counsel sign-off on the PDPL analysis and the draft legal pages.
 npm test        # typecheck, build, the suite, then the mutation gate
 ```
 The mutation check injects every defect listed in `verify/mutation-check.mjs`
-(140 on 2026-09-19) and requires each one to be caught; a pattern that no longer
+(149 on 2026-09-19) and requires each one to be caught; a pattern that no longer
 matches the build fails the gate too, so a refactor cannot silently retire one.
 **If you fix a defect the suite would not otherwise catch, add a mutation for it.**
 
@@ -422,6 +422,19 @@ found last deployed on 2026-09-08, so four days of sync fixes, including the
   Publicly it answers only `{"ok":…}`; counts and reasons need `?key=` matching
   the `HEALTH_KEY` secret. An expired client connection is reported, not red:
   that is the client's action, not a system fault. Seven mutations guard it.
+- **The security audit log (`audit_log`, migration 0023) is append-only by the
+  database, not by convention**: no updates, no deletes under 90 days, no
+  truncate, no browser access (proven live 2026-09-19). Write it with `audit()`
+  from `_audit.ts`, which never throws and never blocks the action it records.
+  OAuth callbacks are wrapped with `auditedCallback`, which reads the outcome
+  off the redirect, so no exit can be missed. `/api/health` turns red on an
+  alarming event (`isAlarming`: a data subject's right not honoured, or a Meta
+  deletion/deauthorize request matching nobody) and if the weekly review stops.
+- **Never reply "deleted" without checking the deletes.** Instrumenting the
+  audit log found `disconnect.ts` telling clients "stored data deleted" after
+  refused deletes, `meta-deauthorize.ts` answering `ok` while still holding a
+  withdrawn credential, and account deletion saying "we have been alerted" when
+  nothing alerted anyone. All three are fixed and guarded.
 - `buildCsv` uses `seriesByDay(..., "followers")` while the dashboard uses
   `followersByDay()`. These agree: the primary key is `(account_id, date)`.
 

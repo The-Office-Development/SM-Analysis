@@ -1,6 +1,7 @@
 import type { Handler } from "./_lib";
 import crypto from "node:crypto";
 import { admin, userIdFromToken, json, log, writeFailed, deletionStatus, type WriteError } from "./_lib";
+import { audit } from "./_audit";
 
 /**
  * Data subject rights, self-service.
@@ -36,6 +37,7 @@ export const handler: Handler = async (event) => {
     ]);
 
     log("account.exported", { uid, accounts: ids.length });
+    await audit(db, "data.export", "success", { user_id: uid, detail: { accounts: ids.length } });
     return {
       statusCode: 200,
       headers: {
@@ -107,6 +109,7 @@ export const handler: Handler = async (event) => {
        * to retry. An incomplete erasure is recoverable; an incomplete erasure
        * with the key thrown away is not.
        */
+      await audit(db, "account.delete", "failure", { user_id: uid, detail: { failed_writes: failed, code } });
       log("account.delete_incomplete", {
         uid, code, failed_writes: failed,
         detail: "the subject's data was NOT fully erased and the sign-in record was kept so "
@@ -131,6 +134,10 @@ export const handler: Handler = async (event) => {
 
     if (authErr) {
       // Every data row is gone; only the sign-in record survived. Say exactly that.
+      // This audit row is what makes "we have been alerted" below true: a
+      // failed account.delete turns /api/health red, and the monitor pages the
+      // operator. Before the audit log it was a log line nobody read.
+      await audit(db, "account.delete", "failure", { user_id: uid, detail: { reason: "sign_in_record_not_removed", code } });
       log("account.auth_delete_failed", { uid, code, detail: authErr });
       return json(200, {
         message: "All your data has been deleted, but your sign-in record could not be removed. "
@@ -139,6 +146,7 @@ export const handler: Handler = async (event) => {
       });
     }
 
+    await audit(db, "account.delete", "success", { user_id: uid, detail: { accounts: (accounts ?? []).length, code } });
     log("account.deleted", { uid, accounts: (accounts ?? []).length, code });
     return json(200, { message: "Your account and all associated data have been deleted.", confirmation_code: code });
   }

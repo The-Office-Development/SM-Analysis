@@ -1,6 +1,7 @@
 import type { Handler } from "./_lib";
 import { admin, log } from "./_lib";
 import { refreshIdentity, type Identity } from "./_tokens";
+import { audit, purgeAudit, weeklyReview } from "./_audit";
 
 /**
  * Renew platform tokens before they lapse.
@@ -31,12 +32,19 @@ export const run: Handler = async () => {
     if (Date.now() - startedAt > TIME_BUDGET_MS) break;
     const r = await refreshIdentity(db, id);
     if (r === "refreshed") refreshed++;
-    else if (r === "failed") failed++;
+    else if (r === "failed") {
+      failed++;
+      await audit(db, "token.refresh", "failure", { user_id: id.user_id, platform: id.provider });
+    }
     else if (r === "locked") locked++;
     else skipped++;
   }
 
-  log("token_refresh.finished", { refreshed, failed, skipped, locked, ms: Date.now() - startedAt });
+  // The audit log's upkeep rides on this four-hourly job (see _audit.ts).
+  const purged = await purgeAudit(db);
+  const review = await weeklyReview(db);
+
+  log("token_refresh.finished", { refreshed, failed, skipped, locked, purged, review, ms: Date.now() - startedAt });
   return { statusCode: failed > 0 && refreshed === 0 ? 500 : 200, body: JSON.stringify({ refreshed, failed, skipped, locked }) };
 };
 

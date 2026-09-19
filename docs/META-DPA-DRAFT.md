@@ -99,10 +99,11 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
 | 3.1-17.a | Patching, backend | Dependencies pinned by `package-lock.json`; `npm audit` clean; **Dependabot weekly** (`.github/dependabot.yml`, added 2026-09-19), and every update must pass CI including the mutation gate | ✅ (🔴 also switch on Dependabot security alerts in the repo settings) |
 | 3.1-17.c | Patching, organisation's own systems | | 🔴 automatic OS updates on work devices |
 | 3.1-21 | Public way to report vulnerabilities | **Published 2026-09-19**: `/.well-known/security.txt` (RFC 9116), contact `info@theoffice.it.com`. Before that the URL returned our app's HTML (the SPA fallback). A test fails a month before it expires | ✅ |
+| 3.1-22.c | Logs protected from tampering | **Yes, enforced by the database**: rows cannot be updated at all, cannot be deleted until 90 days old, the table cannot be truncated, and browser keys have no access. Proven live 2026-09-19 against controls | ✅ |
 | 3.1-22.a | Admin audit logs | Cloudflare and Supabase keep account audit logs for their dashboards | 🔴 confirm retention on our plans; screenshot |
-| 3.1-22.b | Application event logs (user id, event, time, success) | Structured logs exist (`log()`), and `sync_log` in the database. **But Cloudflare keeps function logs only live** (no `observability` configured), so they are not retained | 🟡 an audit table in Postgres, below |
-| 3.1-22.d | Retained 30+ days | **No, today** | 🟡 same |
-| 3.1-22.e | Automated weekly review of application logs | Partly: `/api/health` watches sync outcomes continuously | 🟡 weekly security-event summary from the audit table |
+| 3.1-22.b | Application event logs (user id, event, time, success) | **Yes, since 2026-09-19**: `pulseboard.audit_log` (migration 0023) records connect (every exit of every OAuth callback), disconnect, data export, account deletion, Meta deletion and deauthorize requests (with the Meta user id), token refresh failures, and share links created or revoked. Each row: our user id, platform user id where known, event, time, success/failure. Never tokens or platform data | ✅ |
+| 3.1-22.d | Retained 30+ days | **Yes, 90 days**, then purged automatically | ✅ |
+| 3.1-22.e | Automated weekly review of application logs | **Yes**: an automated weekly review counts the week's events and alarms and records that it ran; `/api/health` turns red (paging the operator via the uptime monitor) on any alarming event within 24 hours, and if the weekly review ever stops running | ✅ once the uptime monitor is set up |
 | 3.1-22.f | Weekly admin-log review | | 🔴 a weekly look, recorded |
 | 3.1-22.g | Incident investigation process, reporting to Meta | | 🟡 draft a one-page procedure |
 | 3.1-23 | Personnel security | Two officers | 🔴 confidentiality agreement; short security briefing, dated |
@@ -113,7 +114,7 @@ is 7 days or so, say "removed from backups within N days", well inside 120.
 
 **Ours to close (code, config, documents):**
 1. ~~Publish `security.txt`~~ **done 2026-09-19**.
-2. **An application audit log** retained 90 days in our own database, not the
+2. ~~An application audit log~~ **done 2026-09-19** (migration 0023). It was: an application audit log retained 90 days in our own database, not the
    platform's live logs: connect, disconnect, deletion requests, token refresh
    failures, auth failures, each with user id, event, time and outcome
    (3.1-22.b/d). A weekly automated summary of it (3.1-22.e).

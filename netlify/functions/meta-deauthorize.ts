@@ -1,4 +1,5 @@
 import type { Handler } from "./_lib";
+import { audit } from "./_audit";
 import { admin, json, log, writeFailed } from "./_lib";
 import { verifyMetaFamilyRequest } from "./meta-data-deletion";
 
@@ -25,7 +26,7 @@ export const handler: Handler = async (event) => {
     .eq("provider", provider)
     .eq("external_user_id", String(payload.user_id));
 
-  let stopped = 0;
+  let stopped = 0, failedWrites = 0;
   for (const identity of identities ?? []) {
     const { data: accounts } = await db.from("social_accounts").select("id").eq("identity_id", identity.id);
     for (const a of accounts ?? []) {
@@ -36,16 +37,26 @@ export const handler: Handler = async (event) => {
       // believes they withdrew, and the sync will keep presenting the account as
       // connected — the exact pattern this callback exists to stop.
       const { error: secErr } = await db.from("account_secrets").delete().eq("account_id", a.id);
-      writeFailed("deauthorize.write_failed", secErr, { account: a.id, table: "account_secrets" });
+      if (writeFailed("deauthorize.write_failed", secErr, { account: a.id, table: "account_secrets" })) failedWrites++;
       const { error: accErr } = await db.from("social_accounts").update({ status: "revoked" }).eq("id", a.id);
-      writeFailed("deauthorize.write_failed", accErr, { account: a.id, table: "social_accounts" });
+      if (writeFailed("deauthorize.write_failed", accErr, { account: a.id, table: "social_accounts" })) failedWrites++;
       stopped++;
     }
     const { error: idErr } = await db.from("provider_identities").delete().eq("id", identity.id);
-    writeFailed("deauthorize.write_failed", idErr, { identity: identity.id, table: "provider_identities" });
+    if (writeFailed("deauthorize.write_failed", idErr, { identity: identity.id, table: "provider_identities" })) failedWrites++;
   }
 
   if (!identities?.length) log("deauthorize.no_identity_match", { provider, external_user_id: String(payload.user_id) });
+  /*
+   * A refused write used to be logged and then counted as stopped anyway, and
+   * the person who withdrew access had a credential we still held. Now it is a
+   * recorded failure, which turns /api/health red. A request matching nobody
+   * is recorded too: it is the untested id question (see meta-data-deletion).
+   */
+  await audit(db, "platform.deauthorize", failedWrites ? "failure" : "success", {
+    platform: provider, platform_user_id: String(payload.user_id),
+    detail: { matched: Boolean(identities?.length), accounts: stopped, failed_writes: failedWrites },
+  });
   log("deauthorize.handled", { provider, accounts: stopped });
-  return json(200, { ok: true, accounts: stopped });
+  return json(200, { ok: failedWrites === 0, accounts: stopped });
 };

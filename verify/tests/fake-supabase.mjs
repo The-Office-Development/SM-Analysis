@@ -153,6 +153,16 @@ export function makeDb(seed = {}, opts = {}) {
     return api;
   }
 
+  /*
+   * Column defaults the real schema fills in, so a fake insert looks like a real
+   * one. Only where code depends on them: audit_log.at is stamped by the
+   * database (`default now()`), deliberately not by the app, so the fake must
+   * stamp it too or every "when did this last happen" reads as never.
+   */
+  const DEFAULTS = {
+    audit_log: () => ({ at: new Date().toISOString() }),
+  };
+
   function upsert(table, payload, opts = {}) {
     const failed = writeError(table);
     if (failed) {
@@ -163,7 +173,7 @@ export function makeDb(seed = {}, opts = {}) {
       };
       return refused;
     }
-    const list = Array.isArray(payload) ? payload : [payload];
+    const list = (Array.isArray(payload) ? payload : [payload]).map((r) => ({ ...(DEFAULTS[table]?.() ?? {}), ...r }));
     const keys = (opts.onConflict ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     const store = rowsOf(table);
     const written = [];

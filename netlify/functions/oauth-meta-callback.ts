@@ -1,11 +1,12 @@
 import type { Handler } from "./_lib";
+import { auditedCallback } from "./_audit";
 import {
   env, verifyState, readCookie, clearNonceCookie, STATE_COOKIE, admin, saveAccount,
   backToApp, graphGet, encryptToken, log, writeFailed, GRAPH, AccountOwnedByAnotherTenant,
 } from "./_lib";
 
 /** Meta OAuth redirect target — exchanges the code and stores Pages + IG accounts. */
-export const handler: Handler = async (event) => {
+const handle: Handler = async (event) => {
   const q = event.queryStringParameters ?? {};
   const clear = { "Set-Cookie": clearNonceCookie() };
 
@@ -120,3 +121,6 @@ export const handler: Handler = async (event) => {
     return backToApp("error", "meta_callback_failed", clear);
   }
 };
+
+// Every exit recorded in the security audit log (migration 0023, Meta DPA 3.1-22).
+export const handler: Handler = auditedCallback("meta", handle);

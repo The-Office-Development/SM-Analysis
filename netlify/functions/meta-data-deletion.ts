@@ -1,6 +1,7 @@
 import type { Handler } from "./_lib";
 import crypto from "node:crypto";
 import { admin, env, json, log, writeFailed, deletionStatus, type Db, type WriteError } from "./_lib";
+import { audit } from "./_audit";
 
 /**
  * Meta data-deletion callback.  POST /api/meta-data-deletion
@@ -45,6 +46,17 @@ export const handler: Handler = async (event) => {
     status,
   });
   writeFailed("deletion.record_write_failed", recErr, { provider, code, accounts: deleted, status });
+
+  /*
+   * "not_found" is recorded as its own status, because it is the one outcome
+   * this project has never been able to test: whether the user id Meta sends
+   * for an Instagram Login user matches the id we stored. A not_found for
+   * someone who did connect means the lookup is wrong, and /api/health turns
+   * red on it so a person looks.
+   */
+  await audit(db, "platform.deletion_request", status === "failed" ? "failure" : "success", {
+    platform: provider, platform_user_id: String(payload.user_id), detail: { status, accounts: deleted, code },
+  });
 
   if (failed > 0) {
     // An operator has to finish this by hand, and has 30 days to do it. Nothing

@@ -2,6 +2,7 @@ import type { Handler } from "./_lib";
 import crypto from "node:crypto";
 import { admin, type Db } from "./_lib";
 import { liMinSyncIntervalMs } from "./_linkedin";
+import { isAlarming, REVIEW_EVERY_MS } from "./_audit";
 
 /**
  * GET /api/health: is the sync actually running?
@@ -83,10 +84,44 @@ export async function assess(db: Db, now = Date.now()) {
   const lastTurnMs = turns.length ? Math.min(...turns.map((t) => ago(t))) : Infinity;
   if (live.length && lastTurnMs > CRON_SILENT_MS) reasons.push("the scheduled sync has not taken a turn recently");
 
+  /*
+   * The security audit log (migration 0023). Two ways it turns this red:
+   *  - an ALARMING event in the last 24 hours: a data subject's right not
+   *    honoured, or a Meta deletion request that matched nobody (isAlarming).
+   *    Red for a day, so the monitor pages once and a person looks;
+   *  - the weekly review has stopped running. A log nobody reviews is the
+   *    failure Meta's question 3.1-22.e is about.
+   */
+  const dayAgo = new Date(now - 86_400_000).toISOString();
+  const { data: recent, error: recentErr } = await db
+    .from("audit_log").select("event,outcome,detail,at").gte("at", dayAgo).limit(2_000);
+  const { data: reviews, error: reviewErr } = await db
+    .from("audit_log").select("at").eq("event", "audit.weekly_review").order("at", { ascending: false }).limit(1);
+  const { data: first, error: firstErr } = await db
+    .from("audit_log").select("at").order("at", { ascending: true }).limit(1);
+  let alarms = 0;
+  let lastReviewMs: number | null = null;
+  if (recentErr || reviewErr || firstErr) {
+    reasons.push("the security audit log could not be read");
+  } else {
+    alarms = ((recent ?? []) as { event: string; outcome: string; detail?: any }[]).filter(isAlarming).length;
+    if (alarms) reasons.push(`${alarms} security event(s) in the last 24 hours need a person`);
+    const lastReview = (reviews as { at: string }[] | null)?.[0]?.at;
+    const firstAt = (first as { at: string }[] | null)?.[0]?.at;
+    lastReviewMs = lastReview ? now - Date.parse(lastReview) : null;
+    // A day's slack over the weekly cadence. A log younger than that has not
+    // been owed a review yet, so a fresh deployment is not red.
+    const overdue = REVIEW_EVERY_MS + 86_400_000;
+    const owed = lastReviewMs !== null ? lastReviewMs > overdue : Boolean(firstAt && now - Date.parse(firstAt) > overdue);
+    if (owed) reasons.push("the weekly security review has not run");
+  }
+
   return {
     ok: reasons.length === 0,
     reasons,
     detail: {
+      security_alarms_24h: alarms,
+      last_security_review_days: lastReviewMs === null ? null : Math.round(lastReviewMs / 86_400_000),
       connected: live.length,
       stale: stale.length,
       // A client must reconnect these. It is their action, not a system fault,

@@ -1,4 +1,5 @@
 import type { Handler } from "./_lib";
+import { audit } from "./_audit";
 import {
   admin, userIdFromToken, json, decryptToken, appsecretProof, log, writeFailed, GRAPH,
   type Db, type WriteError,
@@ -34,6 +35,9 @@ export const handler: Handler = async (event) => {
   // Revoke the app's platform access only when this is the last account still
   // using that identity — several Pages commonly share one authorisation.
   let revoked = false;
+  // Every table whose delete was refused. Checked before the reply, because the
+  // reply tells a client their data is gone.
+  const failed: string[] = [];
   if (acc.identity_id) {
     const { data: siblings } = await db
       .from("social_accounts")
@@ -43,7 +47,9 @@ export const handler: Handler = async (event) => {
     if (!siblings?.length) {
       revoked = await revokeIdentity(db, acc.identity_id, acc.platform);
       const { error } = await db.from("provider_identities").delete().eq("id", acc.identity_id);
-      writeFailed("disconnect.delete_failed", error, { uid, identity: acc.identity_id, table: "provider_identities" });
+      if (writeFailed("disconnect.delete_failed", error, { uid, identity: acc.identity_id, table: "provider_identities" })) {
+        failed.push("provider_identities");
+      }
     }
   }
 
@@ -53,14 +59,34 @@ export const handler: Handler = async (event) => {
   // The response below tells the client their data has been deleted. A delete
   // that quietly failed makes that sentence untrue, and the stored token is the
   // row this comment was written to protect.
-  const gone = (table: string, res: { error?: WriteError | null }) =>
-    writeFailed("disconnect.delete_failed", res.error, { uid, account: acc.id, table });
+  const gone = (table: string, res: { error?: WriteError | null }) => {
+    if (writeFailed("disconnect.delete_failed", res.error, { uid, account: acc.id, table })) failed.push(table);
+  };
   gone("account_secrets", await db.from("account_secrets").delete().eq("account_id", acc.id));
   gone("metrics_daily", await db.from("metrics_daily").delete().eq("account_id", acc.id));
   gone("content", await db.from("content").delete().eq("account_id", acc.id));
   gone("audience_snapshots", await db.from("audience_snapshots").delete().eq("account_id", acc.id));
   gone("social_accounts", await db.from("social_accounts").delete().eq("id", acc.id));
 
+  /*
+   * Say "deleted" only if it was. The deletes above used to log a refusal and
+   * carry on, and this reply said "stored data deleted" regardless: a client
+   * told their data was gone, when it might all still be there. The same rule
+   * as deletionStatus() for Meta's callbacks, which CLAUDE.md lists as an
+   * invariant; this endpoint had never been held to it.
+   */
+  if (failed.length) {
+    await audit(db, "disconnect", "failure", {
+      user_id: uid, platform: acc.platform, account_id: acc.id, detail: { tables_not_deleted: failed, revoked },
+    });
+    return json(500, {
+      message: `${acc.username} could not be fully disconnected: some of its stored data could not be deleted. `
+        + `Please try again, and if it keeps failing write to info@theoffice.it.com.`,
+      revoked,
+    });
+  }
+
+  await audit(db, "disconnect", "success", { user_id: uid, platform: acc.platform, account_id: acc.id, detail: { revoked } });
   log("account.disconnected", { uid, account: acc.id, platform: acc.platform, revoked });
   return json(200, {
     message: revoked

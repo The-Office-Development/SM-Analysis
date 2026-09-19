@@ -38,8 +38,28 @@ const SHARE = "verify/build/share.js";
 const REFRESH = "verify/build/refresh-post.js";
 const CRON = "verify/build/sync-cron.js";
 const HEALTH = "verify/build/health.js";
+const AUDIT = "verify/build/_audit.js";
 
 const mutations = [
+  { name: "disconnect saying 'data deleted' after the deletes were refused", file: "verify/build/disconnect.js",
+    find: "if (failed.length) {", replace: "if (false) {" },
+  { name: "deauthorize reporting ok while still holding the withdrawn credential", file: "verify/build/meta-deauthorize.js",
+    find: "return json(200, { ok: failedWrites === 0, accounts: stopped });", replace: "return json(200, { ok: true, accounts: stopped });" },
+  { name: "a Meta deletion request that matched nobody not raised to a person", file: AUDIT,
+    find: 'if (r.event === "platform.deletion_request" && r.detail?.status === "not_found")', replace: "if (false)" },
+  { name: "the audit log trusting a forged state's user id", file: AUDIT,
+    find: "user_id = verifyState(q.state, readCookie(event.headers?.cookie, STATE_COOKIE))?.uid ?? null;",
+    replace: 'user_id = JSON.parse(Buffer.from(String(q.state).split(".")[0], "base64url").toString()).uid ?? null;' },
+  { name: "security alarms not turning health red", file: HEALTH,
+    find: "if (alarms)", replace: "if (false)" },
+  { name: "a stopped weekly security review not noticed", file: HEALTH,
+    find: "if (owed)", replace: "if (false)" },
+  { name: "the audit purge deleting rows younger than 90 days", file: AUDIT,
+    find: '.delete().lt("at", cutoff);', replace: '.delete().lt("at", new Date(now).toISOString());' },
+  { name: "credential-looking keys written into audit rows", file: AUDIT,
+    find: "if (!CREDENTIAL_KEY.test(k))", replace: "if (true)" },
+  { name: "'we have been alerted' with nothing alerting anyone", file: "verify/build/account-data.js",
+    find: 'await audit(db, "account.delete", "failure", { user_id: uid, detail: { reason: "sign_in_record_not_removed", code } });', replace: "" },
   { name: "health judged by turns taken, blind to a sync that never succeeds (2026-09-18)", file: HEALTH,
     find: "ago(a.last_synced_at ?? a.connected_at)", replace: "ago(a.sync_turn_at ?? a.connected_at)" },
   { name: "a stopped cron not noticed by the health check", file: HEALTH,

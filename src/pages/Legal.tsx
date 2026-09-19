@@ -147,6 +147,7 @@ export function Privacy() {
 
       <h3>How long we keep it</h3>
       <p>We keep what you connect for as long as you keep it connected, and no longer. <b>Disconnecting an account deletes it immediately</b>: the access token, every daily metric, every post record, the audience breakdowns and that account's sync history are removed at once, not after a delay. There is no retention window afterwards because there is nothing left to retain. Deleting your whole account removes everything above along with your goals, your recorded consents and any report links you created.</p>
+      <p><b>One exception, for security.</b> We keep a security log of account events: connecting or disconnecting an account, creating or revoking a report link, exporting or deleting your data, and deletion requests from the platforms. Each entry records an internal identifier, what happened, when, and whether it worked. It never holds your figures, your posts or any access token. Entries are kept for <b>90 days</b> and then deleted automatically, including after you delete your account, so that a problem with a deletion can still be found and fixed. Nobody can edit an entry once it is written.</p>
 
       <h3>Shared report links</h3>
       <p>A shared link holds a <b>snapshot</b> of the figures as they stood when you created it; it does not update afterwards. Anyone holding the link can open it without signing in, so treat one as public for as long as it works.</p>
