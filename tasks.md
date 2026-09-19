@@ -101,10 +101,15 @@ fair game.
       **Left:** point a free uptime monitor at
       `https://app.theoffice.it.com/api/health` (UptimeRobot free, 5-minute
       checks, alert on non-200). Owner's account, owner's phone.
-- [ ] **Pre-write Meta's Data Protection Assessment.** It follows App Review and
-      asks how data is stored, protected, deleted, and who the sub-processors
-      are. Every answer is in the code and in `TRANSFER-ASSESSMENT.md`.
-      Drafting it now turns a later delay into copy-paste.
+- [~] **Pre-write Meta's Data Protection Assessment.** **Drafted 2026-09-19:
+      `docs/META-DPA-DRAFT.md`** against Meta's question list v3.1, facts
+      measured live. Most answers are ready; the gaps are listed there as six
+      items we can close (security.txt, a 90-day audit log with a weekly
+      summary, SAST/DAST in CI, a cloud config review, Dependabot, one written
+      security policy) and owner actions (DPAs, 2FA on GitHub/Cloudflare/
+      Supabase/Meta/email, device encryption, confidentiality agreement).
+      Measured gaps worth knowing: the GitHub org does not require 2FA, there
+      is no security.txt, and function logs are not retained at all.
 - [ ] **Reviewer's-eye walkthrough.** Drive the app in the screencast order
       (`APP-REVIEW-PREP.md` §5), screenshot each page a reviewer sees, fix
       anything that reads as broken or unfinished. Reviewers reject for broken
