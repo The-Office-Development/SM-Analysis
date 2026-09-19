@@ -1,3 +1,4 @@
+import { useAnchored } from "../lib/anchor";
 import { useEffect, useRef, useState } from "react";
 import { useDash } from "../context/DashboardContext";
 import { RANGE_PRESETS, RANGE_MIN, RANGE_MAX, clampRange } from "../lib/types";
@@ -50,6 +51,8 @@ function windowLabel(days: number): string {
 export default function RangePicker() {
   const dash = useDash();
   const [open, setOpen] = useState(false);
+  const customRef = useRef<HTMLButtonElement>(null);
+  const rangePos = useAnchored<HTMLDivElement>(open, customRef);
   const [draft, setDraft] = useState(String(dash.range));
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -101,7 +104,7 @@ export default function RangePicker() {
           * without opening anything — a dashboard whose window is a mystery
           * invites every figure on it to be misread.
           */}
-        <button aria-pressed={!isPreset} aria-haspopup="dialog" aria-expanded={open}
+        <button ref={customRef} aria-pressed={!isPreset} aria-haspopup="dialog" aria-expanded={open}
                 onClick={() => setOpen((v) => !v)}
                 title="Choose your own date range">
           {isPreset ? "Custom" : `${dash.range}D`}
@@ -111,7 +114,7 @@ export default function RangePicker() {
       {open && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 55 }} onClick={() => setOpen(false)} />
-          <div className="rangepop" role="dialog" aria-label="Custom date range" style={{ top: 34, right: 0 }}>
+          <div className="rangepop" role="dialog" aria-label="Custom date range" ref={rangePos.ref} style={rangePos.style}>
             <div className="quick">
               {QUICK.map((q) => (
                 <button key={q.days} aria-pressed={dash.range === q.days}

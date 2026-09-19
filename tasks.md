@@ -110,10 +110,13 @@ fair game.
       Supabase/Meta/email, device encryption, confidentiality agreement).
       Measured gaps worth knowing: the GitHub org does not require 2FA, there
       is no security.txt, and function logs are not retained at all.
-- [ ] **Reviewer's-eye walkthrough.** Drive the app in the screencast order
-      (`APP-REVIEW-PREP.md` §5), screenshot each page a reviewer sees, fix
-      anything that reads as broken or unfinished. Reviewers reject for broken
-      flows, not only for policy.
+- [x] **Reviewer's-eye walkthrough.** **Done 2026-09-19** (`APP-REVIEW-PREP.md`
+      §6). Fixed: the platform picker and date range did nothing on phones
+      (clipped by the toolbar), a post's page was titled "Overview", the
+      sign-in page promised watch time and retention, a wrapping button.
+      🔴 Owner: turn OFF Cloudflare Web Analytics for the `pulseboard` Pages
+      project; our CSP blocks it, so it collects nothing and puts an error in
+      the console of every page.
 - [ ] **Re-run the reconciliation.** Last run 2026-09-05 (views within 0.7%).
       The sync's cadence and story handling changed on 2026-09-18/19. Needs
       one of the operators to read about six figures off @malekismaiil's

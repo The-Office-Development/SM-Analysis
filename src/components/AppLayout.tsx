@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useAnchored } from "../lib/anchor";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useDemo } from "../context/DemoContext";
@@ -39,12 +40,17 @@ export default function AppLayout() {
   const loc = useLocation();
   const nav = useNavigate();
   const [scopeOpen, setScopeOpen] = useState(false);
+  const scopeRef = useRef<HTMLButtonElement>(null);
+  const scopePos = useAnchored<HTMLDivElement>(scopeOpen, scopeRef);
   const [acctOpen, setAcctOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
   const name = demo ? "Demo mode" : (user?.user_metadata?.full_name as string) || user?.email?.split("@")[0] || "You";
   const email = demo ? "Sample data · not real" : user?.email;
-  const title = TITLES[loc.pathname] ?? "Overview";
+  // By first path segment, so a post's own page (/content/:id) is titled with
+  // its section. Keyed on the full path, it fell through to "Overview" while
+  // the sidebar said Content: a mismatch a reviewer's screencast would show.
+  const title = TITLES[`/${loc.pathname.split("/")[1] ?? ""}`] ?? "Overview";
 
   const scopeLabel = dash.scope === "all" ? "All platforms" : PLATFORMS[dash.scope].name;
 
@@ -148,13 +154,13 @@ export default function AppLayout() {
           <RangePicker />
 
           <div className="menu-anchor">
-            <button className="btn btn--sm" onClick={() => setScopeOpen((v) => !v)}>
+            <button ref={scopeRef} className="btn btn--sm" onClick={() => setScopeOpen((v) => !v)}>
               {scopeLabel} <IcChevron style={{ width: 14, height: 14 }} />
             </button>
             {scopeOpen && (
               <>
                 <div style={{ position: "fixed", inset: 0, zIndex: 55 }} onClick={() => setScopeOpen(false)} />
-                <div className="pop" style={{ top: 40, right: 0 }}>
+                <div className="pop" ref={scopePos.ref} style={scopePos.style}>
                   <button onClick={() => { dash.setScope("all"); setScopeOpen(false); }}>
                     <span className="dot" style={{ background: "var(--text)" }} /> All platforms
                   </button>

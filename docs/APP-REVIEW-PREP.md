@@ -118,3 +118,41 @@ share. The data is shown only to the user who connected the account.
 4. Back in PulseBoard, the account shows Connected.
 5. Overview with real figures, then Content → one post's detail, then Audience.
 6. Connections → Disconnect, to show the user can withdraw.
+
+## 6. Reviewer's-eye walkthrough, 2026-09-19
+
+Every page a reviewer meets, driven in a headless browser against the live site
+at desktop (1440) and phone (390) width, in the screencast order: sign-in, the
+legal pages, then Overview, Connections, Content, a post, Audience, Reports,
+Analysis, Platforms, Planner, Assistant (demo mode). Checked automatically for
+"NaN", "undefined", error text, sideways overflow and script errors, then every
+screenshot looked at.
+
+**Found and fixed:**
+- **On a phone, the platform picker and the custom date range did not work.**
+  Tapping them opened a menu that the sideways-scrolling toolbar clipped to
+  nothing. Both are now positioned against the screen and clamped inside it
+  (`src/lib/anchor.ts`), verified drawn and on-screen at both widths.
+- **A post's page was titled "Overview"** while the sidebar said Content. It
+  would have shown in the screencast.
+- **The sign-in page promised "watch time and retention"**, which nothing
+  fetches, and led with TikTok, which is being rebuilt. Now it claims only what
+  works. Reviewers compare the claims with the app.
+- On Connections, Instagram's Disconnect button wrapped onto a line of its own.
+
+**Found, not ours to fix in code:**
+- 🔴 **Every page logs a security-policy error in the browser console.**
+  Cloudflare injects its Web Analytics script, and our Content-Security-Policy
+  (correctly strict) blocks it. So analytics collects nothing, and a reviewer
+  who opens the console sees an error on every page. Turn Web Analytics OFF
+  for the `pulseboard` Pages project (Cloudflare dashboard, Pages, pulseboard,
+  Metrics / Web Analytics). If analytics is ever wanted, it must be allowed in
+  the CSP AND named in the privacy policy, not just switched on.
+
+**Clean:** no broken values, no sideways overflow on a phone, no script errors
+on any page apart from the one above.
+
+**Noted for the TikTok rebuild, not App Review:** the demo shows a TikTok post
+with reach, and labels "Satisfying process clip" a Photo. Which figures TikTok
+can supply depends on the API chosen (`TIKTOK-PLAN.md` §4), and the demo must
+not promise more than that (CLAUDE.md, "The demo is part of the product").

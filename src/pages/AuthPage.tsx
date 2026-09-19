@@ -4,10 +4,16 @@ import { useDemo } from "../context/DemoContext";
 import { isConfigured } from "../lib/supabase";
 import { IcCheck } from "../lib/icons";
 
+/*
+ * Only what the product does today. This page is the first thing an App Review
+ * reviewer sees, and they compare it with the app. Until 2026-09-19 it promised
+ * "watch time and retention", which nothing fetches, and led with TikTok, which
+ * is being rebuilt.
+ */
 const POINTS = [
-  "Facebook, Instagram and TikTok in one place",
+  "Your accounts across platforms, in one place",
   "Follower, reach and engagement trends over time",
-  "Per-post breakdowns with watch time and retention",
+  "Every post and story measured against your own typical post",
   "Audience demographics and best time to post",
 ];
 
@@ -61,7 +67,7 @@ export default function AuthPage() {
             ))}
           </div>
         </div>
-        <span className="muted" style={{ fontSize: 12 }}>Your numbers come straight from Instagram, Facebook and TikTok themselves.</span>
+        <span className="muted" style={{ fontSize: 12 }}>Your numbers come straight from each platform's own official API.</span>
       </div>
 
       <div className="auth__card">

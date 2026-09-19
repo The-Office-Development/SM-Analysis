@@ -162,11 +162,11 @@ export default function Connections() {
                       <span>@{a.username}</span>
                       {p === "linkedin" && <span className="muted">· {a.auth_mode === "linkedin_member" ? "profile" : "page"}</span>}
                       {a.last_synced_at && <span className="muted">· synced {formatDistanceToNow(new Date(a.last_synced_at), { addSuffix: true })}</span>}
+                      <button className="btn btn--sm btn--danger" style={{ marginLeft: 8, height: 24 }} onClick={() => disconnect(a.id, p)}>Disconnect</button>
                       <ScopeNote platform={p} writeScopes={a.write_scopes} checkedAt={a.scopes_checked_at} member={a.auth_mode === "linkedin_member"} />
                       {p === "linkedin" && a.auth_mode !== "linkedin_member" && (
                         <PagePicker accountId={a.id} demo={demo} onSwitched={() => void dash.refresh()} />
                       )}
-                      <button className="btn btn--sm btn--danger" style={{ marginLeft: 8, height: 24 }} onClick={() => disconnect(a.id, p)}>Disconnect</button>
                       {a.status === "connected" && a.needs_reauth && (
                         <div className="muted" style={{ flexBasis: "100%", fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>
                           {PLATFORMS[p].name} connections expire and cannot be renewed for
